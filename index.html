@@ -159,29 +159,38 @@ let editItems=null;
 const ar2en=s=>String(s).replace(/[٠-٩]/g,d=>"٠١٢٣٤٥٦٧٨٩".indexOf(d)).replace(/[۰-۹]/g,d=>"۰۱۲۳۴۵۶۷۸۹".indexOf(d)).replace(/٫/g,".");
 const isNum=s=>s!==""&&!isNaN(+String(s).replace(",","."));
 function parseItems(txt){
-  const items=[],bad=[],lines=ar2en(txt).split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
-  lines.forEach((line,idx)=>{
-    let c=line.split("\t").map(s=>s.trim()).filter(Boolean);
-    if(c.length<2){const m=line.match(/^(.*\S)\s+(\d+(?:[.,]\d+)?)$/);if(m)c=[m[1].replace(/[,;،\s]+$/,""),m[2]]}
-    if(c.length<2)c=line.split(/\s{2,}|[,;،]/).map(s=>s.trim()).filter(Boolean);
-    if(c.length>=2&&isNum(c[c.length-1]))items.push({name:c.slice(0,-1).join(" "),qty:+c[c.length-1].replace(",",".")});
-    else if(c.length>=2&&isNum(c[0]))items.push({name:c.slice(1).join(" "),qty:+c[0].replace(",",".")});
-    else if(idx===0&&lines.length>1)return; /* سطر العناوين (الصنف / الكمية) */
+  const items=[],bad=[],lines=ar2en(txt).split(/\r?\n/).filter(l=>l.trim());
+  const cellsOf=l=>l.indexOf("\t")>=0?l.split("\t").map(s=>s.trim()):l.split(/[,;،]/).map(s=>s.trim());
+  let map={n:0,c:1,q:2},start=0;
+  if(lines.length){
+    const h=cellsOf(lines[0]),m={};
+    h.forEach((x,i)=>{if(/كود|code|sku|باركود/i.test(x))m.c=i;else if(/كمي|qty|quantity|عدد/i.test(x))m.q=i;else if(/صنف|اسم|item|name|بيان|منتج/i.test(x))m.n=i});
+    if(Object.keys(m).length&&!h.some(x=>isNum(x))){
+      start=1;
+      if(m.n!==undefined&&m.q!==undefined)map={n:m.n,c:m.c,q:m.q};
+      else bad.push(lines[0]);
+    }
+  }
+  lines.slice(start).forEach(line=>{
+    const c=cellsOf(line);
+    const n=c[map.n]||"",q=c[map.q]||"",code=map.c!==undefined?(c[map.c]||""):"";
+    const needCols=Math.max(map.n,map.q,map.c===undefined?0:map.c)+1;
+    if(c.length>=needCols&&n&&isNum(q))items.push({name:n,code:code,qty:+q.replace(",",".")});
     else bad.push(line);
   });
   return {items,bad};
 }
-const itemsTsv=o=>(o.items||[]).map(i=>i.name+"\t"+i.qty).join("\n");
-const itemsTbl=o=>(o.items&&o.items.length)?`<div class="tw" style="margin-top:6px"><table style="max-width:420px"><tr><th>الصنف</th><th>الكمية</th></tr>${o.items.map(i=>`<tr><td>${esc(i.name)}</td><td><b>${esc(i.qty)}</b></td></tr>`).join("")}</table></div>`:`<div class="mut" style="margin-top:6px">مفيش أصناف مسجّلة للطلب ده</div>`;
+const itemsTsv=o=>(o.items||[]).map(i=>i.name+"\t"+(i.code||"")+"\t"+i.qty).join("\n");
+const itemsTbl=o=>(o.items&&o.items.length)?`<div class="tw" style="margin-top:6px"><table style="max-width:520px"><tr><th>الصنف</th><th>الكود</th><th>الكمية</th></tr>${o.items.map(i=>`<tr><td>${esc(i.name)}</td><td>${esc(i.code||"")}</td><td><b>${esc(i.qty)}</b></td></tr>`).join("")}</table></div>`:`<div class="mut" style="margin-top:6px">مفيش أصناف مسجّلة للطلب ده</div>`;
 function itemsBox(o){
   if(editItems!==o.id)return `<div><b>الأصناف والكميات</b> <span class="mut">(${(o.items||[]).length} صنف)</span>${itemsTbl(o)}<button class="b s" style="margin-top:6px" onclick="editItems='${o.id}';render()">${(o.items||[]).length?"تعديل / لصق من جديد":"📋 لصق الأصناف من الإكسيل"}</button></div>`;
-  return `<div><b>الأصناف والكميات</b><div class="mut">انسخ من الإكسيل عمودين (الصنف ثم الكمية) والصقهم هنا. لو في أصناف قديمة هتتبدّل بالجديدة.</div>
-  <textarea class="wi" id="it-${o.id}" rows="7" placeholder="مثال:&#10;كرتونة مياه&#9;10&#10;زيت عباد&#9;5" style="margin-top:6px">${esc(itemsTsv(o))}</textarea>
+  return `<div><b>الأصناف والكميات</b><div class="mut">انسخ من الإكسيل 3 أعمدة بالترتيب: الصنف ثم الكود ثم الكمية، والصقهم هنا. لو في أصناف قديمة هتتبدّل بالجديدة.</div>
+  <textarea class="wi" id="it-${o.id}" rows="7" placeholder="مثال (الصنف ثم الكود ثم الكمية):&#10;كرتونة مياه&#9;A101&#9;10&#10;زيت عباد&#9;B205&#9;5" style="margin-top:6px">${esc(itemsTsv(o))}</textarea>
   <div class="row" style="margin-top:6px"><button class="b ok" onclick="saveItems('${o.id}')">حفظ الأصناف</button><button class="b s" onclick="editItems=null;render()">إلغاء</button></div></div>`;
 }
 async function saveItems(id){
   const r=parseItems($("#it-"+id)?.value||"");
-  if(r.bad.length)return toast("السطر ده مش مفهوم (لازم صنف وجنبه كمية): "+r.bad[0]);
+  if(r.bad.length)return toast("السطر ده مش مفهوم (لازم صنف وكود وكمية): "+r.bad[0]);
   if(!r.items.length)return toast("الصق الأصناف والكميات الأول");
   const cur=orders.find(x=>x.id===id),had=!!(cur&&cur.items&&cur.items.length);
   editItems=null;
@@ -241,7 +250,7 @@ function teleView(){
   <div class="g2"><div><label>رقم طلب العميل</label><input id="num"></div><div><label>اسم العميل</label><input id="cust"></div>
   <div><label>التليفون</label><input id="ph"></div><div><label>قيمة الطلب</label><input id="amt" type="number"></div></div>
   <label style="margin-top:12px">الأصناف والكميات (اختياري – انسخيها من الإكسيل والصقيها هنا)</label>
-  <textarea class="wi" id="itx" rows="5" placeholder="الصنف [Tab] الكمية – سطر لكل صنف"></textarea>
+  <textarea class="wi" id="itx" rows="5" placeholder="الصنف ثم الكود ثم الكمية – سطر لكل صنف (انسخيهم من الإكسيل)"></textarea>
   <div style="margin-top:12px"><button class="b" onclick="newOrder()">إرسال للوجيستك</button></div></div>
   <div class="card"><b>طلباتي</b>${list(mine,"tele")}</div>`;
 }
@@ -252,7 +261,7 @@ async function newOrder(){
   const dup=orders.find(o=>String(o.num).trim()===num);
   if(dup)return toast("رقم الطلب "+num+" موجود قبل كده (عميل: "+dup.customer+" – بواسطة "+dup.createdBy+"). مينفعش يتكرر.");
   const pr=parseItems($("#itx")?.value||"");
-  if(pr.bad.length)return toast("سطر مش مفهوم في الأصناف (لازم صنف وجنبه كمية): "+pr.bad[0]);
+  if(pr.bad.length)return toast("سطر مش مفهوم في الأصناف (لازم صنف وكود وكمية): "+pr.bad[0]);
   const o={id:"o"+Date.now(),items:pr.items,num,customer:c,phone:$("#ph").value.trim(),amount:+$("#amt").value||0,createdAt:Date.now(),createdBy:who,stage:"new",paid:false,holdReason:"",shipRef:"",collected:0,acct:"",accAmt:0,log:[],mentions:[{id:""+Date.now(),t:Date.now(),by:actor(),from:"tele",text:"طلب جديد",to:["log"],ack:{}}]};
   await save(o,"إنشاء الطلب");render();
 }
