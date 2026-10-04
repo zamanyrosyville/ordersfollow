@@ -56,7 +56,8 @@ th{color:var(--mut);font-weight:600;font-size:12px}
   <nav>
     <button data-v="tele">شاشة التيليسيلز</button>
     <button data-v="log">شاشة اللوجيستك</button>
-    <button data-v="wh">شاشة المخزن</button>
+    <button data-v="wm">مخزن مشعل</button>
+    <button data-v="wo">مخزن أكتوبر</button>
     <button data-v="acc">شاشة الحسابات</button>
     <button data-v="dash">الداشبورد (الإدارة)</button>
   </nav>
@@ -73,10 +74,14 @@ const OWNER_EMAIL="walidelkadi73@gmail.com";
 const STAGES={new:["جديد – بانتظار اللوجيستك","#6b7686"],checking:["قيد المراجعة بالمخازن","#1f6feb"],modified:["معدّل – يحتاج مراجعة","#8a4fd6"],hold:["متوقف","#d63b3b"],ready:["جاهز للشحن","#d98a00"],shipped:["تم الشحن","#0c8fa8"],delivered:["تم التسليم","#1a9d55"],cancelled:["ملغي","#444"]};
 const SRC=["العميل","اللوجيستك","التيليسيلز (خطأ/تصحيح)"];
 let role="",owner=false,pins={};try{role=localStorage.getItem("role")||""}catch(e){}
-let db=null,orders=[],view="tele",who="",filter="all",openId=null,modFor=null;
-try{who=localStorage.getItem("who")||"";view=localStorage.getItem("v")||"tele"}catch(e){}
+let db=null,orders=[],view="tele",who="",filter="all",openId=null,modFor=null,selGirl="";
+try{who=localStorage.getItem("who")||"";view=localStorage.getItem("v")||"tele";if(role)who=localStorage.getItem("who_"+role)||who}catch(e){}
 const $=s=>document.querySelector(s);
-const RL={tele:"التيليسيلز",log:"اللوجيستك",wh:"المخزن",acc:"الحسابات"};
+const RL={tele:"التيليسيلز",log:"اللوجيستك",wm:"مخزن مشعل",wo:"مخزن أكتوبر",acc:"الحسابات"};
+const WHN={wm:"مخزن مشعل",wo:"مخزن أكتوبر"};
+const whName=o=>WHN[o.whId]||"المخزن";
+const wn=id=>whName(orders.find(x=>x.id===id)||{});
+const pinOf=n=>String((contacts.find(c=>c.name===n)||{}).pin||"");
 const actor=()=>owner?"المدير":who.trim();
 const actorRole=()=>owner?"المدير":(RL[role]||"");
 let qNum="",qGirl="",wipeAsk=false,delAsk=null;
@@ -126,13 +131,13 @@ const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&g
 const fmt=t=>new Date(t).toLocaleString("ar-EG",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"});
 const tag=k=>`<span class="tag" style="background:${STAGES[k][1]}">${STAGES[k][0]}</span>`;
 const payTag=o=>o.acct==="full"?`<span class="tag" style="background:#1a9d55">تحصيل كامل مؤكد</span>`:o.acct==="partial"?`<span class="tag" style="background:#d98a00">تحصيل جزئي مؤكد: ${o.accAmt} من ${o.amount||0}</span>`:o.collected?`<span class="tag" style="background:#0c8fa8">البنت بلّغت تحصيل ${o.collected} – بانتظار الحسابات</span>`:`<span class="tag" style="background:#6b7686">لم يتم التحصيل</span>`;
-const whTxt=o=>{const w=o.wh||{};return "المخزن: "+(w.shipped?"تم الشحن":w.ready==="yes"?"الأصناف جاهزة":w.ready==="no"?"غير جاهزة"+(w.reason?" ("+w.reason+")":""):"لم يرد بعد")};
-const tlabel=k=>k==="log"?"اللوجيستك (مروان)":k==="wh"?"المخزن":k==="acc"?"الحسابات (شيماء)":k.replace("tele:","");
+const whTxt=o=>{const w=o.wh||{};if(!o.whId)return "لم يتم تحويل الطلب لمخزن بعد";return whName(o)+": "+(w.shipped?"تم الشحن":w.ready==="yes"?"الأصناف جاهزة":w.ready==="no"?"غير جاهزة"+(w.reason?" ("+w.reason+")":""):"لم يرد بعد")};
+const tlabel=k=>k==="log"?"اللوجيستك (مروان)":k==="wm"?"مخزن مشعل":k==="wo"?"مخزن أكتوبر":k==="wh"?"المخزن":k==="acc"?"الحسابات (شيماء)":k.replace("tele:","");
 const pendKeys=o=>[...new Set((o.mentions||[]).flatMap(m=>m.to.filter(k=>!(m.ack||{})[k])))];
 const myKey=()=>role==="tele"?"tele:"+who.trim():role;
 function targets(r,o,text){
   const c="tele:"+o.createdBy;let t=[];
-  if(r==="tele")t=["log"];else if(r==="log")t=["wh",c];else if(r==="wh")t=[c,"log"];else if(r==="acc")t=[c];
+  if(r==="tele")t=["log"];else if(r==="log")t=[...(o.whId?[o.whId]:[]),c];else if(r==="wm"||r==="wo")t=[c,"log"];else if(r==="acc")t=[c];
   if(r==="tele"&&/^التحصيل/.test(text))t.push("acc");
   return t;
 }
@@ -151,7 +156,7 @@ const mods=o=>(o.log||[]).filter(l=>l.kind==="mod");
 
 document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{view=b.dataset.v;qNum="";qGirl="";try{localStorage.setItem("v",view)}catch(e){}render()});
 
-function pickGirl(i){const v=namesList()[i];if(!v)return;who=v;$("#who").value=v;try{localStorage.setItem("who_tele",v)}catch(e){};render()}
+function pickGirl(i){if(!owner)return;const v=namesList()[i];if(!v)return;who=v;$("#who").value=v;try{localStorage.setItem("who_tele",v)}catch(e){};render()}
 function needName(){
   if(owner){
     if(view==="tele"&&!who.trim()){toast("اختاري اسم البنت اللي الطلب يتسجّل عليها (فوق)");return false}
@@ -159,7 +164,7 @@ function needName(){
   }
   const v=(role==="tele"?who:$("#who").value).trim();
   if(v){who=v;try{localStorage.setItem("who_"+role,who)}catch(e){}return true}
-  toast(role==="tele"?"اختاري اسمك (دوسي على اسمك) فوق الأول":"اكتب اسمك في الخانة اللي فوق الأول");return false;
+  toast(role==="tele"?"دوسي على «تغيير الشاشة» وادخلي باسمك والرقم السري":"اكتب اسمك في الخانة اللي فوق الأول");return false;
 }
 
 
@@ -172,11 +177,12 @@ async function upd(id,fn,text,kind,extra){
   if(!needName())return;
   const o=JSON.parse(JSON.stringify(orders.find(x=>x.id===id))),r=owner?"owner":role;
   if(r==="tele"&&o.createdBy!==who)return toast("الطلب ده مش بتاعك – بس اللي عملته تقدر تعدّل عليه");
+  if((r==="wm"||r==="wo")&&o.whId!==r)return toast("الطلب ده مش محوّل على مخزنك");
   fn(o);
   const to=targets(r,o,text);let t2=text;
   if(to.length){o.mentions=[...(o.mentions||[]),{id:""+Date.now(),t:Date.now(),by:actor(),from:r,text,to,ack:{}}];t2+=" [إشارة إلى: "+to.map(tlabel).join("، ")+"]"}
   await save(o,t2,kind,extra);typing=false;render();
-  if(kind==="mod"||/^(المخزن|تغيير الحالة|سبب التوقف|التحصيل|الحسابات)/.test(text))notice(o,text);
+  if(kind==="mod"||/^(المخزن|مخزن|تحويل|تغيير الحالة|سبب التوقف|التحصيل|الحسابات)/.test(text))notice(o,text);
 }
 
 /* ---- modification box (used by both telesales & logistics) ---- */
@@ -217,33 +223,36 @@ function logView(){
   const act=orders.filter(o=>!["delivered","cancelled"].includes(o.stage)&&match(o));
   if(!act.length)return searchBar()+`<div class="card empty">مفيش طلبات مطابقة</div>`;
   return searchBar()+act.map(o=>`<div class="card"><div class="row"><div><b>#${esc(o.num)} – ${esc(o.customer)}</b><div class="mut">${esc(o.phone)} · ${o.amount||0} ج · ${esc(o.createdBy)} · ${fmt(o.createdAt)}</div></div><div class="x">${tag(o.stage)} ${mods(o).length?`<span class="mod">${mods(o).length} تعديل</span>`:""}</div></div>
-  <div class="mut">${whTxt(o)}</div>${o.stage==="modified"?`<div class="hold" style="color:#8a4fd6">⚠ آخر تعديل: ${esc(mods(o).slice(-1)[0]?.text)}</div>`:""}
+  <div class="mut">${whTxt(o)}</div>${!o.whId?`<div class="hold">⚠ لازم تحدد المخزن (مشعل / أكتوبر) عشان الطلب يظهر عندهم</div>`:""}${o.stage==="modified"?`<div class="hold" style="color:#8a4fd6">⚠ آخر تعديل: ${esc(mods(o).slice(-1)[0]?.text)}</div>`:""}
   <div class="g2"><div><label>حالة الطلب</label><select onchange="setStage('${o.id}',this.value)">${Object.entries(STAGES).map(([v,s])=>`<option value="${v}" ${o.stage===v?"selected":""}>${s[0]}</option>`).join("")}</select></div>
   <div><label>سبب التوقف</label>${reasonSel("hr-"+o.id,o.holdReason,"setHold('"+o.id+"',this.value)")}</div>
+  <div><label>المخزن المسؤول عن الطلب</label><select onchange="setWh('${o.id}',this.value)"><option value="">— حدّد المخزن —</option>${Object.entries(WHN).map(([v,n])=>`<option value="${v}" ${o.whId===v?"selected":""}>${n}</option>`).join("")}</select></div>
   <div><label>رقم الشحنة</label><input value="${esc(o.shipRef)}" onchange="setShip('${o.id}',this.value)"></div>
   <div><label>التحصيل</label>${payTag(o)}</div></div>
   <div style="margin-top:8px">${modBox(o,"log")}</div></div>`).join("");
 }
 const setStage=(id,v)=>{const cur=orders.find(x=>x.id===id);if(v==="hold"&&!(cur&&cur.holdReason)){toast("اختار سبب التوقف من القايمة الأول");render();return}return upd(id,o=>{o.stage=v},"تغيير الحالة إلى: "+STAGES[v][0])};
 const setHold=(id,v)=>{if(!v){render();return}return upd(id,o=>{o.holdReason=v;o.stage="hold"},"سبب التوقف: "+v)};
+const setWh=(id,v)=>{if(!v){render();return}return upd(id,o=>{o.whId=v;o.wh={ready:"pending",shipped:false,reason:""};if(["new","modified","hold","ready"].includes(o.stage)){o.stage="checking";o.holdReason=""}},"تحويل الطلب إلى "+WHN[v])};
 const setShip=(id,v)=>upd(id,o=>{o.shipRef=v},"رقم الشحنة: "+v);
 const togglePaid=id=>upd(id,o=>{o.paid=!o.paid},"التحصيل: "+(orders.find(x=>x.id===id).paid?"إلغاء":"تم"));
 
 /* ---- Warehouse ---- */
-function whView(){
-  const act=orders.filter(o=>!["delivered","cancelled"].includes(o.stage)&&match(o));
-  if(!act.length)return searchBar()+`<div class="card empty">مفيش طلبات مطابقة</div>`;
-  return searchBar()+act.map(o=>{const w=o.wh||{},lm=mods(o).slice(-1)[0];return `<div class="card"><div class="row"><div><b>#${esc(o.num)} – ${esc(o.customer)}</b><div class="mut">${fmt(o.createdAt)}</div></div><div class="x">${tag(o.stage)}</div></div>
+function whView(wid){
+  const act=orders.filter(o=>o.whId===wid&&!["delivered","cancelled"].includes(o.stage)&&match(o));
+  const head=`<div class="card"><b>${WHN[wid]}</b> <span class="mut">– الطلبات المحوّلة لك من اللوجيستك: ${act.length}</span></div>`;
+  if(!act.length)return head+searchBar()+`<div class="card empty">مفيش طلبات محوّلة لـ${WHN[wid]} دلوقتي</div>`;
+  return head+searchBar()+act.map(o=>{const w=o.wh||{},lm=mods(o).slice(-1)[0];return `<div class="card"><div class="row"><div><b>#${esc(o.num)} – ${esc(o.customer)}</b><div class="mut">${fmt(o.createdAt)}</div></div><div class="x">${tag(o.stage)}</div></div>
   ${lm?`<div class="hold" style="color:#8a4fd6">آخر تعديل: ${esc(lm.text)}</div>`:""}
   <div class="mut">${whTxt(o)}</div>
   <div class="row" style="margin-top:8px"><button class="b ok" onclick="whReady('${o.id}')">الأصناف جاهزة</button>
   ${reasonSel("wr-"+o.id,w.reason)}<button class="b" style="background:var(--bad)" onclick="whNot('${o.id}')">غير جاهزة</button></div>
   <div class="row" style="margin-top:8px"><input class="wi" id="ws-${o.id}" placeholder="رقم الشحنة (اختياري)" value="${esc(o.shipRef)}"><button class="b" onclick="whShip('${o.id}')">تم الشحن</button>${w.shipped?`<button class="b s" onclick="whUnship('${o.id}')">إلغاء الشحن</button>`:""}</div></div>`}).join("");
 }
-const whReady=id=>upd(id,o=>{o.wh={...(o.wh||{}),ready:"yes",reason:""};if(["new","checking","modified","hold"].includes(o.stage)){o.stage="ready";o.holdReason=""}},"المخزن: الأصناف جاهزة");
-function whNot(id){const r=($("#wr-"+id)?.value||"").trim();if(!r)return toast("اختار سبب عدم الجاهزية من القايمة الأول");upd(id,o=>{o.wh={...(o.wh||{}),ready:"no",reason:r,shipped:false};o.stage="hold";o.holdReason="المخزن: "+(r||"الأصناف غير جاهزة")},"المخزن: الأصناف غير جاهزة"+(r?" – "+r:""))}
-function whShip(id){const r=($("#ws-"+id)?.value||"").trim();upd(id,o=>{o.wh={...(o.wh||{}),ready:"yes",shipped:true};o.stage="shipped";o.holdReason="";if(r)o.shipRef=r},"المخزن: تم الشحن"+(r?" – شحنة "+r:""))}
-const whUnship=id=>upd(id,o=>{o.wh={...(o.wh||{}),shipped:false};o.stage="ready"},"المخزن: إلغاء الشحن");
+const whReady=id=>upd(id,o=>{o.wh={...(o.wh||{}),ready:"yes",reason:""};if(["new","checking","modified","hold"].includes(o.stage)){o.stage="ready";o.holdReason=""}},wn(id)+": الأصناف جاهزة");
+function whNot(id){const r=($("#wr-"+id)?.value||"").trim();if(!r)return toast("اختار سبب عدم الجاهزية من القايمة الأول");upd(id,o=>{o.wh={...(o.wh||{}),ready:"no",reason:r,shipped:false};o.stage="hold";o.holdReason=whName(o)+": "+r},wn(id)+": الأصناف غير جاهزة – "+r)}
+function whShip(id){const r=($("#ws-"+id)?.value||"").trim();upd(id,o=>{o.wh={...(o.wh||{}),ready:"yes",shipped:true};o.stage="shipped";o.holdReason="";if(r)o.shipRef=r},wn(id)+": تم الشحن"+(r?" – شحنة "+r:""))}
+const whUnship=id=>upd(id,o=>{o.wh={...(o.wh||{}),shipped:false};o.stage="ready"},wn(id)+": إلغاء الشحن");
 
 function girlCollect(id){const v=+($("#pc-"+id)?.value)||0;if(!v)return toast("اكتب المبلغ المحصّل");upd(id,o=>{o.collected=v},"التحصيل: بلّغت "+actor()+" إن العميل دفع "+v)}
 function accView(){
@@ -265,17 +274,19 @@ function dashView(){
   if(filter==="unpaid")rows=unpaid;else if(filter==="modded")rows=modded;else if(filter!=="all")rows=orders.filter(o=>o.stage===filter);
   rows=rows.filter(match);
   const tm=orders.reduce((s,o)=>s+mods(o).length,0);
+  const wc=k=>orders.filter(o=>!["delivered","cancelled"].includes(o.stage)&&(k?o.whId===k:!o.whId)).length;
   return searchBar()+`<div class="kpis">${kp.map(([k,t,n])=>`<div class="kpi ${filter===k?"on":""}" onclick="filter='${k}';render()"><b>${n}</b><span>${t}</span></div>`).join("")}</div>
   <div class="card mut">إجمالي التعديلات: <b style="color:var(--tx)">${tm}</b> · من العميل: <b style="color:var(--tx)">${cnt(SRC[0])}</b> · من اللوجيستك: <b style="color:var(--tx)">${cnt(SRC[1])}</b> · أخطاء تيليسيلز: <b style="color:var(--tx)">${cnt(SRC[2])}</b> · غير محصّل: <b style="color:var(--tx)">${unpaid.reduce((s,o)=>s+(o.amount||0)-(o.accAmt||0),0).toLocaleString("ar-EG")}</b></div>
+  <div class="card mut">الطلبات الشغالة عند: مخزن مشعل <b style="color:var(--tx)">${wc("wm")}</b> · مخزن أكتوبر <b style="color:var(--tx)">${wc("wo")}</b> · لسه متحوّلتش لمخزن <b style="color:var(--tx)">${wc("")}</b></div>
   <div class="card mut">إشارات لم يُؤكَّد الاطلاع عليها: <b style="color:var(--tx)">${orders.reduce((n,o)=>n+pendKeys(o).length,0)}</b>${orders.filter(o=>pendKeys(o).length).map(o=>`<div>#${esc(o.num)}: بانتظار ${pendKeys(o).map(tlabel).join("، ")}</div>`).join("")}</div>
   <div class="card"><b>إدارة الطلبات (للمدير فقط)</b><div class="row" style="margin-top:8px">${wipeAsk?`<span class="hold">متأكد؟ هيتمسح ${orders.length} طلب نهائياً ومينفعش يرجعوا.</span><button class="b x" style="background:var(--bad)" onclick="wipeAll()">نعم، امسح الكل</button><button class="b s x" onclick="wipeAsk=false;render()">إلغاء</button>`:`<button class="b x" style="background:var(--bad)" onclick="wipeAsk=true;render()">🗑 مسح كل الطلبات (${orders.length})</button>`}</div></div>
   <div class="card"><b>أسباب عدم الشحن / التوقف (أنت اللي بتحددها)</b><div class="mut">المخزن واللوجيستك مجبرين يختاروا من القايمة دي بس، مفيش كتابة حرة.</div>
   ${reasons.map((r,i)=>`<div class="row" style="margin-top:6px"><span>${esc(r)}</span><button class="b s x" onclick="delReason(${i})">حذف</button></div>`).join("")||'<div class="mut" style="margin-top:6px">مفيش أسباب – ضيف سبب واحد على الأقل</div>'}
   <div class="row" style="margin-top:8px"><input id="rn" placeholder="سبب جديد، مثلاً: العميل رفض الاستلام"><button class="b x" onclick="addReason()">إضافة</button></div></div>
-  <div class="card"><b>أرقام البنات (للإشعار الراجع لهم)</b><div class="mut">الاسم لازم يطابق اللي بتكتبه البنت في خانة "اسمك".</div>
-  ${contacts.map((c,i)=>`<div class="row" style="margin-top:6px"><span>${esc(c.name)} – ${esc(c.phone)}</span><button class="b s x" onclick="delContact(${i})">حذف</button></div>`).join("")}
-  <div class="row" style="margin-top:8px"><input id="cn" placeholder="الاسم"><input id="cp" placeholder="رقم الموبايل"><button class="b x" onclick="addContact()">إضافة</button></div></div>
-  <div class="card"><b>الأرقام السرية للشاشات</b><div class="row" style="margin-top:6px"><input id="pinin" value="${esc(pins.log)}" placeholder="رقم اللوجيستك (فاضي = بدون)"><input id="pinwh" value="${esc(pins.wh)}" placeholder="رقم المخزن (فاضي = بدون)"><input id="pinacc" value="${esc(pins.acc)}" placeholder="رقم الحسابات (فاضي = بدون)"><button class="b x" onclick="savePin()">حفظ</button></div></div>
+  <div class="card"><b>البنات: الأرقام والرقم السري لكل واحدة</b><div class="mut">كل بنت بتدخل باسمها ورقمها السري بس، ومش بتقدر تشوف أو تعدّل طلبات غيرها. رقم الموبايل للإشعار الراجع لها.</div>
+  ${contacts.map((c,i)=>`<div class="row" style="margin-top:8px"><span><b>${esc(c.name)}</b> – ${esc(c.phone)}${c.pin?"":' <span class="hold">(بدون رقم سري)</span>'}</span><input class="wi" id="gp-${i}" value="${esc(c.pin)}" placeholder="الرقم السري" style="max-width:150px"><button class="b x" onclick="setGirlPin(${i})">حفظ الرقم السري</button><button class="b s x" onclick="delContact(${i})">حذف</button></div>`).join("")}
+  <div class="row" style="margin-top:10px"><input id="cn" placeholder="الاسم"><input id="cp" placeholder="رقم الموبايل"><input id="cpin" placeholder="الرقم السري"><button class="b x" onclick="addContact()">إضافة بنت</button></div></div>
+  <div class="card"><b>الأرقام السرية للشاشات</b><div class="row" style="margin-top:6px"><input id="pinin" value="${esc(pins.log)}" placeholder="رقم اللوجيستك (فاضي = بدون)"><input id="pinwm" value="${esc(pins.wm)}" placeholder="رقم مخزن مشعل (فاضي = بدون)"><input id="pinwo" value="${esc(pins.wo)}" placeholder="رقم مخزن أكتوبر (فاضي = بدون)"><input id="pinacc" value="${esc(pins.acc)}" placeholder="رقم الحسابات (فاضي = بدون)"><button class="b x" onclick="savePin()">حفظ</button></div></div>
   <div class="card">${list(rows,"dash")}</div>`;
 }
 const cnt=s=>orders.reduce((n,o)=>n+mods(o).filter(m=>m.src===s).length,0);
@@ -293,40 +304,49 @@ function list(rows,mode){
   ${openId===o.id?`<tr><td colspan="7"><div class="log">${(o.log||[]).map(x=>`${x.kind==="mod"?"🔧":"•"} ${fmt(x.t)} – ${esc(x.by)}${x.rl?" ("+esc(x.rl)+")":""}: ${esc(x.text)}`).join("<br>")}</div></td></tr>`:""}`}).join("")}</table></div>`;
 }
 
-const allowed=()=>owner?["tele","log","wh","acc","dash"]:["tele","log","wh","acc"].includes(role)?[role]:[];
-function chooser(){return `<div class="card" style="max-width:420px;margin:30px auto"><b>اختار شاشتك</b>
-  <div style="margin-top:12px"><button class="b" style="width:100%" onclick="pick('tele')">شاشة التيليسيلز</button></div>
-  <div style="margin-top:14px"><label>شاشة اللوجيستك${pins.log?" (الرقم السري مطلوب)":""}</label>${pins.log?'<input id="pin" type="password" placeholder="الرقم السري">':""}
-  <button class="b s" style="width:100%;margin-top:8px" onclick="pick('log')">دخول اللوجيستك</button></div>
-  <div style="margin-top:14px"><label>شاشة المخزن${pins.wh?" (الرقم السري مطلوب)":""}</label>${pins.wh?'<input id="pinw" type="password" placeholder="الرقم السري">':""}
-  <button class="b s" style="width:100%;margin-top:8px" onclick="pick('wh')">دخول المخزن</button></div>
-  <div style="margin-top:14px"><label>شاشة الحسابات${pins.acc?" (الرقم السري مطلوب)":""}</label>${pins.acc?'<input id="pina" type="password" placeholder="الرقم السري">':""}
-  <button class="b s" style="width:100%;margin-top:8px" onclick="pick('acc')">دخول الحسابات</button></div>
+const allowed=()=>owner?["tele","log","wm","wo","acc","dash"]:["tele","log","wm","wo","acc"].includes(role)?[role]:[];
+const PINID={log:"pin",wm:"pinwm",wo:"pinwo",acc:"pina"};
+function chooser(){
+  const sec=(r,label)=>`<div style="margin-top:14px"><label>${label}${pins[r]?" (الرقم السري مطلوب)":""}</label>${pins[r]?`<input class="ci" id="${PINID[r]}" type="password" placeholder="الرقم السري">`:""}
+  <button class="b s" style="width:100%;margin-top:8px" onclick="pick('${r}')">دخول ${label}</button></div>`;
+  const names=namesList();
+  return `<div class="card" style="max-width:420px;margin:30px auto"><b>اختار شاشتك</b>
+  <div style="margin-top:12px"><label>شاشة التيليسيلز – دوسي على اسمك</label>
+  <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">${names.map((n,i)=>`<button class="b ${n===selGirl?"ok":"s"}" style="padding:12px 18px;font-size:16px" onclick="selGirl=namesList()[${i}];render()">${n===selGirl?"✓ ":""}${esc(n)}</button>`).join("")||'<span class="mut">مفيش أسماء مسجلة – المدير يضيفها من الداشبورد</span>'}</div>
+  ${selGirl?`${pinOf(selGirl)?'<input class="ci" id="pint" type="password" placeholder="الرقم السري بتاعك" style="margin-top:8px">':""}<button class="b" style="width:100%;margin-top:8px" onclick="pick('tele')">دخول باسم ${esc(selGirl)}</button>`:""}</div>
+  ${sec("log","شاشة اللوجيستك")}${sec("wm","شاشة مخزن مشعل")}${sec("wo","شاشة مخزن أكتوبر")}${sec("acc","شاشة الحسابات")}
   <div class="mut" style="margin-top:12px">الداشبورد متاح لمالك الصفحة فقط.</div></div>`}
 function pick(r){
-  if(r==="log"&&pins.log&&($("#pin")?.value||"")!==pins.log)return toast("الرقم السري غلط");
-  if(r==="acc"&&pins.acc&&($("#pina")?.value||"")!==pins.acc)return toast("الرقم السري غلط");
-  if(r==="wh"&&pins.wh&&($("#pinw")?.value||"")!==pins.wh)return toast("الرقم السري غلط");
-  role=r;try{localStorage.setItem("role",r)}catch(e){};view=r;
-  if(!owner){let nm=({log:"مروان",acc:"شيماء"})[r];if(!nm){try{nm=localStorage.getItem("who_"+r)||""}catch(e){nm=""}}who=nm;$("#who").value=nm}
+  if(r==="tele"){
+    if(!selGirl)return toast("دوسي على اسمك الأول");
+    const p=pinOf(selGirl);if(p&&($("#pint")?.value||"")!==p)return toast("الرقم السري غلط");
+  }else if(pins[r]&&($("#"+PINID[r])?.value||"")!==pins[r])return toast("الرقم السري غلط");
+  role=r;try{localStorage.setItem("role",r)}catch(e){};view=r;typing=false;
+  if(!owner){
+    let nm;
+    if(r==="tele"){nm=selGirl;try{localStorage.setItem("who_tele",nm)}catch(e){}}
+    else{nm=({log:"مروان",acc:"شيماء"})[r];if(!nm){try{nm=localStorage.getItem("who_"+r)||""}catch(e){nm=""}}}
+    who=nm;$("#who").value=nm;
+  }
   render();
 }
 async function saveContacts(l){
   if(!db)return toast("الحفظ غير متاح");
   try{await db.collection("settings").doc("contacts").set({phones:l});toast("تم الحفظ ✔",true)}catch(e){toast("تعذر الحفظ: "+(e.message||e.code))}
 }
-const addContact=()=>{const n=$("#cn").value.trim(),p=$("#cp").value.trim();if(!n||!p)return toast("اكتب الاسم والرقم");saveContacts([...contacts,{name:n,phone:p}])};
+const addContact=()=>{const n=$("#cn").value.trim(),p=$("#cp").value.trim(),pn=$("#cpin").value.trim();if(!n||!p)return toast("اكتب الاسم والرقم");if(contacts.some(c=>c.name===n))return toast("الاسم ده موجود");saveContacts([...contacts,{name:n,phone:p,pin:pn}])};
+const setGirlPin=i=>saveContacts(contacts.map((c,k)=>k===i?{...c,pin:$("#gp-"+i).value.trim()}:c));
 const delContact=i=>saveContacts(contacts.filter((_,k)=>k!==i));
 async function savePin(){
   if(!db)return toast("الحفظ غير متاح");
-  try{await db.collection("settings").doc("pins").set({log:$("#pinin").value.trim(),wh:$("#pinwh").value.trim(),acc:$("#pinacc").value.trim()});toast("تم حفظ الرقم السري ✔",true)}catch(e){toast("تعذر الحفظ: "+(e.message||e.code))}
+  try{await db.collection("settings").doc("pins").set({log:$("#pinin").value.trim(),wm:$("#pinwm").value.trim(),wo:$("#pinwo").value.trim(),acc:$("#pinacc").value.trim()});toast("تم حفظ الرقم السري ✔",true)}catch(e){toast("تعذر الحفظ: "+(e.message||e.code))}
 }
 function render(){
   const al=allowed();
   $("#ownerBtn").textContent=owner?"خروج المدير":"دخول المدير";
   const tl=(owner?view==="tele":role==="tele"),box=$("#whoBox");
   $("#who").style.display=tl?"none":"";box.style.display=tl?"flex":"none";
-  if(tl)box.innerHTML='<span class="mut" style="width:100%">اختاري اسمك:</span>'+(namesList().map((n,i)=>`<button class="b ${n===who?"ok":"s"}" style="padding:12px 18px;font-size:16px" onclick="pickGirl(${i})">${n===who?"✓ ":""}${esc(n)}</button>`).join("")||'<span class="mut">مفيش أسماء مسجلة</span>');
+  if(tl)box.innerHTML=owner?'<span class="mut" style="width:100%">اختار اسم البنت اللي الطلب يتسجّل عليها:</span>'+(namesList().map((n,i)=>`<button class="b ${n===who?"ok":"s"}" style="padding:12px 18px;font-size:16px" onclick="pickGirl(${i})">${n===who?"✓ ":""}${esc(n)}</button>`).join("")||'<span class="mut">مفيش أسماء مسجلة</span>'):'<span style="font-size:16px">👤 مسجّلة باسم: <b>'+esc(who||"—")+'</b></span>';
   $("#names").innerHTML=contacts.map(c=>`<option value="${esc(c.name)}">`).join("");
   $("#chg").style.display=(!owner&&role)?"":"none";
   document.querySelector("nav").style.display=al.length>1?"":"none";
@@ -335,11 +355,11 @@ function render(){
   if(!al.includes(view))view=al[0];
   document.querySelectorAll("nav button").forEach(b=>{b.style.display=al.includes(b.dataset.v)?"":"none";b.classList.toggle("on",b.dataset.v===view)});
   const ae=document.activeElement&&document.activeElement.id;
-  $("#app").innerHTML=(owner?"":inbox())+(view==="tele"?teleView():view==="log"?logView():view==="wh"?whView():view==="acc"?accView():dashView());
+  $("#app").innerHTML=(owner?"":inbox())+(view==="tele"?teleView():view==="log"?logView():view==="wm"||view==="wo"?whView(view):view==="acc"?accView():dashView());
   if(ae==="qn"||ae==="qg"){const e=document.getElementById(ae);if(e){e.focus();const n=e.value.length;try{e.setSelectionRange(n,n)}catch(x){}}}
 }
 let typing=false;document.addEventListener("input",()=>typing=true);
-function refresh(){if(typing&&(document.querySelector("#num")||document.querySelector("#mtxt")||document.querySelector("#pin")||document.querySelector("#pinw")||document.querySelector("#pina")||["pinin","pinwh","pinacc","cn","cp","rn"].includes(document.activeElement?.id)||document.activeElement?.classList.contains("wi")))return;typing=false;render()}
+function refresh(){const ae=document.activeElement,id=(ae&&ae.id)||"";if(typing&&(document.querySelector("#num")||document.querySelector("#mtxt")||document.querySelector(".ci")||["pinin","pinwm","pinwo","pinacc","cn","cp","cpin","rn"].includes(id)||id.indexOf("gp-")===0||(ae&&ae.classList&&ae.classList.contains("wi"))))return;typing=false;render()}
 $("#who").value=who;$("#who").oninput=()=>{typing=false};
 render();
 let listening=false;
