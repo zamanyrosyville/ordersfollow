@@ -19,7 +19,7 @@ nav button.on{background:var(--pri);color:#fff;border-color:var(--pri)}
 main{max-width:1100px;margin:0 auto;padding:14px}
 .card{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:14px;margin-bottom:12px}
 label{display:block;font-size:13px;color:var(--mut);margin:8px 0 3px}
-input,select{width:100%;padding:9px;border:1px solid var(--bd);border-radius:7px;background:var(--bg);color:var(--tx);font:inherit}
+input,select,textarea{width:100%;padding:9px;border:1px solid var(--bd);border-radius:7px;background:var(--bg);color:var(--tx);font:inherit}
 .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .row>*{flex:1;min-width:120px}.row .x{flex:0 0 auto;min-width:0}
 .g2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
@@ -154,6 +154,42 @@ async function ack(oid,mid){
 }
 const mods=o=>(o.log||[]).filter(l=>l.kind==="mod");
 
+/* ---- الأصناف والكميات (لصق من الإكسيل) ---- */
+let editItems=null;
+const ar2en=s=>String(s).replace(/[٠-٩]/g,d=>"٠١٢٣٤٥٦٧٨٩".indexOf(d)).replace(/[۰-۹]/g,d=>"۰۱۲۳۴۵۶۷۸۹".indexOf(d)).replace(/٫/g,".");
+const isNum=s=>s!==""&&!isNaN(+String(s).replace(",","."));
+function parseItems(txt){
+  const items=[],bad=[],lines=ar2en(txt).split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+  lines.forEach((line,idx)=>{
+    let c=line.split("\t").map(s=>s.trim()).filter(Boolean);
+    if(c.length<2){const m=line.match(/^(.*\S)\s+(\d+(?:[.,]\d+)?)$/);if(m)c=[m[1].replace(/[,;،\s]+$/,""),m[2]]}
+    if(c.length<2)c=line.split(/\s{2,}|[,;،]/).map(s=>s.trim()).filter(Boolean);
+    if(c.length>=2&&isNum(c[c.length-1]))items.push({name:c.slice(0,-1).join(" "),qty:+c[c.length-1].replace(",",".")});
+    else if(c.length>=2&&isNum(c[0]))items.push({name:c.slice(1).join(" "),qty:+c[0].replace(",",".")});
+    else if(idx===0&&lines.length>1)return; /* سطر العناوين (الصنف / الكمية) */
+    else bad.push(line);
+  });
+  return {items,bad};
+}
+const itemsTsv=o=>(o.items||[]).map(i=>i.name+"\t"+i.qty).join("\n");
+const itemsTbl=o=>(o.items&&o.items.length)?`<div class="tw" style="margin-top:6px"><table style="max-width:420px"><tr><th>الصنف</th><th>الكمية</th></tr>${o.items.map(i=>`<tr><td>${esc(i.name)}</td><td><b>${esc(i.qty)}</b></td></tr>`).join("")}</table></div>`:`<div class="mut" style="margin-top:6px">مفيش أصناف مسجّلة للطلب ده</div>`;
+function itemsBox(o){
+  if(editItems!==o.id)return `<div><b>الأصناف والكميات</b> <span class="mut">(${(o.items||[]).length} صنف)</span>${itemsTbl(o)}<button class="b s" style="margin-top:6px" onclick="editItems='${o.id}';render()">${(o.items||[]).length?"تعديل / لصق من جديد":"📋 لصق الأصناف من الإكسيل"}</button></div>`;
+  return `<div><b>الأصناف والكميات</b><div class="mut">انسخ من الإكسيل عمودين (الصنف ثم الكمية) والصقهم هنا. لو في أصناف قديمة هتتبدّل بالجديدة.</div>
+  <textarea class="wi" id="it-${o.id}" rows="7" placeholder="مثال:&#10;كرتونة مياه&#9;10&#10;زيت عباد&#9;5" style="margin-top:6px">${esc(itemsTsv(o))}</textarea>
+  <div class="row" style="margin-top:6px"><button class="b ok" onclick="saveItems('${o.id}')">حفظ الأصناف</button><button class="b s" onclick="editItems=null;render()">إلغاء</button></div></div>`;
+}
+async function saveItems(id){
+  const r=parseItems($("#it-"+id)?.value||"");
+  if(r.bad.length)return toast("السطر ده مش مفهوم (لازم صنف وجنبه كمية): "+r.bad[0]);
+  if(!r.items.length)return toast("الصق الأصناف والكميات الأول");
+  const cur=orders.find(x=>x.id===id),had=!!(cur&&cur.items&&cur.items.length);
+  editItems=null;
+  if(had){
+    await upd(id,o=>{o.items=r.items;if(!["shipped","delivered","cancelled"].includes(o.stage)){o.stage="modified";o.wh={...(o.wh||{}),ready:"pending",shipped:false}}},"تعديل (اللوجيستك): تحديث الأصناف والكميات ("+r.items.length+" صنف)","mod",{src:SRC[1]});
+  }else await upd(id,o=>{o.items=r.items},"تحديث الأصناف والكميات ("+r.items.length+" صنف)");
+}
+
 document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{view=b.dataset.v;qNum="";qGirl="";try{localStorage.setItem("v",view)}catch(e){}render()});
 
 function pickGirl(i){if(!owner)return;const v=namesList()[i];if(!v)return;who=v;$("#who").value=v;try{localStorage.setItem("who_tele",v)}catch(e){};render()}
@@ -182,7 +218,7 @@ async function upd(id,fn,text,kind,extra){
   const to=targets(r,o,text);let t2=text;
   if(to.length){o.mentions=[...(o.mentions||[]),{id:""+Date.now(),t:Date.now(),by:actor(),from:r,text,to,ack:{}}];t2+=" [إشارة إلى: "+to.map(tlabel).join("، ")+"]"}
   await save(o,t2,kind,extra);typing=false;render();
-  if(kind==="mod"||/^(المخزن|مخزن|تحويل|تغيير الحالة|سبب التوقف|التحصيل|الحسابات)/.test(text))notice(o,text);
+  if(kind==="mod"||/^(المخزن|مخزن|تحويل|تحديث الأصناف|تغيير الحالة|سبب التوقف|التحصيل|الحسابات)/.test(text))notice(o,text);
 }
 
 /* ---- modification box (used by both telesales & logistics) ---- */
@@ -204,6 +240,8 @@ function teleView(){
   return `<div class="card"><b>طلب عميل جديد</b>
   <div class="g2"><div><label>رقم طلب العميل</label><input id="num"></div><div><label>اسم العميل</label><input id="cust"></div>
   <div><label>التليفون</label><input id="ph"></div><div><label>قيمة الطلب</label><input id="amt" type="number"></div></div>
+  <label style="margin-top:12px">الأصناف والكميات (اختياري – انسخيها من الإكسيل والصقيها هنا)</label>
+  <textarea class="wi" id="itx" rows="5" placeholder="الصنف [Tab] الكمية – سطر لكل صنف"></textarea>
   <div style="margin-top:12px"><button class="b" onclick="newOrder()">إرسال للوجيستك</button></div></div>
   <div class="card"><b>طلباتي</b>${list(mine,"tele")}</div>`;
 }
@@ -213,8 +251,9 @@ async function newOrder(){
   if(!num||!c)return alert("اكتب رقم طلب العميل واسم العميل");
   const dup=orders.find(o=>String(o.num).trim()===num);
   if(dup)return toast("رقم الطلب "+num+" موجود قبل كده (عميل: "+dup.customer+" – بواسطة "+dup.createdBy+"). مينفعش يتكرر.");
-  
-  const o={id:"o"+Date.now(),num,customer:c,phone:$("#ph").value.trim(),amount:+$("#amt").value||0,createdAt:Date.now(),createdBy:who,stage:"new",paid:false,holdReason:"",shipRef:"",collected:0,acct:"",accAmt:0,log:[],mentions:[{id:""+Date.now(),t:Date.now(),by:actor(),from:"tele",text:"طلب جديد",to:["log"],ack:{}}]};
+  const pr=parseItems($("#itx")?.value||"");
+  if(pr.bad.length)return toast("سطر مش مفهوم في الأصناف (لازم صنف وجنبه كمية): "+pr.bad[0]);
+  const o={id:"o"+Date.now(),items:pr.items,num,customer:c,phone:$("#ph").value.trim(),amount:+$("#amt").value||0,createdAt:Date.now(),createdBy:who,stage:"new",paid:false,holdReason:"",shipRef:"",collected:0,acct:"",accAmt:0,log:[],mentions:[{id:""+Date.now(),t:Date.now(),by:actor(),from:"tele",text:"طلب جديد",to:["log"],ack:{}}]};
   await save(o,"إنشاء الطلب");render();
 }
 
@@ -229,6 +268,7 @@ function logView(){
   <div><label>المخزن المسؤول عن الطلب</label><select onchange="setWh('${o.id}',this.value)"><option value="">— حدّد المخزن —</option>${Object.entries(WHN).map(([v,n])=>`<option value="${v}" ${o.whId===v?"selected":""}>${n}</option>`).join("")}</select></div>
   <div><label>رقم الشحنة</label><input value="${esc(o.shipRef)}" onchange="setShip('${o.id}',this.value)"></div>
   <div><label>التحصيل</label>${payTag(o)}</div></div>
+  <div style="margin-top:8px">${itemsBox(o)}</div>
   <div style="margin-top:8px">${modBox(o,"log")}</div></div>`).join("");
 }
 const setStage=(id,v)=>{const cur=orders.find(x=>x.id===id);if(v==="hold"&&!(cur&&cur.holdReason)){toast("اختار سبب التوقف من القايمة الأول");render();return}return upd(id,o=>{o.stage=v},"تغيير الحالة إلى: "+STAGES[v][0])};
@@ -245,6 +285,7 @@ function whView(wid){
   return head+searchBar()+act.map(o=>{const w=o.wh||{},lm=mods(o).slice(-1)[0];return `<div class="card"><div class="row"><div><b>#${esc(o.num)} – ${esc(o.customer)}</b><div class="mut">${fmt(o.createdAt)}</div></div><div class="x">${tag(o.stage)}</div></div>
   ${lm?`<div class="hold" style="color:#8a4fd6">آخر تعديل: ${esc(lm.text)}</div>`:""}
   <div class="mut">${whTxt(o)}</div>
+  <div style="margin-top:6px"><b>الأصناف المطلوبة</b>${itemsTbl(o)}</div>
   <div class="row" style="margin-top:8px"><button class="b ok" onclick="whReady('${o.id}')">الأصناف جاهزة</button>
   ${reasonSel("wr-"+o.id,w.reason)}<button class="b" style="background:var(--bad)" onclick="whNot('${o.id}')">غير جاهزة</button></div>
   <div class="row" style="margin-top:8px"><input class="wi" id="ws-${o.id}" placeholder="رقم الشحنة (اختياري)" value="${esc(o.shipRef)}"><button class="b" onclick="whShip('${o.id}')">تم الشحن</button>${w.shipped?`<button class="b s" onclick="whUnship('${o.id}')">إلغاء الشحن</button>`:""}</div></div>`}).join("");
@@ -301,7 +342,7 @@ function list(rows,mode){
   <td>${payTag(o)}</td>
   <td class="mut">${l?fmt(l.t)+"<br>"+esc(l.by)+(l.rl?" ("+esc(l.rl)+")":""):""}</td>
   <td>${mode==="tele"&&!["delivered","cancelled"].includes(o.stage)?modBox(o,"tele")+`<div style="margin-top:6px"><input class="wi" id="pc-${o.id}" type="number" placeholder="المبلغ المحصّل" style="width:120px"><button class="b s" onclick="girlCollect('${o.id}')">سجّل تحصيل</button></div> `:""}${mode==="dash"?(delAsk===o.id?`<button class="b x" style="background:var(--bad)" onclick="deleteOrder('${o.id}')">تأكيد الحذف</button> <button class="b s x" onclick="delAsk=null;render()">إلغاء</button> `:`<button class="b s x" onclick="delAsk='${o.id}';render()">حذف</button> `):""}<button class="b s" onclick="openId=openId==='${o.id}'?null:'${o.id}';render()">السجل</button></td></tr>
-  ${openId===o.id?`<tr><td colspan="7"><div class="log">${(o.log||[]).map(x=>`${x.kind==="mod"?"🔧":"•"} ${fmt(x.t)} – ${esc(x.by)}${x.rl?" ("+esc(x.rl)+")":""}: ${esc(x.text)}`).join("<br>")}</div></td></tr>`:""}`}).join("")}</table></div>`;
+  ${openId===o.id?`<tr><td colspan="7"><b>الأصناف والكميات</b>${itemsTbl(o)}<div class="log" style="margin-top:8px">${(o.log||[]).map(x=>`${x.kind==="mod"?"🔧":"•"} ${fmt(x.t)} – ${esc(x.by)}${x.rl?" ("+esc(x.rl)+")":""}: ${esc(x.text)}`).join("<br>")}</div></td></tr>`:""}`}).join("")}</table></div>`;
 }
 
 const allowed=()=>owner?["tele","log","wm","wo","acc","dash"]:["tele","log","wm","wo","acc"].includes(role)?[role]:[];
@@ -359,7 +400,7 @@ function render(){
   if(ae==="qn"||ae==="qg"){const e=document.getElementById(ae);if(e){e.focus();const n=e.value.length;try{e.setSelectionRange(n,n)}catch(x){}}}
 }
 let typing=false;document.addEventListener("input",()=>typing=true);
-function refresh(){const ae=document.activeElement,id=(ae&&ae.id)||"";if(typing&&(document.querySelector("#num")||document.querySelector("#mtxt")||document.querySelector(".ci")||["pinin","pinwm","pinwo","pinacc","cn","cp","cpin","rn"].includes(id)||id.indexOf("gp-")===0||(ae&&ae.classList&&ae.classList.contains("wi"))))return;typing=false;render()}
+function refresh(){const ae=document.activeElement,id=(ae&&ae.id)||"";if(typing&&(document.querySelector("#num")||document.querySelector("#mtxt")||document.querySelector(".ci")||document.querySelector("textarea")||["pinin","pinwm","pinwo","pinacc","cn","cp","cpin","rn"].includes(id)||id.indexOf("gp-")===0||(ae&&ae.classList&&ae.classList.contains("wi"))))return;typing=false;render()}
 $("#who").value=who;$("#who").oninput=()=>{typing=false};
 render();
 let listening=false;
