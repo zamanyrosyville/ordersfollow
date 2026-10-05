@@ -5,42 +5,79 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>متابعة طلبات العملاء</title>
 <style>
-:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);--bg:#f4f6f9;--card:#fff;--tx:#1b2430;--mut:#6b7686;--bd:#dfe4ea;--pri:#1f6feb;--ok:#1a9d55;--bad:#d63b3b}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#12161c;--card:#1b222c;--tx:#e8edf3;--mut:#93a0b1;--bd:#2c3644}}
-:root[data-theme="dark"]{--bg:#12161c;--card:#1b222c;--tx:#e8edf3;--mut:#93a0b1;--bd:#2c3644}
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Reem+Kufi:wght@500;700&display=swap');
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+ --bg:#edeee9;--card:#fbfbf8;--inp:#fff;--tx:#241b16;--mut:#6f6459;--bd:#d9d8cf;
+ --pri:#5a3a2a;--acc:#b57a2c;--ok:#2f7d5b;--bad:#b8412f;--hd:#2a1d17;--hdtx:#f1e6d6;--hdmut:#bfa98f;
+ --f:"IBM Plex Sans Arabic",Tahoma,"Segoe UI",Arial,sans-serif;--fd:"Reem Kufi","IBM Plex Sans Arabic",Tahoma,sans-serif}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#16110e;--card:#211a16;--inp:#2a211c;--tx:#efe6da;--mut:#a89886;--bd:#3a2e27;--pri:#c9a27a;--hd:#0e0a08}}
+:root[data-theme="dark"]{--bg:#16110e;--card:#211a16;--inp:#2a211c;--tx:#efe6da;--mut:#a89886;--bd:#3a2e27;--pri:#c9a27a;--hd:#0e0a08}
 html{scroll-padding-top:env(safe-area-inset-top,0px)}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--tx);font-family:Tahoma,"Segoe UI",Arial,sans-serif;font-size:15px}
-header{background:var(--card);border-bottom:1px solid var(--bd);padding:12px 16px;position:sticky;top:env(safe-area-inset-top,0px);z-index:5}
-h1{margin:0 0 10px;font-size:18px}
-nav{display:flex;gap:8px;flex-wrap:wrap}
-nav button{flex:1;min-width:110px;padding:10px;border:1px solid var(--bd);background:var(--bg);color:var(--tx);border-radius:8px;font:inherit;cursor:pointer}
-nav button.on{background:var(--pri);color:#fff;border-color:var(--pri)}
-main{max-width:1100px;margin:0 auto;padding:14px}
-.card{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:14px;margin-bottom:12px}
-label{display:block;font-size:13px;color:var(--mut);margin:8px 0 3px}
-input,select,textarea{width:100%;padding:9px;border:1px solid var(--bd);border-radius:7px;background:var(--bg);color:var(--tx);font:inherit}
+body{margin:0;background:var(--bg);color:var(--tx);font-family:var(--f);font-size:15px;line-height:1.6}
+:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+header{background:var(--hd);color:var(--hdtx);padding:12px 16px 0;position:sticky;top:env(safe-area-inset-top,0px);z-index:5;border-bottom:3px solid var(--acc)}
+.top{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+h1{margin:0;font-family:var(--fd);font-weight:700;font-size:21px;letter-spacing:0;color:var(--hdtx)}
+h1 small{font-family:var(--f);font-weight:400;font-size:13px;color:var(--hdmut);margin-right:8px}
+.acts{display:flex;gap:6px}
+header input{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.2);color:var(--hdtx)}
+header input::placeholder{color:var(--hdmut)}
+header button.b.s{background:rgba(255,255,255,.08);color:var(--hdtx);border:1px solid rgba(255,255,255,.22)}
+nav{display:flex;gap:2px;flex-wrap:nowrap;overflow-x:auto;margin:0 -16px;padding:0 12px;scrollbar-width:none}
+nav::-webkit-scrollbar{display:none}
+nav button{flex:0 0 auto;padding:11px 16px;border:0;border-bottom:3px solid transparent;margin-bottom:-3px;background:transparent;color:var(--hdmut);border-radius:0;font:inherit;font-weight:500;cursor:pointer;white-space:nowrap}
+nav button.on{color:#fff;border-bottom-color:var(--acc);background:rgba(255,255,255,.07)}
+main{max-width:1100px;margin:0 auto;padding:16px 14px 40px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:16px;margin-bottom:12px}
+.card>b:first-child{font-family:var(--fd);font-size:17px;font-weight:700;color:var(--pri)}
+summary{cursor:pointer;font-weight:600}
+label{display:block;font-size:13px;color:var(--mut);margin:10px 0 4px}
+input,select,textarea{width:100%;padding:10px 11px;border:1px solid var(--bd);border-radius:8px;background:var(--inp);color:var(--tx);font:inherit}
+input:focus,select:focus,textarea:focus{border-color:var(--acc)}
 .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .row>*{flex:1;min-width:120px}.row .x{flex:0 0 auto;min-width:0}
 .g2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 @media(max-width:600px){.g2{grid-template-columns:1fr}}
-button.b{padding:9px 14px;border:0;border-radius:7px;background:var(--pri);color:#fff;font:inherit;cursor:pointer}
-button.b.s{background:var(--bg);color:var(--tx);border:1px solid var(--bd)}
-button.b.ok{background:var(--ok)}
-.tag{display:inline-block;padding:2px 9px;border-radius:12px;font-size:12px;color:#fff;white-space:nowrap}
+button.b{padding:10px 16px;border:0;border-radius:8px;background:var(--pri);color:#fff;font:inherit;font-weight:500;cursor:pointer}
+button.b:active{transform:translateY(1px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) button.b{color:#1a120d}}
+button.b.s{background:transparent;color:var(--tx);border:1px solid var(--bd)}
+button.b.ok{background:var(--ok);color:#fff}
+.tag{display:inline-block;padding:2px 10px;border-radius:12px;font-size:12px;font-weight:500;color:#fff;white-space:nowrap}
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:12px}
-.kpi{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:12px;cursor:pointer;text-align:center}
-.kpi b{display:block;font-size:24px}.kpi span{font-size:12px;color:var(--mut)}
-.kpi.on{outline:2px solid var(--pri)}
+.kpi{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:12px;cursor:pointer;text-align:center}
+.kpi b{display:block;font-family:var(--fd);font-size:28px;color:var(--pri)}.kpi span{font-size:12px;color:var(--mut)}
+.kpi.on{outline:2px solid var(--acc);border-color:var(--acc)}
 .tw{overflow-x:auto}
 table{width:100%;border-collapse:collapse;font-size:14px}
-th,td{padding:8px;text-align:right;border-bottom:1px solid var(--bd);vertical-align:top}
-th{color:var(--mut);font-weight:600;font-size:12px}
+th,td{padding:9px 8px;text-align:right;border-bottom:1px solid var(--bd);vertical-align:top}
+th{color:var(--mut);font-weight:600;font-size:12px;background:rgba(0,0,0,.025)}
 .mut{color:var(--mut);font-size:12px}
 .hold{color:var(--bad);font-size:13px}
 .log{font-size:13px;line-height:1.9;border-top:1px dashed var(--bd);padding-top:6px}
 .empty{text-align:center;color:var(--mut);padding:30px}
-.mod{background:#8a4fd6;color:#fff;border-radius:10px;padding:1px 8px;font-size:12px}
+.mod{background:#7b5aa6;color:#fff;border-radius:10px;padding:1px 8px;font-size:12px}
+/* شاشة الدخول */
+.login{max-width:760px;margin:0 auto}
+.hero{position:relative;overflow:hidden;background:var(--hd);color:var(--hdtx);border-radius:16px;padding:34px 24px 28px;margin-bottom:14px;min-height:190px}
+.hero h2{margin:0 0 6px;font-family:var(--fd);font-size:30px;font-weight:700;line-height:1.3}
+.hero p{margin:0;color:var(--hdmut);max-width:30ch}
+.hero svg{position:absolute;left:18px;bottom:0;width:120px;height:100%;pointer-events:none}
+.hero svg path{fill:none;stroke:var(--acc);stroke-width:2;stroke-linecap:round;opacity:.75;stroke-dasharray:300;stroke-dashoffset:300;animation:rise 3.2s ease-out .2s forwards}
+.hero svg path+path{stroke:var(--hdmut);opacity:.4;animation-delay:.7s}
+@keyframes rise{to{stroke-dashoffset:0}}
+@media (prefers-reduced-motion:reduce){.hero svg path{animation:none;stroke-dashoffset:0}}
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:600px){.tiles{grid-template-columns:1fr}.hero h2{font-size:25px}}
+.tile{margin:0}
+.tile h3{margin:0 0 2px;font-family:var(--fd);font-size:17px;color:var(--pri)}
+.tile p{margin:0 0 10px;color:var(--mut);font-size:13px}
+.craw{font-weight:700;font-size:16px;color:#8a5410}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .craw{color:#e0a85a}}
+.hero p{max-width:22ch}
+.pills{display:flex;flex-wrap:wrap;gap:8px}
+.pills .b{padding:12px 18px;font-size:16px}
 #printArea{display:none}
 @media print{
   body>*:not(#printArea){display:none!important}
@@ -50,6 +87,13 @@ th{color:var(--mut);font-weight:600;font-size:12px}
   #printArea th,#printArea td{border:1px solid #444;padding:4px 6px;color:#000;font-size:12px}
   #printArea h2{margin:0 0 4px}
   #printArea .pb{page-break-inside:avoid;margin-bottom:12px}
+  @page{size:A4;margin:10mm}
+  body{background:#fff!important}
+  #printArea .wbx{width:190mm;height:138mm;border:2px solid #000;padding:0;overflow:hidden;font-size:15px;page-break-inside:avoid}
+  #printArea .wbx .co{background:#000;color:#fff;text-align:center;font-size:40px;font-weight:700;padding:14px 8px;line-height:1.2}
+  #printArea .wbx table{margin:0}
+  #printArea .wbx th{width:26%;background:#eee;font-size:15px}
+  #printArea .wbx td{font-size:19px;font-weight:600}
 }
 #msg{background:#fff3cd;color:#664d03;padding:8px 14px;font-size:13px;display:none}
 </style>
@@ -57,19 +101,18 @@ th{color:var(--mut);font-weight:600;font-size:12px}
 <body>
 <div id="msg"></div>
 <div id="notify" style="position:fixed;bottom:calc(70px + env(safe-area-inset-bottom,0px));left:12px;right:12px;z-index:19;display:none;background:#25d366;color:#fff;padding:12px;border-radius:8px;text-align:center"></div>
-<div id="toast" style="position:fixed;bottom:calc(16px + env(safe-area-inset-bottom,0px));left:12px;right:12px;z-index:20;display:none;background:#d63b3b;color:#fff;padding:12px;border-radius:8px;text-align:center"></div>
+<div id="toast" style="position:fixed;bottom:calc(16px + env(safe-area-inset-bottom,0px));left:12px;right:12px;z-index:20;display:none;background:#b8412f;color:#fff;padding:12px;border-radius:10px;text-align:center"></div>
 <header>
-  <h1>📦 متابعة طلبات العملاء <span class="mut" style="font-weight:normal">(نسخة Firebase)</span></h1>
-  <div style="margin-bottom:8px"><input id="who" list="names" placeholder="اسمك (مطلوب قبل أي حفظ)" style="max-width:320px"><datalist id="names"></datalist><div id="whoBox" style="display:none;flex-wrap:wrap;gap:6px;align-items:center"></div></div>
-  <button class="b s" id="ownerBtn" style="margin-bottom:8px" onclick="owner?ownerLogout():ownerLogin()">دخول المدير</button>
-  <button class="b s" id="chg" style="display:none;margin-bottom:8px" onclick="role='';try{localStorage.removeItem('role')}catch(e){};render()">تغيير الشاشة</button>
+  <div class="top"><h1>زماني <small>متابعة طلبات العملاء</small></h1>
+  <div class="acts"><button class="b s" id="chg" style="display:none" onclick="role='';try{localStorage.removeItem('role')}catch(e){};render()">تغيير الشاشة</button><button class="b s" id="ownerBtn" onclick="owner?ownerLogout():ownerLogin()">دخول المدير</button></div></div>
+  <div style="margin-bottom:10px"><input id="who" list="names" placeholder="اسمك (مطلوب قبل أي حفظ)" style="max-width:320px"><datalist id="names"></datalist><div id="whoBox" style="display:none;flex-wrap:wrap;gap:6px;align-items:center"></div></div>
   <nav>
-    <button data-v="tele">شاشة التيليسيلز</button>
-    <button data-v="log">شاشة اللوجيستك</button>
+    <button data-v="tele">التيليسيلز</button>
+    <button data-v="log">اللوجيستك</button>
     <button data-v="wm">مخزن مشعل</button>
     <button data-v="wo">مخزن أكتوبر</button>
-    <button data-v="acc">شاشة الحسابات</button>
-    <button data-v="dash">الداشبورد (الإدارة)</button>
+    <button data-v="acc">الحسابات</button>
+    <button data-v="dash">الإدارة</button>
   </nav>
 </header>
 <main id="app"></main>
@@ -82,7 +125,7 @@ th{color:var(--mut);font-weight:600;font-size:12px}
 const FIREBASE_CONFIG={apiKey:"AIzaSyAnhSG87VR9Uuev-Ybog1vMArwGPO-xgBE",authDomain:"follow-telesales.firebaseapp.com",projectId:"follow-telesales",appId:"1:93502420574:web:cfad17f249e5876e34e6cf"};
 const OWNER_EMAIL="walidelkadi73@gmail.com";
 /* ============================== */
-const STAGES={new:["جديد – بانتظار اللوجيستك","#6b7686"],checking:["قيد المراجعة بالمخازن","#1f6feb"],modified:["معدّل – يحتاج مراجعة","#8a4fd6"],hold:["متوقف","#d63b3b"],ready:["جاهز للشحن","#d98a00"],partial:["شحن جزئي","#e0701a"],shipped:["تم الشحن","#0c8fa8"],delivered:["تم التسليم","#1a9d55"],cancelled:["ملغي","#444"]};
+const STAGES={new:["جديد – بانتظار اللوجيستك","#6f6459"],checking:["قيد المراجعة بالمخازن","#3d6f8e"],modified:["معدّل – يحتاج مراجعة","#7b5aa6"],hold:["متوقف","#b8412f"],ready:["جاهز للشحن","#9a6410"],partial:["شحن جزئي","#b5560f"],shipped:["تم الشحن","#2e7d86"],delivered:["تم التسليم","#2f7d5b"],cancelled:["ملغي","#4a403a"]};
 const SRC=["العميل","اللوجيستك","التيليسيلز (خطأ/تصحيح)"];
 let role="",owner=false,pins={};try{role=localStorage.getItem("role")||""}catch(e){}
 let db=null,orders=[],view="tele",who="",filter="all",openId=null,modFor=null,selGirl="";
@@ -94,11 +137,11 @@ const pinOf=n=>String((contacts.find(c=>c.name===n)||{}).pin||"");
 const actor=()=>owner?"المدير":who.trim();
 const actorRole=()=>owner?"المدير":(RL[role]||"");
 let qNum="",qGirl="",wipeAsk=false,delAsk=null;
-const match=o=>(!qNum||String(o.num).includes(qNum))&&(!qGirl||String(o.createdBy||"").includes(qGirl));
+const match=o=>(!qNum||String(o.num).includes(qNum)||String(o.ccode||"").toLowerCase().includes(qNum.toLowerCase()))&&(!qGirl||String(o.createdBy||"").includes(qGirl));
 const searchBar=()=>`<div class="card"><div class="g2"><input id="qn" placeholder="🔍 بحث برقم طلب العميل" value="${esc(qNum)}" oninput="qNum=this.value.trim();render()">${can("cgirl")?`<input id="qg" placeholder="🔍 بحث باسم البنت" value="${esc(qGirl)}" oninput="qGirl=this.value.trim();render()">`:""}</div><div class="mut" style="margin-top:6px">إجمالي الطلبات المسجّلة في السيستم: <b>${orders.length}</b>${(qNum||qGirl)?" · فيه بحث شغّال، امسح الخانتين لعرض الكل":""}</div></div>`;
 async function deleteOrder(id){
   if(!db)return toast("الحفظ غير متاح");
-  try{await db.collection("orders").doc(id).delete();delAsk=null;toast("تم الحذف ✔",true)}catch(e){toast("تعذر الحذف: "+(e.message||e.code))}
+  try{const o0=orders.find(x=>x.id===id);await db.collection("orders").doc(id).delete();if(o0&&o0.ccode)await db.collection("codes").doc(codeId(o0.ccode)).delete();delAsk=null;toast("تم الحذف ✔",true)}catch(e){toast("تعذر الحذف: "+(e.message||e.code))}
 }
 
 /* ---- إلغاء / تنظيف الطلبات ---- */
@@ -125,7 +168,7 @@ async function bfRun(){
     for(let i=0;i<rows.length;i+=400){
       const b=db.batch();
       rows.slice(i,i+400).forEach(o=>{const ref=db.collection("orders").doc(o.id);
-        if(bf.act==="delete")b.delete(ref);
+        if(bf.act==="delete"){b.delete(ref);if(o.ccode)b.delete(db.collection("codes").doc(codeId(o.ccode)))}
         else b.set(ref,{...o,stage:"cancelled",cancelBy:"owner",cancelReason:"إلغاء من المدير بشروط",cancelAt:Date.now(),log:[...(o.log||[]),{t:Date.now(),by:"المدير",rl:"المدير",text:"إلغاء من المدير (فلتر جماعي)",kind:"st"}]});
       });
       await b.commit();
@@ -149,7 +192,7 @@ function bulkCard(){
 }
 async function wipeAll(){
   if(!db)return toast("الحفظ غير متاح");
-  try{await Promise.all(orders.map(o=>db.collection("orders").doc(o.id).delete()));wipeAsk=false;toast("تم مسح كل الطلبات ✔",true)}catch(e){toast("تعذر المسح: "+(e.message||e.code))}
+  try{await Promise.all(orders.map(o=>db.collection("orders").doc(o.id).delete()));await Promise.all(orders.filter(o=>o.ccode).map(o=>db.collection("codes").doc(codeId(o.ccode)).delete()));wipeAsk=false;toast("تم مسح كل الطلبات ✔",true)}catch(e){toast("تعذر المسح: "+(e.message||e.code))}
 }
 const DEFAULT_REASONS=["الصنف غير متوفر بالمخزن","الكمية غير كافية","العميل طلب التأجيل","العميل لا يرد","العنوان غير واضح","بانتظار تحصيل المبلغ"];
 let reasons=DEFAULT_REASONS.slice();
@@ -168,7 +211,7 @@ let contacts=DEFAULTS.slice();
 const mergeC=l=>l;
 const waNum=n=>{n=String(n).replace(/\D/g,"");if(n.startsWith("0"))n="2"+n;else if(n.startsWith("1"))n="20"+n;return n};
 function notice(o,text){
-  const msg="🔔 تعديل على طلب #"+o.num+"\nالعميل: "+o.customer+"\nالحالة الحالية: "+STAGES[o.stage][0]+"\nموضوع التعديل: "+text+"\n\nالمعدِّل: "+actor()+(owner?"":" ("+actorRole()+")");
+  const msg="🔔 تعديل على طلب #"+o.num+(o.ccode?"/"+o.ccode:"")+"\nالعميل: "+o.customer+"\nالحالة الحالية: "+STAGES[o.stage][0]+"\nموضوع التعديل: "+text+"\n\nالمعدِّل: "+actor()+(owner?"":" ("+actorRole()+")");
   const link=(num,label)=>'<a target="_blank" rel="noopener noreferrer" style="color:#fff;font-weight:bold;text-decoration:none;display:block;padding:4px" href="https://wa.me/'+waNum(num)+'?text='+encodeURIComponent(msg)+'" onclick="setTimeout(()=>$(\'#notify\').style.display=\'none\',300)">📲 '+label+'</a>';
   const actorTele=!owner&&role==="tele";
   const c=contacts.find(x=>x.name===o.createdBy);
@@ -181,7 +224,7 @@ function notice(o,text){
   n.style.display="block";
 }
 
-function toast(t,ok){const e=$("#toast");e.textContent=t;e.style.background=ok?"#1a9d55":"#d63b3b";e.style.display="block";clearTimeout(window._t);window._t=setTimeout(()=>e.style.display="none",4000)}
+function toast(t,ok){const e=$("#toast");e.textContent=t;e.style.background=ok?"#2f7d5b":"#b8412f";e.style.display="block";clearTimeout(window._t);window._t=setTimeout(()=>e.style.display="none",4000)}
 window.alert=t=>toast(t);
 const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const fmt=t=>new Date(t).toLocaleString("ar-EG",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"});
@@ -283,7 +326,9 @@ const can=(k,scr)=>{
   if(r==="tele")return !["cdue","cwaybill","cprint"].includes(k);
   return permVal(k,r);
 };
-const cT=(o,scr)=>"#"+esc(o.num)+(can("cname",scr)?" – "+esc(o.customer):"");
+const dnum=(o,scr)=>String(o.num)+((o.ccode&&can("cname",scr))?"/"+o.ccode:"");
+const codeId=c=>"c_"+String(c).trim().toLowerCase().replace(/[\/\s.#?\[\]*~]+/g,"_");
+const cT=(o,scr)=>"#<bdi dir=\"ltr\">"+esc(dnum(o,scr))+"</bdi>"+(can("cname",scr)?" – "+esc(o.customer):"");
 const metaLine=(o,scr)=>[can("cphone",scr)?esc(o.phone):"",can("camt",scr)?(o.amount||0)+" ج":"",can("cgirl",scr)?esc(o.createdBy):"",fmt(o.createdAt)].filter(Boolean).join(" · ");
 async function setPerm(k,r,v){
   if(!db)return toast("الحفظ غير متاح");
@@ -291,6 +336,14 @@ async function setPerm(k,r,v){
   perms={...perms,[k]:cur};
   try{await db.collection("settings").doc("perms").set(perms);toast("تم حفظ الصلاحية ✔",true)}catch(e){toast("تعذر الحفظ: "+(e.message||e.code))}
 }
+
+/* ---- عنوان الشحن المفصّل ---- */
+const ADDR_F=[["g","المحافظة"],["c","المركز / المدينة"],["s","الشارع"],["sh","اسم المحل"],["l","علامة مميزة"]];
+const addrTxt=a=>[a.g&&"محافظة "+a.g,a.c&&"مركز "+a.c,a.s&&"شارع "+a.s,a.sh&&"محل "+a.sh,a.l&&"علامة: "+a.l].filter(Boolean).join(" – ");
+const addrOf=o=>o.addr||{s:o.shipData||""};
+const addrInputs=(pre,a)=>`<div class="g2">${ADDR_F.map(([k,l])=>`<div><label>${l}${k==="g"||k==="c"||k==="s"?" *":""}</label><input class="wi" id="${pre}${k}" value="${esc((a||{})[k]||"")}"></div>`).join("")}</div>`;
+const readAddr=pre=>{const a={};ADDR_F.forEach(([k])=>a[k]=($("#"+pre+k)?.value||"").trim());return a};
+const addrOk=a=>a.g&&a.c&&a.s;
 /* ---- بوليصة الشحن ---- */
 const WB_DEF={senderName:"شركة زماني للعود والبخور",senderPhone:""};
 let wbill={...WB_DEF};
@@ -298,14 +351,15 @@ const shipTxtPlain=o=>[o.shipMethod||"—",o.shipCo,(o.shipData||"").replace(/\n
 function printWaybill(id){
   const o=orders.find(x=>x.id===id);if(!o)return;
   if(!can("cwaybill"))return toast("طباعة البوليصة غير متاحة لشاشتك");
-  if(!wbill.senderPhone)toast("رقم تليفون المرسل لسه ما اتكتبش (المدير يكتبه من الداشبورد)");
-  const co=o.shipCo||(o.shipMethod==="تسليم الشركة"?"تسليم الشركة (توصيل بمعرفة الشركة)":"—");
-  const row=(a,b)=>`<tr><th style="width:28%;text-align:right">${a}</th><td colspan="3" style="font-size:16px">${b}</td></tr>`;
-  doPrint("بوليصة شحن",`<div class="pb" style="border:2px solid #000;padding:10px"><table>
-  <tr><th style="width:28%;text-align:right">رقم الطلب</th><td><b style="font-size:18px">#${esc(o.num)}</b></td><th>التاريخ</th><td>${esc(fmt(Date.now()))}</td></tr>
-  ${row("اسم المرسل",esc(wbill.senderName||WB_DEF.senderName))}${row("تليفون المرسل",esc(wbill.senderPhone||"—"))}
-  ${row("شركة الشحن",esc(co))}${row("اسم العميل",esc(o.customer))}${row("تليفون العميل",esc(o.phone||"—"))}
-  ${row("العنوان / بيانات التسليم",esc(o.shipData||"—").replace(/\n/g,"<br>"))}</table></div>`);
+  if(!wbill.senderPhone)toast("رقم تليفون الراسل (رقم مروان) لسه ما اتكتبش، المدير يكتبه من الإدارة");
+  const co=o.shipCo||(o.shipMethod==="تسليم الشركة"?"تسليم الشركة":"—"),ad=addrOf(o);
+  const row=(a,b)=>`<tr><th style="text-align:right">${a}</th><td>${b}</td></tr>`;
+  const adr=o.addr?ADDR_F.filter(([k])=>ad[k]).map(([k,l])=>`${l}: <b>${esc(ad[k])}</b>`).join("<br>"):esc(ad.s||"—").replace(/\n/g,"<br>");
+  doPrint("",`<div class="wbx"><div class="co">${esc(co)}</div><table>
+  ${row("الراسل",esc(wbill.senderName||WB_DEF.senderName))}${row("هاتف الراسل",esc(wbill.senderPhone||"—"))}
+  ${row("المستلم",esc(o.customer))}${row("هاتف المستلم",esc(o.phone||"—"))}
+  ${row("العنوان",adr)}
+  <tr><th style="text-align:right">رقم الطلب</th><td><bdi dir="ltr">${esc(o.num)}${o.ccode?"/"+esc(o.ccode):""}</bdi></td></tr></table></div>`,true);
 }
 async function saveWaybill(){
   if(!db)return toast("الحفظ غير متاح");
@@ -318,10 +372,12 @@ async function createOrder(o){
   o.log=[...(o.log||[]),{t:Date.now(),by:actor(),rl:actorRole(),text:"إنشاء الطلب",kind:"st"}];
   const ref=db.collection("orders").doc(o.id);
   try{
-    await db.runTransaction(async t=>{const sn=await t.get(ref);if(sn.exists)throw new Error("DUP");t.set(ref,o)});
+    const cref=o.ccode?db.collection("codes").doc(codeId(o.ccode)):null;
+    await db.runTransaction(async t=>{const sn=await t.get(ref);if(sn.exists)throw new Error("DUP");if(cref){const cs=await t.get(cref);if(cs.exists)throw new Error("DUPC")}t.set(ref,o);if(cref)t.set(cref,{orderId:o.id,code:o.ccode})});
     toast("تم الحفظ ✔",true);return true;
   }catch(e){
-    if(String(e.message||"").indexOf("DUP")>=0)toast("رقم الطلب "+o.num+" اتسجل قبل كده. مينفعش يتكرر.");
+    if(String(e.message||"").indexOf("DUPC")>=0)toast("كود العميل "+o.ccode+" اتسجل قبل كده. مينفعش يتكرر.");
+    else if(String(e.message||"").indexOf("DUP")>=0)toast("رقم الطلب "+o.num+" اتسجل قبل كده. مينفعش يتكرر.");
     else alert("تعذر الحفظ: "+(e.message||e.code));
     return false;
   }
@@ -353,15 +409,15 @@ function shipBox(o){
   if(editShip!==o.id)return `${shipLine(o)}<button class="b s x" onclick="editShip='${o.id}';render()">تعديل بيانات الشحن</button>`;
   return `<div class="card" style="margin:6px 0"><label>طريقة الشحن</label><select class="wi" id="sm-${o.id}"><option value="">— اختار —</option>${SHIPM.map(m=>`<option ${m===o.shipMethod?"selected":""}>${m}</option>`).join("")}</select>
   <label>اسم شركة الشحن</label><input class="wi" id="sc-${o.id}" value="${esc(o.shipCo||"")}">
-  <label>العنوان / بيانات التسليم</label><textarea class="wi" id="sd-${o.id}" rows="3">${esc(o.shipData||"")}</textarea>
+  <b style="font-size:14px">عنوان التسليم</b>${addrInputs("sa"+o.id+"-",addrOf(o))}
   <div class="row" style="margin-top:6px"><button class="b ok" onclick="saveShip('${o.id}')">حفظ</button><button class="b s" onclick="editShip=null;render()">إلغاء</button></div></div>`;
 }
 function saveShip(id){
-  const m=$("#sm-"+id)?.value||"",c=($("#sc-"+id)?.value||"").trim(),d=($("#sd-"+id)?.value||"").trim();
-  if(!m||!d)return toast("اختار طريقة الشحن واكتب العنوان / بيانات التسليم");
+  const m=$("#sm-"+id)?.value||"",c=($("#sc-"+id)?.value||"").trim(),ad=readAddr("sa"+id+"-"),d=addrTxt(ad);
+  if(!m||!addrOk(ad))return toast("اختار طريقة الشحن واكتب المحافظة والمركز والشارع");
   if(m==="شركة شحن"&&!c)return toast("اكتب اسم شركة الشحن");
   const src=role==="tele"?SRC[2]:SRC[1];editShip=null;
-  upd(id,o=>{o.shipMethod=m;o.shipCo=c;o.shipData=d},"تعديل ("+src+"): بيانات الشحن – "+m+(c?" – "+c:"")+": "+d.replace(/\n/g," / "),"mod",{src});
+  upd(id,o=>{o.shipMethod=m;o.shipCo=c;o.addr=ad;o.shipData=d},"تعديل ("+src+"): بيانات الشحن – "+m+(c?" – "+c:"")+": "+d.replace(/\n/g," / "),"mod",{src});
 }
 async function saveRules(){
   if(!db)return toast("الحفظ غير متاح");
@@ -376,9 +432,9 @@ function dashRows(){
   return rows.filter(match);
 }
 const payTxt=o=>o.acct==="full"?"تحصيل كامل مؤكد":o.acct==="partial"?"تحصيل جزئي مؤكد: "+o.accAmt+" من "+(o.amount||0):o.collected?"البنت بلّغت تحصيل "+o.collected+" – بانتظار الحسابات":"لم يتم التحصيل";
-function doPrint(title,html){
+function doPrint(title,html,bare){
   const pa=$("#printArea");if(!pa)return;
-  pa.innerHTML=`<h2>${esc(title)}</h2><div style="margin-bottom:8px;font-size:11px">${esc(fmt(Date.now()))} · طُبع بواسطة: ${esc(actor()||"—")}</div>${html}`;
+  pa.innerHTML=bare?html:`<h2>${esc(title)}</h2><div style="margin-bottom:8px;font-size:11px">${esc(fmt(Date.now()))} · طُبع بواسطة: ${esc(actor()||"—")}</div>${html}`;
   setTimeout(()=>window.print(),80);
 }
 window.onafterprint=()=>{const pa=$("#printArea");if(pa)pa.innerHTML=""};
@@ -393,14 +449,14 @@ function printWh(wid,kind){
     const rows=pickRows(o),sh=(o.ship||{})[wid]||{},sp=wid==="wo"?woSplit(rows):{groups:[],other:rows};let body="";
     sp.groups.forEach(G=>{
       let w=0;const by={};
-      const trs=G.rows.map(r=>{const m=meas(r.i);w+=m*r.p.pack.g;by[r.p.suf]=(by[r.p.suf]||0)+m;return `<tr><td>${esc(r.p.pack.n)}</td><td>${esc(r.i.code)}</td><td>${esc(r.i.qty)}</td><td>${esc(+r.i.picked||0)}</td><td>${rem(r.i)}</td><td>${fmtW(m*r.p.pack.g)}</td><td>☐</td></tr>`}).join("");
+      const trs=G.rows.map(r=>{const m=meas(r.i);w+=m*r.p.pack.g;by[r.p.suf]=(by[r.p.suf]||0)+m;return `<tr><td>${esc(r.i.code)}</td><td>${esc(r.i.name)}</td><td>${esc(r.p.pack.n)}</td><td>${esc(r.i.qty)}</td><td>${esc(+r.i.picked||0)}</td><td>${rem(r.i)}</td><td>${fmtW(m*r.p.pack.g)}</td><td>☐</td></tr>`}).join("");
       const T=tot[G.base]=tot[G.base]||{name:G.name,g:0,by:{}};T.g+=w;Object.keys(by).forEach(k=>T.by[k]=(T.by[k]||0)+by[k]);
-      body+=`<div style="margin:6px 0"><b>${esc(G.name)} (كود ${esc(G.base)})</b> – ${lbl}: <b>${fmtW(w)}</b> (${esc(byPackTxt(by))})<table><tr><th>نوع العبوة</th><th>الكود</th><th>المطلوب (عبوات)</th><th>المتحضّر</th><th>المتبقي</th><th>الوزن</th><th>تم</th></tr>${trs}</table></div>`;
+      body+=`<div style="margin:6px 0"><b>${esc(G.base)} – ${esc(G.name)}</b> – ${lbl}: <b>${fmtW(w)}</b> (${esc(byPackTxt(by))})<table><tr><th>الكود</th><th>اسم الصنف</th><th>نوع العبوة</th><th>المطلوب (عبوات)</th><th>المتحضّر</th><th>المتبقي</th><th>الوزن</th><th>تم</th></tr>${trs}</table></div>`;
     });
-    if(sp.other.length)body+=`<table><tr><th>الصنف</th><th>الكود</th><th>المطلوب</th><th>المتحضّر</th><th>المتبقي</th><th>تم</th></tr>${sp.other.map(z=>`<tr><td>${esc(z.i.name)}</td><td>${esc(z.i.code||"")}</td><td>${esc(z.i.qty)}</td><td>${esc(+z.i.picked||0)}</td><td>${rem(z.i)}</td><td>☐</td></tr>`).join("")}</table>`;
-    return `<div class="pb"><b>طلب #${esc(o.num)}</b>${can("cname",wid)?" – "+esc(o.customer):""}${can("cgirl",wid)?" · البنت: "+esc(o.createdBy):""}${can("cdue",wid)?" · "+esc(dueTxt(o)):""}${sh.done?" · <b>تم الشحن</b>":""}${can("cship",wid)?"<div>🚚 "+esc(shipTxtPlain(o))+"</div>":""}${body}</div>`;
+    if(sp.other.length)body+=`<table><tr><th>الكود</th><th>اسم الصنف</th><th>المطلوب</th><th>المتحضّر</th><th>المتبقي</th><th>تم</th></tr>${sp.other.map(z=>`<tr><td>${esc(z.i.code||"")}</td><td>${esc(z.i.name)}</td><td>${esc(z.i.qty)}</td><td>${esc(+z.i.picked||0)}</td><td>${rem(z.i)}</td><td>☐</td></tr>`).join("")}</table>`;
+    return `<div class="pb"><b>طلب #${esc(dnum(o,wid))}</b>${can("cname",wid)?" – "+esc(o.customer):""}${can("cgirl",wid)?" · البنت: "+esc(o.createdBy):""}${can("cdue",wid)?" · "+esc(dueTxt(o)):""}${sh.done?" · <b>تم الشحن</b>":""}${can("cship",wid)?"<div>🚚 "+esc(shipTxtPlain(o))+"</div>":""}${body}</div>`;
   }).join("");
-  const sum=Object.keys(tot).length?`<div class="pb"><b>إجمالي ${lbl} من كل صنف</b><table><tr><th>الصنف</th><th>الكود</th><th>الإجمالي</th><th>التوزيع</th></tr>${Object.entries(tot).map(([b,T])=>`<tr><td>${esc(T.name)}</td><td>${esc(b)}</td><td><b>${fmtW(T.g)}</b></td><td>${esc(byPackTxt(T.by))}</td></tr>`).join("")}</table></div>`:"";
+  const sum=Object.keys(tot).length?`<div class="pb"><b>إجمالي ${lbl} من كل صنف</b><table><tr><th>الكود</th><th>اسم الصنف</th><th>الإجمالي</th><th>التوزيع</th></tr>${Object.entries(tot).map(([b,T])=>`<tr><td>${esc(b)}</td><td>${esc(T.name)}</td><td><b>${fmtW(T.g)}</b></td><td>${esc(byPackTxt(T.by))}</td></tr>`).join("")}</table></div>`:"";
   doPrint(WHN[wid]+" – "+(kind==="need"?"الأصناف المطلوب تجهيزها":"الأصناف المجهّزة"),sum+blocks);
 }
 function printReport(){
@@ -409,7 +465,7 @@ function printReport(){
   const total=rows.reduce((t,o)=>t+(+o.amount||0),0),coll=rows.reduce((t,o)=>t+(+o.accAmt||0),0),late=rows.filter(isLate).length;
   const fname=filter==="all"?"":filter==="late"?"متأخرة عن المهلة":filter==="unpaid"?"غير محصّل":filter==="modded"?"اتعدّلت":(STAGES[filter]||[filter])[0];
   const sum=`<div class="pb">عدد الطلبات: <b>${rows.length}</b> · ${Object.entries(by).map(([k,n])=>esc(STAGES[k][0])+": <b>"+n+"</b>").join(" · ")} · متأخرة عن مهلة الخروج: <b>${late}</b><br>إجمالي قيمة الطلبات: <b>${total.toLocaleString("ar-EG")}</b> · المحصّل المؤكد: <b>${coll.toLocaleString("ar-EG")}</b> · غير محصّل: <b>${(total-coll).toLocaleString("ar-EG")}</b>${fname?" · الفلتر: "+esc(fname):""}${(qNum||qGirl)?" · فيه بحث شغّال":""}</div>`;
-  const tr=rows.map(o=>{const l=(o.log||[]).slice(-1)[0];return `<tr style="${isLate(o)?"background:#fdd":""}"><td><b>#${esc(o.num)}</b></td><td>${esc(o.customer)}<br>${esc(o.phone)}</td><td>${esc(o.createdBy)}</td><td>${esc(STAGES[o.stage][0])}${o.stage==="cancelled"&&o.cancelReason?`<div class="hold">${o.cancelBy==="girl"?"ألغتها "+esc(o.createdBy)+" – ":""}${esc(o.cancelReason)}</div>`:""}${o.stage==="hold"&&o.holdReason?"<br>السبب: "+esc(o.holdReason):""}</td><td>${esc(whTxt(o))}</td><td>${esc(payTxt(o))}<br>قيمة الطلب: ${o.amount||0}</td><td>${esc(shipTxtPlain(o))}</td><td>${esc(dueTxt(o))}</td><td>${l?esc(fmt(l.t))+"<br>"+esc(l.by):""}</td></tr>`}).join("");
+  const tr=rows.map(o=>{const l=(o.log||[]).slice(-1)[0];return `<tr style="${isLate(o)?"background:#fdd":""}"><td><b>#${esc(o.num)}${o.ccode?"/"+esc(o.ccode):""}</b></td><td>${esc(o.customer)}<br>${esc(o.phone)}</td><td>${esc(o.createdBy)}</td><td>${esc(STAGES[o.stage][0])}${o.stage==="cancelled"&&o.cancelReason?`<div class="hold">${o.cancelBy==="girl"?"ألغتها "+esc(o.createdBy)+" – ":""}${esc(o.cancelReason)}</div>`:""}${o.stage==="hold"&&o.holdReason?"<br>السبب: "+esc(o.holdReason):""}</td><td>${esc(whTxt(o))}</td><td>${esc(payTxt(o))}<br>قيمة الطلب: ${o.amount||0}</td><td>${esc(shipTxtPlain(o))}</td><td>${esc(dueTxt(o))}</td><td>${l?esc(fmt(l.t))+"<br>"+esc(l.by):""}</td></tr>`}).join("");
   doPrint("تقرير الأوردرات وموقفها",sum+`<table><tr><th>الطلب</th><th>العميل</th><th>البنت</th><th>الحالة</th><th>الأصناف / المخازن</th><th>التحصيل</th><th>الشحن</th><th>مهلة الخروج</th><th>آخر حركة</th></tr>${tr}</table>`);
 }
 
@@ -441,7 +497,7 @@ function parseItems(txt){
 }
 const itemsTsv=o=>(o.items||[]).map(i=>o.num+"\t"+(i.code||"")+"\t"+i.name+"\t"+i.qty).join("\n");
 let pendWh={},pendPick={},pendReason={};
-const ROWBG={ok:"rgba(26,157,85,.22)",part:"rgba(217,138,0,.22)",bad:"rgba(214,59,59,.18)",un:"transparent",no:"transparent"};
+const ROWBG={ok:"rgba(47,125,91,.22)",part:"rgba(181,122,44,.24)",bad:"rgba(184,65,47,.18)",un:"transparent",no:"transparent"};
 const PACK={"1":{g:1000,n:"عبوة كيلو"},"2":{g:500,n:"عبوة نص كيلو"},"4":{g:250,n:"عبوة ربع كيلو"},"100":{g:100,n:"عبوة 100 جرام"},"50":{g:50,n:"عبوة 50 جرام"},"5":{g:5000,n:"عبوة 5 كيلو"},"25":{g:25000,n:"برميل 25 كيلو"}};
 function packOf(code){
   const c=ar2en(String(code||"")).trim();
@@ -477,7 +533,7 @@ function itemsTbl(o,mode){
   const it=o.items||[];
   if(!it.length)return `<div class="mut" style="margin-top:6px">مفيش أصناف مسجّلة للطلب ده</div>`;
   const rd=it.filter(i=>itemSt(i).c==="ok").length;
-  return `<div class="tw" style="margin-top:6px"><div class="mut">جاهز ${rd} من ${it.length} صنف</div><table><tr><th>الصنف</th><th>الكود</th><th>المطلوب</th><th>المخزن</th><th>المتحضّر</th><th>الحالة</th></tr>${it.map((i,x)=>{const s=itemSt(i),k=o.id+"-"+x;return `<tr style="background:${ROWBG[s.c]}"><td>${esc(i.name)}</td><td>${esc(i.code||"")}${(()=>{const pk=i.wh==="wo"?packOf(i.code):null;return pk?`<div class="mut">${pk.pack?esc(pk.pack.n):"⚠ عبوة غير معروفة /"+esc(pk.suf)}</div>`:""})()}</td><td><b>${esc(i.qty)}</b></td>
+  return `<div class="tw" style="margin-top:6px"><div class="mut">جاهز ${rd} من ${it.length} صنف</div><table><tr><th>الكود</th><th>الصنف</th><th>المطلوب</th><th>المخزن</th><th>المتحضّر</th><th>الحالة</th></tr>${it.map((i,x)=>{const s=itemSt(i),k=o.id+"-"+x;return `<tr style="background:${ROWBG[s.c]}"><td>${esc(i.code||"")}${(()=>{const pk=i.wh==="wo"?packOf(i.code):null;return pk?`<div class="mut">${pk.pack?esc(pk.pack.n):"⚠ عبوة غير معروفة /"+esc(pk.suf)}</div>`:""})()}</td><td>${esc(i.name)}</td><td><b>${esc(i.qty)}</b></td>
   <td>${mode==="log"?`<select style="min-width:120px" onchange="pendWh['${k}']=this.value"><option value="">— حدّد —</option>${Object.entries(WHN).map(([v,n])=>`<option value="${v}" ${(pendWh[k]!==undefined?pendWh[k]:i.wh)===v?"selected":""}>${n}</option>`).join("")}</select>`:esc(WHN[i.wh]||"—")}</td>
   <td><b>${esc(+i.picked||0)}</b></td><td>${esc(s.t)}</td></tr>`}).join("")}</table></div>`;
 }
@@ -506,7 +562,7 @@ function buildNext(prev,rows){
   const keyOf=i=>i.code?"c:"+i.code:"n:"+i.name;
   const merged=[];rows.forEach(r=>{const m=merged.find(x=>keyOf(x)===keyOf(r)&&x.name===r.name);if(m)m.qty+=r.qty;else merged.push({name:r.name,code:r.code||"",qty:r.qty})});
   const pm={};prev.forEach(p=>pm[keyOf(p)]=p);
-  const next=merged.map(i=>{const p=pm[keyOf(i)];return {name:i.name,code:i.code,qty:i.qty,wh:p?p.wh||"":"",picked:p?Math.min(+p.picked||0,+i.qty):0,reason:p?p.reason||"":""}});
+  const next=merged.map(i=>{const p=pm[keyOf(i)];return {name:i.name,code:i.code,qty:i.qty,wh:p?p.wh||"":"",picked:p?(+p.picked||0):0,reason:p?p.reason||"":""}});
   const sig=l=>JSON.stringify(l.map(i=>[i.name,i.code||"",+i.qty]));
   const same=prev.length>0&&sig(prev)===sig(next),reset=new Set();
   next.forEach(i=>{const p=pm[keyOf(i)];if((!p||+p.qty!==+i.qty)&&i.wh)reset.add(i.wh)});
@@ -606,11 +662,11 @@ async function doMod(id){
 function teleView(){
   const me=who.trim(),mine=me?orders.filter(o=>o.createdBy===me):[];
   return `<div class="card"><b>طلب عميل جديد</b>
-  <div class="g2"><div><label>رقم طلب العميل</label><input id="num"></div><div><label>اسم العميل</label><input id="cust"></div>
+  <div class="g2"><div><label>رقم طلب العميل</label><input id="num"></div><div><label>كود العميل</label><input id="cc"></div><div><label>اسم العميل</label><input id="cust"></div>
   <div><label>التليفون</label><input id="ph"></div><div><label>قيمة الطلب</label><input id="amt" type="number"></div>
   <div><label>طريقة الشحن</label><select id="sm"><option value="">— اختاري —</option>${SHIPM.map(m=>`<option>${m}</option>`).join("")}</select></div>
   <div><label>اسم شركة الشحن (لو الشحن بشركة)</label><input id="sc"></div>
-  <div style="grid-column:1/-1"><label>العنوان / بيانات التسليم (العنوان – الفرع – ملاحظات)</label><textarea id="sd" rows="2"></textarea></div></div>
+  <div style="grid-column:1/-1"><b style="font-size:14px">عنوان التسليم</b>${addrInputs("a-",{})}</div></div>
   <label style="margin-top:12px">الأصناف والكميات (اختياري – انسخي من الإكسيل: رقم الطلب – كود الصنف – اسم الصنف – الكمية)</label>
   <textarea class="wi" id="itx" rows="5" placeholder="رقم الطلب ثم الكود ثم الصنف ثم الكمية – سطر لكل صنف (رقم الطلب لازم يطابق اللي فوق)"></textarea>
   <div style="margin-top:12px"><button class="b" onclick="newOrder()">إرسال للوجيستك</button></div></div>
@@ -620,9 +676,12 @@ async function newOrder(){
   if(!needName())return;
   const num=$("#num").value.trim(),c=$("#cust").value.trim();
   if(!num||!c)return alert("اكتب رقم طلب العميل واسم العميل");
-  const sm=$("#sm")?.value||"",sc=($("#sc")?.value||"").trim(),sd=($("#sd")?.value||"").trim(),phn=($("#ph")?.value||"").trim();
+  const sm=$("#sm")?.value||"",sc=($("#sc")?.value||"").trim(),ad=readAddr("a-"),cc=($("#cc")?.value||"").trim(),phn=($("#ph")?.value||"").trim();
   if(!phn)return toast("اكتبي تليفون العميل (مطلوب لبوليصة الشحن)");
-  if(!sm||!sd)return toast("اختاري طريقة الشحن واكتبي العنوان / بيانات التسليم");
+  if(!sm||!addrOk(ad))return toast("اختاري طريقة الشحن واكتبي المحافظة والمركز والشارع");
+  if(!cc)return toast("اكتبي كود العميل");
+  const dupc=orders.find(o=>String(o.ccode||"").trim().toLowerCase()===cc.toLowerCase());
+  if(dupc)return toast("كود العميل "+cc+" موجود قبل كده. مينفعش يتكرر.");
   if(sm==="شركة شحن"&&!sc)return toast("اكتبي اسم شركة الشحن");
   const dup=orders.find(o=>String(o.num).trim()===num);
   if(dup)return toast("رقم الطلب "+num+" موجود قبل كده (عميل: "+dup.customer+" – بواسطة "+dup.createdBy+"). مينفعش يتكرر.");
@@ -631,7 +690,7 @@ async function newOrder(){
   const wrong=pr.items.find(i=>String(i.order).trim()!==num);
   if(wrong)return toast("رقم الطلب في الأصناف ("+wrong.order+") لازم يطابق رقم الطلب اللي كتبتيه ("+num+")");
   const pn=buildNext([],pr.items).next;
-  const o={id:oidOf(num),items:pn,num,customer:c,phone:$("#ph").value.trim(),amount:+$("#amt").value||0,createdAt:Date.now(),createdBy:who,stage:"new",paid:false,holdReason:"",shipRef:"",shipMethod:sm,shipCo:sc,shipData:sd,accAt:0,shippedAt:0,collected:0,acct:"",accAmt:0,log:[],mentions:[]};
+  const o={id:oidOf(num),items:pn,num,customer:c,phone:$("#ph").value.trim(),amount:+$("#amt").value||0,createdAt:Date.now(),createdBy:who,stage:"new",paid:false,holdReason:"",shipRef:"",ccode:cc,shipMethod:sm,shipCo:sc,addr:ad,shipData:addrTxt(ad),accAt:0,shippedAt:0,collected:0,acct:"",accAmt:0,log:[],mentions:[]};
   const nt=evTargets("tele_new",o,["wm","wo"]);
   if(nt.length)o.mentions=[{id:""+Date.now(),t:Date.now(),by:actor(),from:"tele",text:"طلب جديد",to:nt,ack:{}}];
   if(await createOrder(o)){if(nt.length)pushMention(o,o.mentions[0]);render()}
@@ -659,11 +718,29 @@ const togglePaid=id=>upd(id,o=>{o.paid=!o.paid},"التحصيل: "+(orders.find(
 const mineItems=(o,wid)=>(o.items||[]).map((i,x)=>({i,x})).filter(z=>z.i.wh===wid);
 function whRow(o,z,done,p){
   const i=z.i,k=o.id+"-"+z.x,pv=pendPick[k]!==undefined?pendPick[k]:(+i.picked||0),pr=pendReason[k]!==undefined?pendReason[k]:(i.reason||""),s=itemSt({...i,picked:+pv||0,reason:pr});
-  const first=p?`<td>${esc(p.pack.n)}</td><td>${esc(i.code||"")}</td><td><b>${esc(i.qty)}</b></td><td>${fmtW((+i.qty||0)*p.pack.g)}</td>`:`<td>${esc(i.name)}</td><td>${esc(i.code||"")}${p===null&&packOf(i.code)&&!packOf(i.code).pack?`<div class="hold">⚠ عبوة غير معروفة /${esc(packOf(i.code).suf)}</div>`:""}</td><td><b>${esc(i.qty)}</b></td>`;
+  const pk=packOf(i.code),raw=i.wh==="wo"&&!pk;
+  const cd=raw?`<b class="craw">${esc(i.code||"")}</b>`:esc(i.code||""),nm=raw?`<b class="craw">${esc(i.name)}</b>`:esc(i.name);
+  const warn=p===null&&pk&&!pk.pack?`<div class="hold">⚠ عبوة غير معروفة /${esc(pk.suf)}</div>`:"";
+  const first=p?`<td>${cd}</td><td>${nm}</td><td>${esc(p.pack.n)}</td><td><b>${esc(i.qty)}</b></td><td>${fmtW((+i.qty||0)*p.pack.g)}</td>`:`<td>${cd}${warn}</td><td>${nm}</td><td><b>${esc(i.qty)}</b></td>`;
+  const full=(+i.qty>0)&&(+pv>=+i.qty);
   return `<tr style="background:${ROWBG[s.c]}">${first}
-  <td><input class="wi" type="number" min="0" max="${esc(i.qty)}" step="any" style="width:90px" ${done?"disabled":""} value="${esc(pv)}" oninput="pendPick['${k}']=this.value"></td>
-  <td>${reasonSel("rs-"+k,pr,"pendReason['"+k+"']=this.value")}</td>
-  <td>${done?"":`<button class="b s x" onclick="pickFull('${o.id}',${z.x})">تحضير كامل</button>`}</td></tr>`;
+  <td><div style="display:flex;gap:8px;align-items:center"><input type="checkbox" title="تحضير كامل" aria-label="تحضير كامل" ${full?"checked":""} ${done?"disabled":""} onchange="pickTick('${o.id}',${z.x},this.checked)" style="width:24px;height:24px;flex:0 0 auto;padding:0"><input class="wi" type="number" min="0" step="any" style="width:90px;min-width:70px" ${done?"disabled":""} value="${esc(pv)}" oninput="pendPick['${k}']=this.value"></div></td>
+  <td>${reasonSel("rs-"+k,pr,"pendReason['"+k+"']=this.value")}</td></tr>`;
+}
+function pickTick(oid,x,on){
+  const o=orders.find(z=>z.id===oid);if(!o)return;const k=oid+"-"+x,it=o.items[x];
+  const cur=pendPick[k]!==undefined?+ar2en(pendPick[k]).replace(",","."):(+it.picked||0);
+  pendPick[k]=on?(cur>=+it.qty?cur:+it.qty):0;render();
+}
+function wholeDone(oid,wid){
+  const cur=orders.find(x=>x.id===oid);if(!cur||!needName())return;
+  if(((cur.ship||{})[wid]||{}).done)return toast("الغي الشحن الأول عشان تعدّل التحضير");
+  const mi=mineItems(cur,wid);if(!mi.length)return;
+  const val=z=>{const k=oid+"-"+z.x,v=pendPick[k]!==undefined?+ar2en(pendPick[k]).replace(",","."):(+z.i.picked||0);return isNaN(v)?0:v};
+  const fin=mi.map(z=>({x:z.x,name:z.i.name,q:+z.i.qty,p:Math.max(val(z),+z.i.qty)}));
+  mi.forEach(z=>{delete pendPick[oid+"-"+z.x];delete pendReason[oid+"-"+z.x]});
+  const over=fin.filter(f=>f.p>f.q).map(f=>f.name+" ("+f.p+" من "+f.q+")");
+  upd(oid,o=>{fin.forEach(f=>{o.items[f.x].picked=f.p;o.items[f.x].reason=""});recalc(o)},WHN[wid]+": تم التحضير بالكامل – "+(wid==="wo"?"كميات الزيوت":"كميات الأصناف")+" الخاصة بطلب العميل #"+cur.num+" أصبحت جاهزة"+(over.length?" (فيه زيادة في: "+over.join("، ")+")":""));
 }
 function woSplit(mi){
   const g={},other=[];
@@ -676,32 +753,32 @@ function woSummary(){
   const g={};
   orders.filter(o=>!["delivered","cancelled"].includes(o.stage)).forEach(o=>mineItems(o,"wo").forEach(z=>{const p=packOf(z.i.code);if(!(p&&p.pack))return;const G=g[p.base]=g[p.base]||{name:z.i.name,base:p.base,req:0,pick:0,by:{}};G.req+=(+z.i.qty)*p.pack.g;G.pick+=(+z.i.picked||0)*p.pack.g;G.by[p.suf]=(G.by[p.suf]||0)+(+z.i.qty)}));
   const L=Object.values(g);if(!L.length)return "";
-  return `<div class="card"><b>إجمالي المطلوب من كل صنف (كل الطلبات الشغالة)</b><div class="tw"><table><tr><th>الصنف</th><th>الكود</th><th>إجمالي المطلوب</th><th>المتحضّر</th><th>توزيع العبوات المطلوبة</th></tr>${L.map(G=>`<tr><td>${esc(G.name)}</td><td>${esc(G.base)}</td><td><b>${fmtW(G.req)}</b></td><td>${fmtW(G.pick)}</td><td>${esc(byPackTxt(G.by))}</td></tr>`).join("")}</table></div></div>`;
+  return `<div class="card"><b>إجمالي المطلوب من كل صنف (كل الطلبات الشغالة)</b><div class="tw"><table><tr><th>الكود</th><th>اسم الصنف</th><th>إجمالي المطلوب</th><th>المتحضّر</th><th>توزيع العبوات المطلوبة</th></tr>${L.map(G=>`<tr><td><b class="craw">${esc(G.base)}</b></td><td><b class="craw">${esc(G.name)}</b></td><td><b>${fmtW(G.req)}</b></td><td>${fmtW(G.pick)}</td><td>${esc(byPackTxt(G.by))}</td></tr>`).join("")}</table></div></div>`;
 }
 const PACKLEGEND=`<details class="card"><summary>دليل أكواد العبوات (الكود الأساسي / رقم العبوة)</summary><div class="mut" style="margin-top:6px">/1 = عبوة كيلو · /2 = عبوة نص كيلو · /4 = عبوة ربع كيلو · /100 = عبوة 100 جرام · /50 = عبوة 50 جرام · /5 أو P5 = عبوة 5 كيلو · /25 = برميل 25 كيلو. الكمية المكتوبة = عدد العبوات.</div></details>`;
 function whView(wid){
   const act=orders.filter(o=>mineItems(o,wid).length&&!["delivered","cancelled"].includes(o.stage)&&match(o));
   const head=`<div class="card"><b>${WHN[wid]}</b> <span class="mut">– طلبات فيها أصناف عليك: ${act.length}</span>${can("cprint",wid)?`<div class="row" style="margin-top:8px"><button class="b s x" onclick="printWh('${wid}','need')">🖨 طباعة المطلوب تجهيزه</button><button class="b s x" onclick="printWh('${wid}','done')">🖨 طباعة المجهّز</button></div>`:""}</div>`+(wid==="wo"?woSummary()+PACKLEGEND:"");
   if(!act.length)return head+searchBar()+`<div class="card empty">مفيش أصناف محوّلة لـ${WHN[wid]} دلوقتي</div>`;
-  const hdrStd=`<tr><th>الصنف</th><th>الكود</th><th>المطلوب</th><th>المتحضّر فعلياً</th><th>سبب النقص</th><th></th></tr>`;
-  const hdrPack=`<tr><th>نوع العبوة</th><th>الكود</th><th>عدد العبوات المطلوب</th><th>وزن المطلوب</th><th>المتحضّر (عدد عبوات)</th><th>سبب النقص</th><th></th></tr>`;
+  const hdrStd=`<tr><th>الكود</th><th>اسم الصنف</th><th>المطلوب</th><th>المتحضّر (علّم ✓ لو كامل، أو اكتب الكمية)</th><th>سبب النقص</th></tr>`;
+  const hdrPack=`<tr><th>الكود</th><th>اسم الصنف</th><th>نوع العبوة</th><th>عدد العبوات المطلوب</th><th>وزن المطلوب</th><th>المتحضّر (علّم ✓ لو كامل، أو اكتب عدد العبوات)</th><th>سبب النقص</th></tr>`;
   return head+searchBar()+act.map(o=>{
     const mi=mineItems(o,wid),lm=mods(o).slice(-1)[0],sh=(o.ship||{})[wid]||{},done=!!sh.done,rd=mi.filter(z=>itemSt(z.i).c==="ok").length;
     const sp=wid==="wo"?woSplit(mi):{groups:[],other:mi};
     const groups=sp.groups.map(G=>{
       const reqG=G.rows.reduce((t,r)=>t+(+r.i.qty)*r.p.pack.g,0),pkG=G.rows.reduce((t,r)=>t+(+r.i.picked||0)*r.p.pack.g,0),by={};
       G.rows.forEach(r=>by[r.p.suf]=(by[r.p.suf]||0)+(+r.i.qty));
-      return `<div style="margin-top:8px;border:1px solid var(--bd);border-radius:8px;padding:8px"><b>${esc(G.name)}</b> <span class="mut">كود ${esc(G.base)}</span>
+      return `<div style="margin-top:8px;border:1px solid var(--bd);border-radius:8px;padding:8px"><span class="craw">${esc(G.base)}</span> <b class="craw">${esc(G.name)}</b>
       <div style="margin-top:4px">إجمالي المطلوب: <b>${fmtW(reqG)}</b> · المتحضّر: <b>${fmtW(pkG)}</b></div>
       <div class="mut">التوزيع: ${esc(byPackTxt(by))}</div>
       <div class="tw"><table>${hdrPack}${G.rows.map(r=>whRow(o,r,done,r.p)).join("")}</table></div></div>`}).join("");
     const others=sp.other.length?`<div class="tw" style="margin-top:8px"><table>${hdrStd}${sp.other.map(z=>whRow(o,z,done,wid==="wo"?null:undefined)).join("")}</table></div>`:"";
     return `<div class="card" style="${can("cdue",wid)?lateStyle(o):""}"><div class="row"><div><b>${cT(o,wid)}</b><div class="mut">${metaLine(o,wid)}</div></div><div class="x">${tag(o.stage)}</div></div>${can("cdue",wid)?dueBadge(o):""}<div style="margin-top:4px">${can("cship",wid)?shipLine(o):""}${wid==="wm"&&can("cwaybill",wid)?`<button class="b s x" onclick="printWaybill('${o.id}')">🖨 بوليصة شحن</button>`:""}</div>
-    ${lm?`<div class="hold" style="color:#8a4fd6">آخر تعديل: ${esc(lm.text)}</div>`:""}
+    ${lm&&(can("cship",wid)||/الأصناف|الكميات|تحضير/.test(lm.text))&&!(wid==="wo"&&/بيانات الشحن/.test(lm.text))?`<div class="hold" style="color:#7b5aa6">آخر تعديل: ${esc(lm.text)}</div>`:""}
     <div class="mut" style="margin-top:6px">جاهز ${rd} من ${mi.length} صنف عندك${done?" · <b>تم الشحن</b>"+(sh.ref?" (شحنة "+esc(sh.ref)+")":""):""}</div>
     ${groups}${others}
     ${done?`<div class="row" style="margin-top:8px"><span class="mut">الأصناف اتشحنت. لو عايز تعدّل التحضير الغي الشحن الأول.</span><button class="b s x" onclick="whUnship('${o.id}','${wid}')">إلغاء الشحن</button></div>`
-    :`<div class="row" style="margin-top:8px"><button class="b s x" onclick="pickAll('${o.id}','${wid}')">تحضير كل أصنافي كاملة</button><button class="b ok x" onclick="savePick('${o.id}','${wid}')">حفظ التحضير</button></div>
+    :`<div class="row" style="margin-top:8px"><button class="b ok x" onclick="wholeDone('${o.id}','${wid}')">تم التحضير بالكامل</button><button class="b x" onclick="savePick('${o.id}','${wid}')">حفظ التحضير (كميات مختلفة)</button></div>
     <div class="row" style="margin-top:8px"><input class="wi" id="ws-${o.id}" placeholder="رقم الشحنة (اختياري)"><button class="b x" onclick="whShip('${o.id}','${wid}')">تم شحن الكميات المتحضّرة</button></div>`}</div>`}).join("");
 }
 const pickFull=(oid,x)=>{const o=orders.find(z=>z.id===oid);if(!o)return;pendPick[oid+"-"+x]=o.items[x].qty;render()};
@@ -715,7 +792,6 @@ function savePick(oid,wid){
     const i=z.i,k=oid+"-"+z.x;let p=+i.picked||0,rs=i.reason||"";
     if(pendPick[k]!==undefined){const v=ar2en(pendPick[k]).replace(",",".");if(v===""||isNaN(+v)||+v<0)return toast("اكتب رقم صحيح في الكمية المتحضّرة: "+i.name);p=+v}
     if(pendReason[k]!==undefined)rs=pendReason[k];
-    if(p>+i.qty)return toast("الكمية المتحضّرة أكبر من المطلوبة في: "+i.name);
     if(p>=+i.qty)rs="";
     if(p!==(+i.picked||0)||rs!==(i.reason||""))ch.push({x:z.x,p,rs,name:i.name,q:i.qty});
   }
@@ -788,7 +864,7 @@ const cnt=s=>orders.reduce((n,o)=>n+mods(o).filter(m=>m.src===s).length,0);
 function list(rows,mode){
   if(!rows.length)return `<div class="empty">مفيش طلبات</div>`;
   return `<div class="tw"><table><tr><th>رقم الطلب</th><th>العميل</th><th>الموقف</th><th>التعديلات</th><th>التحصيل</th><th>آخر حركة</th><th></th></tr>
-  ${rows.map(o=>{const l=(o.log||[]).slice(-1)[0],m=mods(o),lm=m.slice(-1)[0];return `<tr style="${mode==="dash"&&isLate(o)?"background:rgba(214,59,59,.12)":""}"><td><b>${esc(o.num)}</b></td><td>${esc(o.customer)}<div class="mut">${esc(o.phone)} · ${o.amount||0} ج</div></td>
+  ${rows.map(o=>{const l=(o.log||[]).slice(-1)[0],m=mods(o),lm=m.slice(-1)[0];return `<tr style="${mode==="dash"&&isLate(o)?"background:rgba(214,59,59,.12)":""}"><td><b><bdi dir="ltr">${esc(o.num)}${o.ccode?"/"+esc(o.ccode):""}</bdi></b></td><td>${esc(o.customer)}<div class="mut">${esc(o.phone)} · ${o.amount||0} ج</div></td>
   <td>${tag(o.stage)}${mode==="dash"?dueBadge(o)+shipLine(o):""}${o.stage==="hold"&&o.holdReason?`<div class="hold">السبب: ${esc(o.holdReason)}</div>`:""}${o.shipRef?`<div class="mut">شحنة: ${esc(o.shipRef)}</div>`:""}${shipTxt(o)}<div class="mut">${whTxt(o)}</div>${pendKeys(o).length?`<div class="hold">بانتظار اطلاع: ${pendKeys(o).map(tlabel).join("، ")}</div>`:""}</td>
   <td>${m.length?`<span class="mod">${m.length}</span><div class="mut">آخر تعديل: ${esc(lm.text)}</div>`:`<span class="mut">—</span>`}</td>
   <td>${payTag(o)}</td>
@@ -800,15 +876,15 @@ function list(rows,mode){
 const allowed=()=>owner?["tele","log","wm","wo","acc","dash"]:["tele","log","wm","wo","acc"].includes(role)?[role]:[];
 const PINID={log:"pin",wm:"pinwm",wo:"pinwo",acc:"pina"};
 function chooser(){
-  const sec=(r,label)=>`<div style="margin-top:14px"><label>${label}${pins[r]?" (الرقم السري مطلوب)":""}</label>${pins[r]?`<input class="ci" id="${PINID[r]}" type="password" placeholder="الرقم السري">`:""}
-  <button class="b s" style="width:100%;margin-top:8px" onclick="pick('${r}')">دخول ${label}</button></div>`;
+  const tile=(r,title,sub)=>`<div class="card tile"><h3>${title}</h3><p>${sub}</p>${pins[r]?`<input class="ci" id="${PINID[r]}" type="password" placeholder="الرقم السري" style="margin-bottom:8px">`:""}<button class="b" style="width:100%" onclick="pick('${r}')">دخول</button></div>`;
   const names=namesList();
-  return `<div class="card" style="max-width:420px;margin:30px auto"><b>اختار شاشتك</b>
-  <div style="margin-top:12px"><label>شاشة التيليسيلز – دوسي على اسمك</label>
-  <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">${names.map((n,i)=>`<button class="b ${n===selGirl?"ok":"s"}" style="padding:12px 18px;font-size:16px" onclick="selGirl=namesList()[${i}];render()">${n===selGirl?"✓ ":""}${esc(n)}</button>`).join("")||'<span class="mut">مفيش أسماء مسجلة – المدير يضيفها من الداشبورد</span>'}</div>
-  ${selGirl?`${pinOf(selGirl)?'<input class="ci" id="pint" type="password" placeholder="الرقم السري بتاعك" style="margin-top:8px">':""}<button class="b" style="width:100%;margin-top:8px" onclick="pick('tele')">دخول باسم ${esc(selGirl)}</button>`:""}</div>
-  ${sec("log","شاشة اللوجيستك")}${sec("wm","شاشة مخزن مشعل")}${sec("wo","شاشة مخزن أكتوبر")}${sec("acc","شاشة الحسابات")}
-  <div class="mut" style="margin-top:12px">الداشبورد متاح لمالك الصفحة فقط.</div></div>`}
+  return `<div class="login"><div class="hero"><h2>شركة زماني<br>للعود والبخور</h2><p>متابعة الطلبات من التسجيل لحد الشحن والتحصيل.</p>
+  <svg viewBox="0 0 120 200" aria-hidden="true"><path d="M60 200C60 170 85 160 75 130C66 104 40 96 52 66C60 46 82 40 74 8"/><path d="M84 200C84 178 100 170 94 148C90 132 74 128 80 108"/></svg></div>
+  <div class="card"><h3 style="margin:0 0 2px;font-family:var(--fd);font-size:17px;color:var(--pri)">التيليسيلز</h3><div class="mut" style="margin-bottom:10px">اختاري اسمك${selGirl&&pinOf(selGirl)?" ثم اكتبي رقمك السري":""}.</div>
+  <div class="pills">${names.map((n,i)=>`<button class="b ${n===selGirl?"ok":"s"}" onclick="selGirl=namesList()[${i}];render()">${n===selGirl?"✓ ":""}${esc(n)}</button>`).join("")||'<span class="mut">مفيش أسماء مسجلة. المدير يضيفها من الإدارة.</span>'}</div>
+  ${selGirl?`<div class="row" style="margin-top:12px">${pinOf(selGirl)?'<input class="ci" id="pint" type="password" placeholder="الرقم السري بتاعك">':""}<button class="b x" style="flex:1" onclick="pick('tele')">دخول باسم ${esc(selGirl)}</button></div>`:""}</div>
+  <div class="tiles">${tile("log","اللوجيستك","توزيع الأصناف على المخازن ومتابعة الحالة")}${tile("acc","الحسابات","تأكيد التحصيل")}${tile("wm","مخزن مشعل","تجهيز الأصناف وطباعة البوليصة")}${tile("wo","مخزن أكتوبر","تجهيز الأصناف حسب العبوات")}</div>
+  <div class="mut" style="margin-top:14px;text-align:center">الإدارة متاحة للمدير فقط، من زر «دخول المدير» فوق.</div></div>`}
 function pick(r){
   if(r==="tele"){
     if(!selGirl)return toast("دوسي على اسمك الأول");
@@ -835,6 +911,9 @@ async function savePin(){
   try{await db.collection("settings").doc("pins").set({log:$("#pinin").value.trim(),wm:$("#pinwm").value.trim(),wo:$("#pinwo").value.trim(),acc:$("#pinacc").value.trim()});toast("تم حفظ الرقم السري ✔",true)}catch(e){toast("تعذر الحفظ: "+(e.message||e.code))}
 }
 function render(){
+  try{render0()}catch(e){const m=$("#msg");if(m){m.style.display="block";m.textContent="حصل خطأ في عرض الشاشة: "+(e.message||e)}}
+}
+function render0(){
   const al=allowed();
   $("#ownerBtn").textContent=owner?"خروج المدير":"دخول المدير";
   const tl=(owner?view==="tele":role==="tele"),box=$("#whoBox");
@@ -852,7 +931,13 @@ function render(){
   if(ae==="qn"||ae==="qg"){const e=document.getElementById(ae);if(e){e.focus();const n=e.value.length;try{e.setSelectionRange(n,n)}catch(x){}}}
 }
 let typing=false;document.addEventListener("input",()=>typing=true);
-function refresh(){const ae=document.activeElement,id=(ae&&ae.id)||"";if(typing&&(document.querySelector("#num")||document.querySelector("#mtxt")||document.querySelector(".ci")||document.querySelector("textarea")||["bfd","pinin","pinwm","pinwo","pinacc","cn","cp","cpin","rn","shh","wbn","wbp"].includes(id)||/^(gp-|shm-)/.test(id)||(ae&&ae.classList&&ae.classList.contains("wi"))))return;typing=false;render()}
+function snapVals(){const m={};document.querySelectorAll("#app input[id],#app textarea[id],#app select[id]").forEach(e=>{m[e.id]=e.type==="checkbox"?e.checked:e.value});return m}
+function refresh(){
+  const ae=document.activeElement;
+  if(ae&&/^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName)&&ae.type!=="checkbox"&&ae.closest&&ae.closest("#app"))return;
+  const v=snapVals();render();
+  Object.keys(v).forEach(id=>{const e=document.getElementById(id);if(!e||e.value===v[id])return;if(e.type==="checkbox")e.checked=v[id];else if(e.value===""||e.defaultValue===e.value)e.value=v[id]});
+}
 $("#who").value=who;$("#who").oninput=()=>{typing=false};
 render();
 let listening=false;
