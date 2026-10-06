@@ -89,11 +89,17 @@ th{color:var(--mut);font-weight:600;font-size:12px;background:rgba(0,0,0,.025)}
   #printArea .pb{page-break-inside:avoid;margin-bottom:12px}
   @page{size:A4;margin:10mm}
   body{background:#fff!important}
-  #printArea .wbx{width:190mm;height:138mm;border:2px solid #000;padding:0;overflow:hidden;font-size:15px;page-break-inside:avoid}
-  #printArea .wbx .co{background:#000;color:#fff;text-align:center;font-size:40px;font-weight:700;padding:14px 8px;line-height:1.2}
+  #printArea{box-sizing:border-box;width:100%;padding:0 1mm}
+  #printArea,#printArea *{box-sizing:border-box}
+  #printArea table{table-layout:auto}
+  #printArea th,#printArea td{overflow-wrap:anywhere;word-break:break-word}
+  #printArea .pb{border:0}
+  #printArea .wbx{width:100%;height:131mm;border:2px solid #000;padding:0;overflow:hidden;font-size:15px;page-break-inside:avoid}
+  #printArea .wbcut{border-top:2px dashed #666;margin:2.5mm 0;height:0;text-align:center}
+  #printArea .wbx .co{background:#000;color:#fff;text-align:center;font-size:38px;font-weight:700;padding:10px 8px;line-height:1.2}
   #printArea .wbx table{margin:0}
   #printArea .wbx th{width:26%;background:#eee;font-size:15px}
-  #printArea .wbx td{font-size:19px;font-weight:600}
+  #printArea .wbx td{font-size:18px;font-weight:600;padding:5px 8px}
 }
 #msg{background:#fff3cd;color:#664d03;padding:8px 14px;font-size:13px;display:none}
 </style>
@@ -250,6 +256,7 @@ const NEV=[
  {k:"tele_collect",l:"البنت بلّغت بالتحصيل",def:{log:1,acc:1}},
  {k:"log_edit",l:"مروان عدّل على طلب",def:{girl:1}},
  {k:"log_assign",l:"مروان طلب أصناف من المخازن (للمخازن المعنية بس)",def:{wm:1,wo:1,wa:1,girl:1}},
+ {k:"acc_hold",l:"الحسابات منعت الشحن لحين السداد (أو رفعت المنع)",def:{girl:1,log:1,wm:1,wo:1,wa:1}},
  {k:"acc_confirm",l:"الحسابات أكدت التحصيل",def:{girl:1,log:1,wm:1}},
  {k:"wm_edit",l:"مخزن مشعل عدّل",def:{log:1,girl:1}},
  {k:"wo_ship",l:"مخزن أكتوبر شحن الكميات لمخزن مشعل",def:{log:1,wm:1}},
@@ -271,8 +278,8 @@ function targets(r,o,text){
   let ev="";
   if(r==="tele")ev=/^التحصيل/.test(text)?"tele_collect":/^إلغاء/.test(text)?"tele_cancel":"tele_edit";
   else if(r==="log")ev=/^(تحويل|تحديث الأصناف|تعديل \(اللوجيستك\): تحديث الأصناف)/.test(text)?"log_assign":"log_edit";
-  else if(r==="acc")ev="acc_confirm";else if(r==="wm")ev="wm_edit";else if(r==="wo")ev=/تم الشحن/.test(text)?"wo_ship":"wo_edit";else if(r==="wa")ev=/تم الشحن/.test(text)?"wa_ship":"wa_edit";
-  let tg=evTargets(ev,o,ev==="log_assign"?whs:WHROLES);
+  else if(r==="acc")ev=/عدم الشحن|رفع منع/.test(text)?"acc_hold":"acc_confirm";else if(r==="wm")ev="wm_edit";else if(r==="wo")ev=/تم الشحن/.test(text)?"wo_ship":"wo_edit";else if(r==="wa")ev=/تم الشحن/.test(text)?"wa_ship":"wa_edit";
+  let tg=evTargets(ev,o,(ev==="log_assign"||ev==="acc_hold")?whs:WHROLES);
   if(isTr(o)){tg=tg.filter(k=>k.indexOf("tele:")!==0&&k!=="acc"&&!(k==="wm"&&o.destType!=="wm"))}
   return tg;
 }
@@ -381,7 +388,10 @@ function fleetCard(){
   return `<div class="card"><b>السائقين وسيارات الشركة</b><div class="mut">أضف الأسماء هنا، والمخزن بيختار منها لما يدوس «تم الخروج».</div>
   <div class="g2" style="margin-top:8px"><div><label>السائقين</label>${fleet.drivers.map((d,i)=>`<div class="row" style="margin-top:4px"><span>${esc(d)}</span><button class="b s x" onclick="delFleet('drivers',${i})">حذف</button></div>`).join("")||'<div class="mut">لسه مفيش</div>'}<div class="row" style="margin-top:6px"><input id="fl-drivers" placeholder="اسم سائق"><button class="b x" onclick="addFleet('drivers')">إضافة</button></div></div>
   <div><label>السيارات</label>${fleet.cars.map((d,i)=>`<div class="row" style="margin-top:4px"><span>${esc(d)}</span><button class="b s x" onclick="delFleet('cars',${i})">حذف</button></div>`).join("")||'<div class="mut">لسه مفيش</div>'}<div class="row" style="margin-top:6px"><input id="fl-cars" placeholder="اسم / رقم سيارة"><button class="b x" onclick="addFleet('cars')">إضافة</button></div></div></div>
-  <label style="margin-top:12px">وجهات أوامر النقل الداخلي (فروع ومكاتب الشركة) – مخزن مشعل (استوك) موجود دايماً</label>${(fleet.dests||[]).map((d,i)=>`<div class="row" style="margin-top:4px"><span>${esc(d)}</span><button class="b s x" onclick="delFleet('dests',${i})">حذف</button></div>`).join("")}<div class="row" style="margin-top:6px"><input id="fl-dests" placeholder="اسم فرع أو مكتب"><button class="b x" onclick="addFleet('dests')">إضافة</button></div></div>
+</div>
+
+  <div class="card"><b>جهات أوامر النقل الداخلي</b><div class="mut">الفروع والمكاتب اللي مروان بيختار منها في «أمر نقل داخلي». «مخزن مشعل (استوك)» موجود دايماً.</div>
+  ${(fleet.dests||[]).map((d,i)=>`<div class="row" style="margin-top:4px"><span>${esc(d)}</span><button class="b s x" onclick="delFleet('dests',${i})">حذف</button></div>`).join("")}<div class="row" style="margin-top:6px"><input id="fl-dests" placeholder="اسم فرع أو مكتب أو جهة"><button class="b x" onclick="addFleet('dests')">إضافة</button></div></div>
   <div class="card"><b>تقرير حركة سيارة الشركة</b><div class="mut">كل خروج من أكتوبر أو أبو صير لمخزن مشعل.</div>
   <div class="g2" style="margin-top:8px"><div><label>السيارة</label><select onchange="ff.car=this.value;render()"><option value="">كل السيارات</option>${opt(fleet.cars,ff.car)}</select></div><div><label>السائق</label><select onchange="ff.driver=this.value;render()"><option value="">كل السائقين</option>${opt(fleet.drivers,ff.driver)}</select></div>
   <div><label>من تاريخ</label><input type="date" value="${esc(ff.from)}" onchange="ff.from=this.value;render()"></div><div><label>إلى تاريخ</label><input type="date" value="${esc(ff.to)}" onchange="ff.to=this.value;render()"></div></div>
@@ -404,11 +414,12 @@ function printWaybill(id){
   const co=o.shipCo||(o.shipMethod==="تسليم الشركة"?"تسليم الشركة":"—"),ad=addrOf(o);
   const row=(a,b)=>`<tr><th style="text-align:right">${a}</th><td>${b}</td></tr>`;
   const adr=o.addr?ADDR_F.filter(([k])=>ad[k]).map(([k,l])=>`${l}: <b>${esc(ad[k])}</b>`).join("<br>"):esc(ad.s||"—").replace(/\n/g,"<br>");
-  doPrint("",`<div class="wbx"><div class="co">${esc(co)}</div><table>
+  const one=`<div class="wbx"><div class="co">${esc(co)}</div><table>
   ${row("الراسل",esc(wbill.senderName||WB_DEF.senderName))}${row("هاتف الراسل",esc(wbill.senderPhone||"—"))}
   ${row("المستلم",esc(o.customer))}${row("هاتف المستلم",esc(o.phone||"—"))}
   ${row("العنوان",adr)}
-  <tr><th style="text-align:right">رقم الطلب</th><td><bdi dir="ltr">${esc(o.num)}${o.ccode?"/"+esc(o.ccode):""}</bdi></td></tr></table></div>`,true);
+  <tr><th style="text-align:right">رقم الطلب</th><td><bdi dir="ltr">${esc(o.num)}${o.ccode?"/"+esc(o.ccode):""}</bdi></td></tr></table></div>`;
+  doPrint("",one+`<div class="wbcut"></div>`+one,true);
 }
 async function saveWaybill(){
   if(!db)return toast("الحفظ غير متاح");
@@ -463,7 +474,7 @@ function shipBox(o){
 }
 function saveShip(id){
   const m=$("#sm-"+id)?.value||"",c=($("#sc-"+id)?.value||"").trim(),ad=readAddr("sa"+id+"-"),d=addrTxt(ad);
-  if(!m||!addrOk(ad))return toast("اختار طريقة الشحن واكتب المحافظة والمركز والشارع");
+  if(!m||(m!=="تسليم الشركة"&&!addrOk(ad)))return toast("اختار طريقة الشحن واكتب المحافظة والمركز والشارع");
   if(m==="شركة شحن"&&!c)return toast("اكتب اسم شركة الشحن");
   const src=role==="tele"?SRC[2]:SRC[1];editShip=null;
   upd(id,o=>{o.shipMethod=m;o.shipCo=c;o.addr=ad;o.shipData=d},"تعديل ("+src+"): بيانات الشحن – "+m+(c?" – "+c:"")+": "+d.replace(/\n/g," / "),"mod",{src});
@@ -715,9 +726,9 @@ function teleView(){
   return `<div class="card"><b>طلب عميل جديد</b>
   <div class="g2"><div><label>رقم طلب العميل</label><input id="num"></div><div><label>كود العميل</label><input id="cc"></div><div><label>اسم العميل</label><input id="cust"></div>
   <div><label>التليفون</label><input id="ph"></div><div><label>قيمة الطلب</label><input id="amt" type="number"></div>
-  <div><label>طريقة الشحن</label><select id="sm"><option value="">— اختاري —</option>${SHIPM.map(m=>`<option>${m}</option>`).join("")}</select></div>
-  <div><label>اسم شركة الشحن (لو الشحن بشركة)</label><input id="sc"></div>
-  <div style="grid-column:1/-1"><b style="font-size:14px">عنوان التسليم</b>${addrInputs("a-",{})}</div></div>
+  <div><label>طريقة الشحن</label><select id="sm" onchange="shipUi()"><option value="">— اختاري —</option>${SHIPM.map(m=>`<option>${m}</option>`).join("")}</select></div>
+  <div id="scBox"><label>اسم شركة الشحن (لو الشحن بشركة)</label><input id="sc"></div>
+  <div id="addrBox" style="grid-column:1/-1"><b style="font-size:14px">عنوان التسليم</b>${addrInputs("a-",{})}</div></div>
   <label style="margin-top:12px">الأصناف والكميات (اختياري – انسخي من الإكسيل: رقم الطلب – كود الصنف – اسم الصنف – الكمية)</label>
   <textarea class="wi" id="itx" rows="5" placeholder="رقم الطلب ثم الكود ثم الصنف ثم الكمية – سطر لكل صنف (رقم الطلب لازم يطابق اللي فوق)"></textarea>
   <div style="margin-top:12px"><button class="b" onclick="newOrder()">إرسال للوجيستك</button></div></div>
@@ -728,8 +739,10 @@ async function newOrder(){
   const num=$("#num").value.trim(),c=$("#cust").value.trim();
   if(!num||!c)return alert("اكتب رقم طلب العميل واسم العميل");
   const sm=$("#sm")?.value||"",sc=($("#sc")?.value||"").trim(),ad=readAddr("a-"),cc=($("#cc")?.value||"").trim(),phn=($("#ph")?.value||"").trim();
-  if(!phn)return toast("اكتبي تليفون العميل (مطلوب لبوليصة الشحن)");
-  if(!sm||!addrOk(ad))return toast("اختاري طريقة الشحن واكتبي المحافظة والمركز والشارع");
+  const co2=sm==="تسليم الشركة";
+  if(!sm)return toast("اختاري طريقة الشحن");
+  if(!co2&&!phn)return toast("اكتبي تليفون العميل (مطلوب لبوليصة الشحن)");
+  if(!co2&&!addrOk(ad))return toast("اكتبي المحافظة والمركز والشارع");
   if(!cc)return toast("اكتبي كود العميل");
   const dupc=orders.find(o=>String(o.ccode||"").trim().toLowerCase()===cc.toLowerCase());
   if(dupc)return toast("كود العميل "+cc+" موجود قبل كده. مينفعش يتكرر.");
@@ -741,7 +754,7 @@ async function newOrder(){
   const wrong=pr.items.find(i=>String(i.order).trim()!==num);
   if(wrong)return toast("رقم الطلب في الأصناف ("+wrong.order+") لازم يطابق رقم الطلب اللي كتبتيه ("+num+")");
   const pn=buildNext([],pr.items).next;
-  const o={id:oidOf(num),items:pn,num,customer:c,phone:$("#ph").value.trim(),amount:+$("#amt").value||0,createdAt:Date.now(),createdBy:who,stage:"new",paid:false,holdReason:"",shipRef:"",ccode:cc,shipMethod:sm,shipCo:sc,addr:ad,shipData:addrTxt(ad),accAt:0,shippedAt:0,collected:0,acct:"",accAmt:0,log:[],mentions:[]};
+  const o={id:oidOf(num),items:pn,num,customer:c,phone:$("#ph").value.trim(),amount:+$("#amt").value||0,createdAt:Date.now(),createdBy:who,stage:"new",paid:false,holdReason:"",shipRef:"",ccode:cc,shipMethod:sm,shipCo:co2?"":sc,addr:co2?{}:ad,shipData:co2?"":addrTxt(ad),accAt:0,shippedAt:0,collected:0,acct:"",accAmt:0,log:[],mentions:[]};
   const nt=evTargets("tele_new",o,WHROLES);
   if(nt.length)o.mentions=[{id:""+Date.now(),t:Date.now(),by:actor(),from:"tele",text:"طلب جديد",to:nt,ack:{}}];
   if(await createOrder(o)){if(nt.length)pushMention(o,o.mentions[0]);render()}
@@ -765,26 +778,29 @@ function parseTransfer(txt){
 function transferCard(){
   return `<details class="card"><summary>🔁 أمر نقل داخلي – طلب تحضير كميات من أكتوبر أو أبو صير</summary>
   <div class="mut" style="margin-top:6px">للاستوك في مشعل، أو لفرع، أو لمكتب الشركة. مش طلب عميل، فمفيش فيه بيانات عميل ولا تحصيل.</div>
-  <div class="g2"><div><label>الوجهة</label><select id="tf-dest"><option value="">— اختار —</option>${destList().map(d=>`<option>${esc(d)}</option>`).join("")}</select></div>
-  <div><label>يتحضّر من</label><select id="tf-wh"><option value="wo">مخزن أكتوبر</option><option value="wa">مخزن أبو صير</option></select></div></div>
-  <label>الأصناف (انسخ من الإكسيل: كود – اسم الصنف – كمية، وعمود رابع اختياري للوحدة: عبوة / قطعة / كرتونة)</label>
-  <textarea class="wi" id="tf-txt" rows="5" placeholder="1000/1&#9;زيت خام&#9;20"></textarea>
+  <div><label>الجهة / الوجهة</label><select id="tf-dest"><option value="">— اختار —</option>${destList().map(d=>`<option>${esc(d)}</option>`).join("")}</select></div>
+  <div class="g2" style="margin-top:6px"><div><label>أصناف مخزن أكتوبر (كود – اسم الصنف – كمية)</label><textarea class="wi" id="tf-txt-wo" rows="5" placeholder="1000/1&#9;زيت خام&#9;20"></textarea></div>
+  <div><label>أصناف مخزن أبو صير (كود – اسم الصنف – كمية – وحدة: عبوة / قطعة / كرتونة)</label><textarea class="wi" id="tf-txt-wa" rows="5" placeholder="S1&#9;صابون&#9;10&#9;كرتونة"></textarea></div></div>
+  <div class="mut">املا خانة مخزن واحد أو الاتنين. كل مخزن بيشوف أصنافه بس.</div>
   <label>ملاحظة (اختياري)</label><input id="tf-note">
   <div style="margin-top:10px"><button class="b" onclick="createTransfer()">إرسال أمر التحضير للمخزن</button></div></details>`;
 }
 async function createTransfer(){
   if(!needName())return;
-  const dest=$("#tf-dest")?.value||"",w=$("#tf-wh")?.value||"",txt=($("#tf-txt")?.value||"").trim(),note=($("#tf-note")?.value||"").trim();
+  const dest=$("#tf-dest")?.value||"",note=($("#tf-note")?.value||"").trim();
   if(!dest)return toast("اختار الوجهة");
-  const pr=parseTransfer(txt);
-  if(pr.bad.length)return toast("سطر مش مفهوم (كود – اسم الصنف – كمية): "+pr.bad[0]);
-  if(!pr.items.length)return toast("الصق الأصناف والكميات");
+  const its=[];
+  for(const w of ["wo","wa"]){const pr=parseTransfer(($("#tf-txt-"+w)?.value||"").trim());
+    if(pr.bad.length)return toast("سطر مش مفهوم في أصناف "+WHN[w]+" (كود – اسم الصنف – كمية): "+pr.bad[0]);
+    pr.items.forEach(i=>its.push({...i,w}))}
+  if(!its.length)return toast("الصق الأصناف والكميات في مخزن واحد على الأقل");
+  const whsU=[...new Set(its.map(i=>i.w))];
   const d=new Date(),ymd=String(d.getFullYear()).slice(2)+String(d.getMonth()+1).padStart(2,"0")+String(d.getDate()).padStart(2,"0");
   const num="T"+ymd+"-"+(orders.filter(o=>isTr(o)&&String(o.num).startsWith("T"+ymd)).length+1);
   const o={id:oidOf(num),kind:"transfer",num,customer:dest,phone:"",amount:0,createdAt:Date.now(),createdBy:actor(),stage:"new",paid:false,holdReason:"",shipRef:"",shipMethod:"",shipCo:"",shipData:"",accAt:0,shippedAt:0,collected:0,acct:"",accAmt:0,dest,destType:dest===MISHAL_DEST?"wm":"other",note,
-    items:pr.items.map(i=>({name:i.name,code:i.code,qty:i.qty,wh:w,picked:0,reason:"",...(isPk(w)&&packOf(i.code)&&packOf(i.code).pack?{}:{unit:i.unit})})),log:[],mentions:[]};
+    items:its.map(i=>({name:i.name,code:i.code,qty:i.qty,wh:i.w,picked:0,reason:"",...(isPk(i.w)&&packOf(i.code)&&packOf(i.code).pack?{}:{unit:i.unit})})),log:[],mentions:[]};
   recalc(o);
-  const to=evTargets("log_assign",o,[w]).filter(k=>k.indexOf("tele:")!==0);
+  const to=evTargets("log_assign",o,whsU).filter(k=>k.indexOf("tele:")!==0);
   if(to.length)o.mentions=[{id:""+Date.now(),t:Date.now(),by:actor(),from:"log",text:"أمر نقل داخلي جديد – تحضير أصناف",to,ack:{}}];
   if(await createOrder(o)){if(to.length)pushMention(o,o.mentions[0]);render()}
 }
@@ -793,7 +809,7 @@ function logView(){
   const act=orders.filter(o=>!["delivered","cancelled"].includes(o.stage)&&match(o));
   if(!act.length)return transferCard()+searchBar()+pasteCard()+`<div class="card empty">مفيش طلبات مطابقة</div>`;
   return printBar()+transferCard()+searchBar()+pasteCard()+act.map(o=>`<div class="card" style="${can("cdue","log")?lateStyle(o):""}"><div class="row"><div><b>${cT(o,"log")}</b>${isTr(o)?` <span class="tag" style="background:#3d6f8e">أمر نقل داخلي</span> <span class="mut">← ${esc(o.dest||"")}</span>`:""}<div class="mut">${metaLine(o,"log")}</div></div><div class="x">${tag(o.stage)} ${mods(o).length?`<span class="mod">${mods(o).length} تعديل</span>`:""}</div></div>
-  <div class="mut">${whTxt(o)}</div>${can("cdue","log")?dueBadge(o):""}<div style="margin-top:4px">${can("cship","log")&&noT(o)?shipBox(o):""}${can("cwaybill","log")&&noT(o)?`<button class="b s x" onclick="printWaybill('${o.id}')">🖨 بوليصة شحن</button>`:""}</div>${!(o.items||[]).length?`<div class="hold">⚠ لسه ما اتسجلتش أصناف للطلب (الصق الأصناف من الإكسيل)</div>`:(o.items||[]).some(i=>!i.wh)?`<div class="hold">⚠ فيه أصناف لسه ما اتحدّدش لها مخزن</div>`:""}${o.stage==="modified"?`<div class="hold" style="color:#8a4fd6">⚠ آخر تعديل: ${esc(mods(o).slice(-1)[0]?.text)}</div>`:""}
+  <div class="mut">${whTxt(o)}</div>${can("cdue","log")?dueBadge(o):""}${holdBanner(o)}<div style="margin-top:4px">${can("cship","log")&&noT(o)?shipBox(o):""}${can("cwaybill","log")&&noT(o)?`<button class="b s x" onclick="printWaybill('${o.id}')">🖨 بوليصة شحن</button>`:""}</div>${!(o.items||[]).length?`<div class="hold">⚠ لسه ما اتسجلتش أصناف للطلب (الصق الأصناف من الإكسيل)</div>`:(o.items||[]).some(i=>!i.wh)?`<div class="hold">⚠ فيه أصناف لسه ما اتحدّدش لها مخزن</div>`:""}${o.stage==="modified"?`<div class="hold" style="color:#8a4fd6">⚠ آخر تعديل: ${esc(mods(o).slice(-1)[0]?.text)}</div>`:""}
   <div class="g2"><div><label>حالة الطلب</label><select onchange="setStage('${o.id}',this.value)">${Object.entries(STAGES).map(([v,s])=>`<option value="${v}" ${o.stage===v?"selected":""}>${s[0]}</option>`).join("")}</select></div>
   <div><label>سبب التوقف</label>${reasonSel("hr-"+o.id,o.holdReason,"setHold('"+o.id+"',this.value)")}</div>
   <div><label>رقم الشحنة</label><input value="${esc(o.shipRef)}" onchange="setShip('${o.id}',this.value)"></div>
@@ -801,7 +817,7 @@ function logView(){
   <div style="margin-top:8px">${itemsBox(o)}</div>
   <div style="margin-top:8px">${modBox(o,"log")}</div></div>`).join("");
 }
-const setStage=(id,v)=>{const cur=orders.find(x=>x.id===id);if(v==="hold"&&!(cur&&cur.holdReason)){toast("اختار سبب التوقف من القايمة الأول");render();return}return upd(id,o=>{o.stage=v;if(v==="shipped"){o.shippedAt=o.shippedAt||Date.now()}else if(v!=="delivered")o.shippedAt=0},"تغيير الحالة إلى: "+STAGES[v][0])};
+const setStage=(id,v)=>{const cur=orders.find(x=>x.id===id);if(cur&&cur.noShip&&["shipped","partial","delivered"].includes(v)){toast("🚫 الحسابات منعت شحن الطلب ده لحين سداد كامل القيمة");render();return}if(v==="hold"&&!(cur&&cur.holdReason)){toast("اختار سبب التوقف من القايمة الأول");render();return}return upd(id,o=>{o.stage=v;if(v==="shipped"){o.shippedAt=o.shippedAt||Date.now()}else if(v!=="delivered")o.shippedAt=0},"تغيير الحالة إلى: "+STAGES[v][0])};
 const setHold=(id,v)=>{if(!v){render();return}return upd(id,o=>{o.holdReason=v;o.stage="hold"},"سبب التوقف: "+v)};
 const setShip=(id,v)=>upd(id,o=>{o.shipRef=v},"رقم الشحنة: "+v);
 const togglePaid=id=>upd(id,o=>{o.paid=!o.paid},"التحصيل: "+(orders.find(x=>x.id===id).paid?"إلغاء":"تم"));
@@ -875,7 +891,7 @@ function whView(wid){
       <div class="mut">التوزيع: ${esc(byPackTxt(by))}</div>
       <div class="tw"><table>${hdrPack}${G.rows.map(r=>whRow(o,r,done,r.p)).join("")}</table></div></div>`}).join("");
     const others=sp.other.length?`<div class="tw" style="margin-top:8px"><table>${hdrStd}${sp.other.map(z=>whRow(o,z,done,isPk(wid)?null:undefined)).join("")}</table></div>`:"";
-    return `<div class="card" style="${can("cdue",wid)?lateStyle(o):""}"><div class="row"><div><b>${cT(o,wid)}</b>${isTr(o)?` <span class="tag" style="background:#3d6f8e">أمر نقل داخلي</span>`:""}<div class="mut">${metaLine(o,wid)}</div></div><div class="x">${tag(o.stage)}</div></div>${can("cdue",wid)?dueBadge(o):""}<div style="margin-top:4px">${can("cship",wid)?shipLine(o):""}${wid==="wm"&&can("cwaybill",wid)?`<button class="b s x" onclick="printWaybill('${o.id}')">🖨 بوليصة شحن</button>`:""}</div>
+    return `<div class="card" style="${can("cdue",wid)?lateStyle(o):""}"><div class="row"><div><b>${cT(o,wid)}</b>${isTr(o)?` <span class="tag" style="background:#3d6f8e">أمر نقل داخلي</span>`:""}<div class="mut">${metaLine(o,wid)}</div></div><div class="x">${tag(o.stage)}</div></div>${can("cdue",wid)?dueBadge(o):""}${holdBanner(o)}<div style="margin-top:4px">${can("cship",wid)?shipLine(o):""}${wid==="wm"&&can("cwaybill",wid)?`<button class="b s x" onclick="printWaybill('${o.id}')">🖨 بوليصة شحن</button>`:""}</div>
     ${lm&&(can("cship",wid)||/الأصناف|الكميات|تحضير/.test(lm.text))&&!(isFd(wid)&&/بيانات الشحن/.test(lm.text))?`<div class="hold" style="color:#7b5aa6">آخر تعديل: ${esc(lm.text)}</div>`:""}
     <div class="mut" style="margin-top:6px">جاهز ${rd} من ${mi.length} صنف عندك${done?" · <b>تم الشحن</b>"+(sh.ref?" (شحنة "+esc(sh.ref)+")":"")+(sh.driver?" · السائق "+esc(sh.driver)+" · "+esc(sh.car):""):""}</div>
     ${wid==="wm"?woBox(o):""}${groups}${others}
@@ -905,6 +921,7 @@ function whShip(oid,wid){
   const o0=orders.find(x=>x.id===oid);if(!o0||!needName())return;
   if(hasPend(o0,wid))return toast("احفظ التحضير الأول بزرار «حفظ التحضير»");
   if(!mineItems(o0,wid).some(z=>+z.i.picked>0))return toast("سجّل الكمية المتحضّرة واحفظها الأول");
+  if(o0.noShip)return toast("🚫 الحسابات منعت شحن الطلب ده لحين سداد كامل القيمة");
   const r=($("#ws-"+oid)?.value||"").trim();let dr="",car="";
   if(isFd(wid)){
     if(!fleet.drivers.length||!fleet.cars.length)return toast("المدير لسه ما ضافش السائقين والسيارات. كلّمه يضيفهم من الإدارة");
@@ -921,11 +938,17 @@ function accView(){
   if(!act.length)return searchBar()+`<div class="card empty">مفيش طلبات مطابقة</div>`;
   return searchBar()+act.map(o=>`<div class="card" style="${can("cdue","acc")?lateStyle(o):""}"><div class="row"><div><b>${cT(o,"acc")}</b><div class="mut">${[can("camt","acc")?"قيمة الطلب "+(o.amount||0)+" · بلّغت البنت تحصيل: "+(o.collected||0)+(o.collected?" ("+diffTxt(o.amount,o.collected).t+")":""):"",can("cgirl","acc")?"البنت: "+esc(o.createdBy):"",can("cphone","acc")?esc(o.phone):""].filter(Boolean).join(" · ")}</div></div><div class="x">${can("camt","acc")?payTag(o):""}</div></div>
   ${can("cdue","acc")?dueBadge(o):""}${can("cship","acc")?shipLine(o):""}
-  <div class="row" style="margin-top:8px"><button class="b ok" onclick="accFull('${o.id}')">تأكيد تحصيل كامل</button><input class="wi" id="ap-${o.id}" type="number" placeholder="إجمالي المبلغ المحصّل" oninput="accDiff('${o.id}')"><button class="b" onclick="accPart('${o.id}')">تأكيد المبلغ المحصّل</button></div><div id="ad-${o.id}" style="margin-top:6px"></div></div>`).join("");
+  ${holdBanner(o)}
+  <div class="row" style="margin-top:8px">${o.acct?"":`<button class="b ok" onclick="accFull('${o.id}')">تأكيد تحصيل كامل</button>`}<input class="wi" id="ap-${o.id}" type="number" placeholder="${o.acct?"تصحيح إجمالي المبلغ المحصّل":"إجمالي المبلغ المحصّل"}" value="${o.acct?esc(o.accAmt):""}" oninput="accDiff('${o.id}')"><button class="b" onclick="accPart('${o.id}')">${o.acct?"حفظ التصحيح":"تأكيد المبلغ المحصّل"}</button>${o.acct?`<button class="b s x" onclick="accReset('${o.id}')">إلغاء تأكيد التحصيل</button>`:""}</div>
+  ${o.acct!=="full"?`<div class="row" style="margin-top:8px">${o.noShip?`<button class="b s x" onclick="accNoShip('${o.id}',false)">رفع منع الشحن</button>`:`<button class="b x" style="background:var(--bad)" onclick="accNoShip('${o.id}',true)">🚫 عدم الشحن لحين سداد كامل القيمة</button>`}</div>`:""}
+  <div id="ad-${o.id}" style="margin-top:6px"></div></div></div>`).join("");
 }
-function accFull(id){const a=orders.find(x=>x.id===id).amount||0;upd(id,o=>{o.acct="full";o.accAmt=a;o.paid=true;o.accAt=o.accAt||Date.now()},"الحسابات: تأكيد تحصيل كامل ("+a+")")}
+const holdBanner=o=>o.noShip?`<div style="margin-top:6px;border:2px solid #b8412f;background:rgba(184,65,47,.12);color:#b8412f;border-radius:8px;padding:6px 10px;font-weight:700">🚫 ممنوع الشحن لحين سداد كامل القيمة${o.noShip.by?" (قرار الحسابات: "+esc(o.noShip.by)+")":""}</div>`:"";
+function accFull(id){const a=orders.find(x=>x.id===id).amount||0;upd(id,o=>{o.acct="full";o.accAmt=a;o.paid=true;o.accAt=o.accAt||Date.now();o.noShip=null},"الحسابات: تأكيد تحصيل كامل ("+a+")")}
+function accReset(id){const o0=orders.find(x=>x.id===id);if(!o0)return;upd(id,o=>{o.acct="";o.accAmt=0;o.paid=false},"الحسابات: إلغاء تأكيد التحصيل (كان "+o0.accAmt+") – تصحيح")}
+function accNoShip(id,on){upd(id,o=>{o.noShip=on?{by:actor(),t:Date.now()}:null},on?"الحسابات: عدم الشحن لحين سداد كامل القيمة":"الحسابات: رفع منع الشحن")}
 function accDiff(id){const o=orders.find(x=>x.id===id);const v=$("#ap-"+id)?.value;const e=$("#ad-"+id);if(!e||!o)return;if(v===""){e.innerHTML="";return}const d=diffTxt(o.amount,+v);e.innerHTML=`<span class="tag" style="background:${d.c}">${d.t}</span>`}
-function accPart(id){const v=+($("#ap-"+id)?.value)||0;if(!v)return toast("اكتب المبلغ المحصّل");const a=orders.find(x=>x.id===id).amount||0,d=diffTxt(a,v),full=v>=a&&a>0;upd(id,o=>{o.acct=full?"full":"partial";o.accAmt=v;o.paid=full;o.accAt=o.accAt||Date.now()},"الحسابات: تأكيد تحصيل "+v+" من "+a+" ("+d.t+")")}
+function accPart(id){const v=+($("#ap-"+id)?.value)||0;if(!v)return toast("اكتب المبلغ المحصّل");const a=orders.find(x=>x.id===id).amount||0,d=diffTxt(a,v),full=v>=a&&a>0;const was=orders.find(x=>x.id===id);upd(id,o=>{o.acct=full?"full":"partial";o.accAmt=v;o.paid=full;o.accAt=o.accAt||Date.now();if(full)o.noShip=null},(was&&was.acct?"الحسابات: تصحيح التحصيل من "+was.accAmt+" إلى "+v:"الحسابات: تأكيد تحصيل "+v)+" من "+a+" ("+d.t+")")}
 
 /* ---- Dashboard ---- */
 function dashView(){
@@ -975,7 +998,7 @@ function list(rows,mode){
   if(!rows.length)return `<div class="empty">مفيش طلبات</div>`;
   return `<div class="tw"><table><tr><th>رقم الطلب</th><th>العميل</th><th>الموقف</th><th>التعديلات</th><th>التحصيل</th><th>آخر حركة</th><th></th></tr>
   ${rows.map(o=>{const l=(o.log||[]).slice(-1)[0],m=mods(o),lm=m.slice(-1)[0];return `<tr style="${mode==="dash"&&isLate(o)?"background:rgba(214,59,59,.12)":""}"><td><b><bdi dir="ltr">${esc(o.num)}${o.ccode?"/"+esc(o.ccode):""}</bdi></b></td><td>${esc(o.customer)}<div class="mut">${esc(o.phone)} · ${o.amount||0} ج</div></td>
-  <td>${tag(o.stage)}${mode==="dash"?dueBadge(o)+shipLine(o):""}${o.stage==="hold"&&o.holdReason?`<div class="hold">السبب: ${esc(o.holdReason)}</div>`:""}${o.shipRef?`<div class="mut">شحنة: ${esc(o.shipRef)}</div>`:""}${shipTxt(o)}<div class="mut">${whTxt(o)}</div>${pendKeys(o).length?`<div class="hold">بانتظار اطلاع: ${pendKeys(o).map(tlabel).join("، ")}</div>`:""}</td>
+  <td>${tag(o.stage)}${o.noShip?`<div class="hold">🚫 ممنوع الشحن لحين السداد</div>`:""}${mode==="dash"?dueBadge(o)+shipLine(o):""}${o.stage==="hold"&&o.holdReason?`<div class="hold">السبب: ${esc(o.holdReason)}</div>`:""}${o.shipRef?`<div class="mut">شحنة: ${esc(o.shipRef)}</div>`:""}${shipTxt(o)}<div class="mut">${whTxt(o)}</div>${pendKeys(o).length?`<div class="hold">بانتظار اطلاع: ${pendKeys(o).map(tlabel).join("، ")}</div>`:""}</td>
   <td>${m.length?`<span class="mod">${m.length}</span><div class="mut">آخر تعديل: ${esc(lm.text)}</div>`:`<span class="mut">—</span>`}</td>
   <td>${payTag(o)}</td>
   <td class="mut">${l?fmt(l.t)+"<br>"+esc(l.by)+(l.rl?" ("+esc(l.rl)+")":""):""}</td>
@@ -1028,6 +1051,7 @@ async function savePin(){
 function render(){
   try{render0()}catch(e){const m=$("#msg");if(m){m.style.display="block";m.textContent="حصل خطأ في عرض الشاشة: "+(e.message||e)}}
 }
+function shipUi(){const v=$("#sm")?.value||"",h=v==="تسليم الشركة";const a=$("#scBox"),b=$("#addrBox");if(a)a.style.display=h?"none":"";if(b)b.style.display=h?"none":""}
 function render0(){
   const al=allowed();
   $("#ownerBtn").textContent=owner?"خروج المدير":"دخول المدير";
@@ -1044,6 +1068,7 @@ function render0(){
   const ae=document.activeElement&&document.activeElement.id;
   $("#app").innerHTML=(owner?"":notifPanel()+inbox())+(view==="tele"?teleView():view==="log"?logView():WHROLES.includes(view)?whView(view):view==="acc"?accView():dashView());
   if(ae==="qn"||ae==="qg"){const e=document.getElementById(ae);if(e){e.focus();const n=e.value.length;try{e.setSelectionRange(n,n)}catch(x){}}}
+  shipUi();
 }
 let typing=false;document.addEventListener("input",()=>typing=true);
 function snapVals(){const m={};document.querySelectorAll("#app input[id],#app textarea[id],#app select[id]").forEach(e=>{m[e.id]=e.type==="checkbox"?e.checked:e.value});return m}
