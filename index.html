@@ -209,7 +209,7 @@ async function wipeAll(){
 }
 const DEFAULT_REASONS=["الصنف غير متوفر بالمخزن","الكمية غير كافية","العميل طلب التأجيل","العميل لا يرد","العنوان غير واضح","بانتظار تحصيل المبلغ"];
 let reasons=DEFAULT_REASONS.slice();
-const reasonSel=(id,cur,cb)=>`<select class="wi" id="${id}" ${cb?`onchange="${cb}"`:""}><option value="">— اختار السبب —</option>${[...new Set([...(cur&&!reasons.includes(cur)?[cur]:[]),...reasons])].map(r=>`<option ${r===cur?"selected":""}>${esc(r)}</option>`).join("")}</select>`;
+const reasonSel=(id,cur,cb,noPay)=>`<select class="wi" id="${id}" ${cb?`onchange="${cb}"`:""}><option value="">— اختار السبب —</option>${[...new Set([...(cur&&!reasons.includes(cur)?[cur]:[]),...reasons])].filter(r=>!(noPay&&/تحصيل|سداد|دفع|الحسابات/.test(r))).map(r=>`<option ${r===cur?"selected":""}>${esc(r)}</option>`).join("")}</select>`;
 async function saveReasons(l){
   if(!db)return toast("الحفظ غير متاح");
   try{await db.collection("settings").doc("reasons").set({list:l});toast("تم حفظ الأسباب ✔",true)}catch(e){toast("تعذر الحفظ: "+(e.message||e.code))}
@@ -266,7 +266,7 @@ const NEV=[
  {k:"wa_edit",l:"مخزن أبو صير عدّل",def:{log:1}}
 ];
 const NRC=[["girl","البنت صاحبة الطلب"],["log","مروان"],["acc","الحسابات"],["wm","مخزن مشعل"],["wo","مخزن أكتوبر"],["wa","مخزن أبو صير"]];
-let nperms={},fleet={drivers:[],cars:[],dests:[SOHAG],staff:[]},ff={car:"",driver:"",from:"",to:""};
+let nperms={},fleet={drivers:[],cars:[],dests:[SOHAG],staff:[],preps:[],revs:[]},ff={car:"",driver:"",from:"",to:""};
 
 const nVal=(ev,rc)=>{const o=(nperms[ev]||{})[rc];if(o!==undefined)return !!o;return !!((NEV.find(x=>x.k===ev)||{def:{}}).def[rc])};
 async function setNotif(ev,rc,v){
@@ -282,6 +282,7 @@ function targets(r,o,text){
   else if(r==="acc")ev=/عدم الشحن|رفع منع/.test(text)?"acc_hold":"acc_confirm";else if(r==="wm")ev="wm_edit";else if(r==="wo")ev=/اكتملت مكونات/.test(text)?"feed_done":/تم الشحن/.test(text)?"wo_ship":"wo_edit";else if(r==="wa")ev=/اكتملت مكونات/.test(text)?"feed_done":/تم الشحن/.test(text)?"wa_ship":"wa_edit";
   let tg=evTargets(ev,o,(ev==="log_assign"||ev==="acc_hold")?whs:WHROLES);
   if(isTr(o)){tg=tg.filter(k=>k.indexOf("tele:")!==0&&k!=="acc"&&!(k==="wm"&&o.destType!=="wm"))}
+  if(r==="acc")tg=tg.filter(k=>!isFd(k)); /* أكتوبر وأبو صير ميعرفوش حاجة عن التحصيل والسداد */
   return tg;
 }
 function evTargets(ev,o,whOk){
@@ -336,7 +337,7 @@ const PERM_DEFS=[
  {k:"cship",l:"بيانات الشحن (الطريقة / الشركة / العنوان)",roles:["log","acc","wm","wo","wa"],def:{log:1,acc:1,wm:1,wo:0,wa:0}},
  {k:"cgirl",l:"اسم البنت صاحبة الطلب (والبحث بيها)",roles:["log","acc","wm","wo","wa"],def:{log:1,acc:1,wm:1,wo:0,wa:0}},
  {k:"camt",l:"قيمة الطلب والتحصيل",roles:["log","acc"],def:{log:1,acc:1}},
- {k:"cdue",l:"المدة المتبقية لخروج البضاعة (واللون الأحمر)",roles:["log","acc","wm","wo","wa"],def:{log:1,acc:1,wm:1,wo:0,wa:0}},
+ {k:"cdue",l:"المدة المتبقية لخروج البضاعة (واللون الأحمر)",roles:["log","acc","wm","wo","wa"],def:{log:1,acc:1,wm:1,wo:1,wa:1}},
  {k:"cwaybill",l:"طباعة بوليصة الشحن",roles:["log","wm"],def:{log:1,wm:1}},
  {k:"cprint",l:"طباعة قوائم التجهيز",roles:["log","wm","wo","wa"],def:{log:1,wm:1,wo:1,wa:1}}
 ];
@@ -388,6 +389,9 @@ function fleetCard(){
   const opt=(arr,cur)=>arr.map(x=>`<option ${x===cur?"selected":""}>${esc(x)}</option>`).join("");
   return `<div class="card"><b>أسماء موظفي الشركة (لشاشات اللوجيستك والمخازن والحسابات)</b><div class="mut">اللي بتضيفه هنا بيظهر في قايمة «اسمك» فوق كل شاشة، والموظف لازم يختار اسمه قبل أي حفظ. البنات بتدخل بأسمائها وأرقامها السرية من كارت أرقام البنات.</div>
   ${(fleet.staff||[]).map((d,i)=>`<div class="row" style="margin-top:4px"><span>${esc(d)}</span><button class="b s x" onclick="delFleet('staff',${i})">حذف</button></div>`).join("")||'<div class="mut">لسه مفيش أسماء</div>'}<div class="row" style="margin-top:6px"><input id="fl-staff" placeholder="اسم موظف"><button class="b x" onclick="addFleet('staff')">إضافة</button></div></div>
+  <div class="card"><b>محضّرين ومراجعين مخزن مشعل</b><div class="mut">أضف الأسماء هنا. مخزن مشعل بيختار منها اسم المحضّر واسم المراجع على كل طلب، وبيظهروا في الطباعة.</div>
+  <div class="g2" style="margin-top:8px"><div><label>المحضّرين</label>${(fleet.preps||[]).map((d,i)=>`<div class="row" style="margin-top:4px"><span>${esc(d)}</span><button class="b s x" onclick="delFleet('preps',${i})">حذف</button></div>`).join("")||'<div class="mut">لسه مفيش</div>'}<div class="row" style="margin-top:6px"><input id="fl-preps" placeholder="اسم محضّر"><button class="b x" onclick="addFleet('preps')">إضافة</button></div></div>
+  <div><label>المراجعين</label>${(fleet.revs||[]).map((d,i)=>`<div class="row" style="margin-top:4px"><span>${esc(d)}</span><button class="b s x" onclick="delFleet('revs',${i})">حذف</button></div>`).join("")||'<div class="mut">لسه مفيش</div>'}<div class="row" style="margin-top:6px"><input id="fl-revs" placeholder="اسم مراجع"><button class="b x" onclick="addFleet('revs')">إضافة</button></div></div></div></div>
   <div class="card"><b>السائقين وسيارات الشركة</b><div class="mut">أضف الأسماء هنا، والمخزن بيختار منها لما يدوس «تم الخروج».</div>
   <div class="g2" style="margin-top:8px"><div><label>السائقين</label>${fleet.drivers.map((d,i)=>`<div class="row" style="margin-top:4px"><span>${esc(d)}</span><button class="b s x" onclick="delFleet('drivers',${i})">حذف</button></div>`).join("")||'<div class="mut">لسه مفيش</div>'}<div class="row" style="margin-top:6px"><input id="fl-drivers" placeholder="اسم سائق"><button class="b x" onclick="addFleet('drivers')">إضافة</button></div></div>
   <div><label>السيارات</label>${fleet.cars.map((d,i)=>`<div class="row" style="margin-top:4px"><span>${esc(d)}</span><button class="b s x" onclick="delFleet('cars',${i})">حذف</button></div>`).join("")||'<div class="mut">لسه مفيش</div>'}<div class="row" style="margin-top:6px"><input id="fl-cars" placeholder="اسم / رقم سيارة"><button class="b x" onclick="addFleet('cars')">إضافة</button></div></div></div>
@@ -467,7 +471,7 @@ const hoursOfWh=(o,w)=>whHrs(w)||hoursOf(o);
 function dueInfoWh(o,w){
   if(o.stage==="cancelled")return null;
   const h=hoursOfWh(o,w),sh=(o.ship||{})[w]||{},nm=WHN[w]||w;
-  if(!o.accAt)return {c:"wait",t:"مهلة "+nm+" ("+h+" ساعة) لسه ما بدأتش – بانتظار تأكيد الحسابات للتحصيل"};
+  if(!o.accAt)return {c:"wait",t:"مهلة "+nm+" ("+h+" ساعة) لسه ما بدأتش"+(isFd(w)?"":" – بانتظار تأكيد الحسابات للتحصيل")};
   const due=o.accAt+h*HR;
   if(sh.done){const at=sh.t||0;if(!at)return {c:"ok",t:nm+": خرجت"};return at<=due?{c:"ok",t:nm+": خرجت في الوقت ✓"}:{c:"late",t:nm+": خرجت متأخرة "+fmtDur(at-due)}}
   const left=due-Date.now();
@@ -537,7 +541,7 @@ function printWh(wid,kind){
       body+=`<div style="margin:6px 0"><b>${esc(G.base)} – ${esc(G.name)}</b> – ${lbl}: <b>${fmtW(w)}</b> (${esc(byPackTxt(by))})<table><tr><th>الكود</th><th>اسم الصنف</th><th>الوحدة</th><th>المطلوب (عبوات)</th><th>المتحضّر</th><th>المتبقي</th><th>الوزن</th><th>تم</th></tr>${trs}</table></div>`;
     });
     if(sp.other.length)body+=`<table><tr><th>الكود</th><th>اسم الصنف</th><th>الوحدة</th><th>المطلوب</th><th>المتحضّر</th><th>المتبقي</th><th>تم</th></tr>${sp.other.map(z=>`<tr><td>${esc(z.i.code||"")}</td><td>${esc(z.i.name)}</td><td>${esc(unitOf(z.i)||"—")}</td><td>${esc(z.i.qty)}</td><td>${esc(+z.i.picked||0)}</td><td>${rem(z.i)}</td><td>☐</td></tr>`).join("")}</table>`;
-    return `<div class="pb"><b>طلب #${esc(dnum(o,sc))}</b>${can("cname",sc)?" – "+esc(o.customer):""}${can("cgirl",sc)?" · البنت: "+esc(o.createdBy):""}${can("cdue",sc)?" · "+esc(dueTxt(o)):""}${sh.done?" · <b>تم الشحن</b>":""}${can("cship",sc)?"<div>🚚 "+esc(shipTxtPlain(o))+"</div>":""}${body}</div>`;
+    return `<div class="pb"><b>طلب #${esc(dnum(o,sc))}</b>${can("cname",sc)?" – "+esc(o.customer):""}${can("cgirl",sc)?" · البنت: "+esc(o.createdBy):""}${can("cdue",sc)?" · "+esc((dueInfoWh(o,wid)||{}).t||""):""}${sh.done?" · <b>تم الشحن</b>":""}${wid==="wm"?`<div>المحضّر: <b>${esc(o.prep||"—")}</b> · المراجع: <b>${esc(o.rev||"—")}</b></div>`:""}${can("cship",sc)?"<div>🚚 "+esc(shipTxtPlain(o))+"</div>":""}${body}</div>`;
   }).join("");
   const sum=Object.keys(tot).length?`<div class="pb"><b>إجمالي ${lbl} من كل صنف</b><table><tr><th>الكود</th><th>اسم الصنف</th><th>الإجمالي</th><th>التوزيع</th></tr>${Object.entries(tot).map(([b,T])=>`<tr><td>${esc(b)}</td><td>${esc(T.name)}</td><td><b>${fmtW(T.g)}</b></td><td>${esc(byPackTxt(T.by))}</td></tr>`).join("")}</table></div>`:"";
   doPrint(WHN[wid]+" – "+(kind==="need"?"الأصناف المطلوب تجهيزها":"الأصناف المجهّزة"),sum+blocks);
@@ -871,7 +875,7 @@ function whRow(o,z,done,p){
   const full=(+i.qty>0)&&(+pv>=+i.qty);
   return `<tr style="background:${ROWBG[s.c]}">${first}
   <td><div style="display:flex;gap:8px;align-items:center"><input type="checkbox" title="تحضير كامل" aria-label="تحضير كامل" ${full?"checked":""} ${done?"disabled":""} onchange="pickTick('${o.id}',${z.x},this.checked)" style="width:24px;height:24px;flex:0 0 auto;padding:0"><input class="wi" type="number" min="0" step="any" style="width:90px;min-width:70px" ${done?"disabled":""} value="${esc(pv)}" oninput="pendPick['${k}']=this.value"></div></td>
-  <td>${reasonSel("rs-"+k,pr,"pendReason['"+k+"']=this.value")}</td></tr>`;
+  <td>${reasonSel("rs-"+k,pr,"pendReason['"+k+"']=this.value",isFd(i.wh))}</td></tr>`;
 }
 function pickTick(oid,x,on){
   const o=orders.find(z=>z.id===oid);if(!o)return;const k=oid+"-"+x,it=o.items[x];
@@ -928,6 +932,9 @@ function woBox(o){
   ${sh.driver||sh.car?`<div class="mut">السائق: <b>${esc(sh.driver||"—")}</b> · السيارة: <b>${esc(sh.car||"—")}</b></div>`:""}
   ${got?`<div class="mut">تم استلامها بواسطة ${esc(got.by)} – ${fmt(got.t)}</div>`:`<button class="b ok" style="margin-top:6px" onclick="wmReceive('${o.id}','${w}')">تم استلام كميات ${WHN[w]}</button>`}</div>`}).join("");
 }
+const prepBox=o=>{const sel=(k,l,arr)=>{const cur=o[k]||"",L=[...(arr||[])];if(cur&&!L.includes(cur))L.unshift(cur);return `<div><label>${l}</label><select onchange="setWmPeople('${o.id}','${k}',this.value)"><option value="">— اختار —</option>${L.map(n=>`<option ${n===cur?"selected":""}>${esc(n)}</option>`).join("")}</select></div>`};
+  return `<div class="g2" style="margin-top:8px">${sel("prep","اسم المحضّر",fleet.preps)}${sel("rev","اسم المراجع",fleet.revs)}</div>${!(fleet.preps||[]).length||!(fleet.revs||[]).length?'<div class="mut">لو القوايم فاضية كلّم المدير يضيف أسماء المحضّرين والمراجعين.</div>':""}`};
+const setWmPeople=(id,k,v)=>upd(id,o=>{o[k]=v},"مخزن مشعل: "+(k==="prep"?"المحضّر":"المراجع")+" "+(v||"(تم المسح)"),undefined,undefined,true);
 const wmReceive=(id,w)=>upd(id,o=>{o.wmRecv={...(o.wmRecv&&!o.wmRecv.t?o.wmRecv:{}),[w]:{t:Date.now(),by:actor()}};if(isTr(o)&&[...new Set((o.items||[]).map(i=>i.wh))].every(x=>o.wmRecv[x]))o.stage="delivered"},"مخزن مشعل: تم استلام كميات "+WHN[w]+" – الطلب جاهز للتقفيل");
 function whView(wid){
   const act=orders.filter(o=>(mineItems(o,wid).length||(wid==="wm"&&woShipped(o)&&(noT(o)||o.destType==="wm")))&&!["delivered","cancelled"].includes(o.stage)&&match(o));
@@ -946,9 +953,10 @@ function whView(wid){
       <div class="mut">التوزيع: ${esc(byPackTxt(by))}</div>
       <div class="tw"><table>${hdrPack}${G.rows.map(r=>whRow(o,r,done,r.p)).join("")}</table></div></div>`}).join("");
     const others=sp.other.length?`<div class="tw" style="margin-top:8px"><table>${hdrStd}${sp.other.map(z=>whRow(o,z,done,isPk(wid)?null:undefined)).join("")}</table></div>`:"";
-    return `<div class="card" style="${can("cdue",wid)?lateStyleWh(o,wid):""}"><div class="row"><div><b>${cT(o,wid)}</b>${isTr(o)?` <span class="tag" style="background:#3d6f8e">أمر نقل داخلي</span>`:""}<div class="mut">${metaLine(o,wid)}</div></div><div class="x">${tag(o.stage)}</div></div>${can("cdue",wid)?dueBadgeWh(o,wid):""}${holdBanner(o)}${wid==="wm"?compBanner(o):""}<div style="margin-top:4px">${can("cship",wid)?shipLine(o):""}${wid==="wm"&&can("cwaybill",wid)?`<button class="b s x" onclick="printWaybill('${o.id}')">🖨 بوليصة شحن</button>`:""}</div>
-    ${lm&&(can("cship",wid)||/الأصناف|الكميات|تحضير/.test(lm.text))&&!(isFd(wid)&&/بيانات الشحن/.test(lm.text))?`<div class="hold" style="color:#7b5aa6">آخر تعديل: ${esc(lm.text)}</div>`:""}
+    return `<div class="card" style="${can("cdue",wid)?lateStyleWh(o,wid):""}"><div class="row"><div><b>${cT(o,wid)}</b>${isTr(o)?` <span class="tag" style="background:#3d6f8e">أمر نقل داخلي</span>`:""}<div class="mut">${metaLine(o,wid)}</div></div><div class="x">${tag(o.stage)}</div></div>${can("cdue",wid)?dueBadgeWh(o,wid):""}${isFd(wid)?(o.noShip?'<div class="hold" style="margin-top:6px">⛔ الشحن متوقف حالياً. كلّم مروان.</div>':""):holdBanner(o)}${wid==="wm"?compBanner(o):""}<div style="margin-top:4px">${can("cship",wid)?shipLine(o):""}${wid==="wm"&&can("cwaybill",wid)?`<button class="b s x" onclick="printWaybill('${o.id}')">🖨 بوليصة شحن</button>`:""}</div>
+    ${lm&&!(isFd(wid)&&/تحصيل|سداد|الحسابات|دفع/.test(lm.text))&&(can("cship",wid)||/الأصناف|الكميات|تحضير/.test(lm.text))&&!(isFd(wid)&&/بيانات الشحن/.test(lm.text))?`<div class="hold" style="color:#7b5aa6">آخر تعديل: ${esc(lm.text)}</div>`:""}
     <div class="mut" style="margin-top:6px">جاهز ${rd} من ${mi.length} صنف عندك${done?" · <b>تم الشحن</b>"+(sh.ref?" (شحنة "+esc(sh.ref)+")":"")+(sh.driver?" · السائق "+esc(sh.driver)+" · "+esc(sh.car):""):""}</div>
+    ${wid==="wm"?prepBox(o):""}
     ${wid==="wm"?woBox(o):""}${groups}${others}
     ${done?`<div class="row" style="margin-top:8px"><span class="mut">الأصناف اتشحنت. لو عايز تعدّل التحضير الغي الشحن الأول.</span><button class="b s x" onclick="whUnship('${o.id}','${wid}')">إلغاء الشحن</button></div>`
     :`${wid==="wm"&&!mi.length?"":`<div class="row" style="margin-top:8px"><button class="b ok x" onclick="wholeDone('${o.id}','${wid}')">تم التحضير بالكامل</button><button class="b x" onclick="savePick('${o.id}','${wid}')">حفظ التحضير (كميات مختلفة)</button></div>`}
@@ -978,7 +986,8 @@ function whShip(oid,wid){
   const f0=feedSt(o0);
   if(wid==="wm"&&!mineItems(o0,wid).length&&f0){if(!f0.complete)return toast("لسه مكونات الطلب ما اكتملتش: بانتظار "+f0.missing.map(w=>WHN[w]).join(" و"))}
   else if(!mineItems(o0,wid).some(z=>+z.i.picked>0))return toast("سجّل الكمية المتحضّرة واحفظها الأول");
-  if(o0.noShip)return toast("🚫 الحسابات منعت شحن الطلب ده لحين سداد كامل القيمة");
+  if(o0.noShip)return toast(isFd(wid)?"⛔ الشحن متوقف حالياً. كلّم مروان.":"🚫 الحسابات منعت شحن الطلب ده لحين سداد كامل القيمة");
+  if(wid==="wm"&&!(o0.prep&&o0.rev))return toast("اختار اسم المحضّر واسم المراجع على الطلب قبل الخروج");
   const r=($("#ws-"+oid)?.value||"").trim();let dr="",car="";
   if(isFd(wid)){
     if(!fleet.drivers.length||!fleet.cars.length)return toast("المدير لسه ما ضافش السائقين والسيارات. كلّمه يضيفهم من الإدارة");
@@ -1155,7 +1164,7 @@ function startListeners(){
   if(listening)return;listening=true;
   db=firebase.firestore();
   const err=e=>{const m=$("#msg");m.style.display="block";m.textContent="خطأ في الاتصال بقاعدة البيانات: "+(e.message||e.code)};
-  db.collection("settings").onSnapshot(x=>{pins={};shipHours=72;shipHoursBy={};whHours={};perms={};nperms={};fleet={drivers:[],cars:[],dests:[SOHAG],staff:[]};wbill={...WB_DEF};reasons=DEFAULT_REASONS.slice();x.docs.forEach(d=>{const v=d.data()||{};if(d.id==="reasons"){const l=toArr(v.list).filter(Boolean);reasons=l}else if(d.id==="rules"){whHours=v.byWh||{};const h=+v.shipHours;if(h>0)shipHours=h;shipHoursBy=v.byMethod||{}}else if(d.id==="perms"){perms=v}else if(d.id==="notif"){nperms=v}else if(d.id==="fleet"){fleet={drivers:toArr(v.drivers).filter(Boolean),cars:toArr(v.cars).filter(Boolean),dests:v.dests?toArr(v.dests).filter(Boolean):[SOHAG],staff:toArr(v.staff).filter(Boolean)}}else if(d.id==="waybill"){wbill={...WB_DEF,...v}}else if(v.phones)contacts=mergeC(toArr(v.phones).filter(x=>x&&x.name));else pins=v});refresh()},err);
+  db.collection("settings").onSnapshot(x=>{pins={};shipHours=72;shipHoursBy={};whHours={};perms={};nperms={};fleet={drivers:[],cars:[],dests:[SOHAG],staff:[],preps:[],revs:[]};wbill={...WB_DEF};reasons=DEFAULT_REASONS.slice();x.docs.forEach(d=>{const v=d.data()||{};if(d.id==="reasons"){const l=toArr(v.list).filter(Boolean);reasons=l}else if(d.id==="rules"){whHours=v.byWh||{};const h=+v.shipHours;if(h>0)shipHours=h;shipHoursBy=v.byMethod||{}}else if(d.id==="perms"){perms=v}else if(d.id==="notif"){nperms=v}else if(d.id==="fleet"){fleet={drivers:toArr(v.drivers).filter(Boolean),cars:toArr(v.cars).filter(Boolean),dests:v.dests?toArr(v.dests).filter(Boolean):[SOHAG],staff:toArr(v.staff).filter(Boolean),preps:toArr(v.preps).filter(Boolean),revs:toArr(v.revs).filter(Boolean)}}else if(d.id==="waybill"){wbill={...WB_DEF,...v}}else if(v.phones)contacts=mergeC(toArr(v.phones).filter(x=>x&&x.name));else pins=v});refresh()},err);
   db.collection("orders").orderBy("createdAt","desc").onSnapshot(s=>{orders=s.docs.map(d=>d.data());checkNew();refresh()},err);
 }
 (function(){
