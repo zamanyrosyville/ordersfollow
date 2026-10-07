@@ -110,8 +110,8 @@ th{color:var(--mut);font-weight:600;font-size:12px;background:rgba(0,0,0,.025)}
 <div id="toast" style="position:fixed;bottom:calc(16px + env(safe-area-inset-bottom,0px));left:12px;right:12px;z-index:20;display:none;background:#b8412f;color:#fff;padding:12px;border-radius:10px;text-align:center"></div>
 <header>
   <div class="top"><h1>زماني <small>متابعة طلبات العملاء</small></h1>
-  <div class="acts"><button class="b s" id="chg" style="display:none" onclick="role='';try{localStorage.removeItem('role')}catch(e){};render()">تغيير الشاشة</button><button class="b s" id="ownerBtn" onclick="owner?ownerLogout():ownerLogin()">دخول المدير</button></div></div>
-  <div style="margin-bottom:10px"><input id="who" list="names" placeholder="اسمك (مطلوب قبل أي حفظ)" style="max-width:320px"><datalist id="names"></datalist><div id="whoBox" style="display:none;flex-wrap:wrap;gap:6px;align-items:center"></div></div>
+  <div class="acts"><button class="b s" id="refBtn" onclick="location.reload()">🔄 تحديث الصفحة</button><button class="b s" id="chg" style="display:none" onclick="role='';try{localStorage.removeItem('role')}catch(e){};render()">🚪 تسجيل خروج</button><button class="b s" id="ownerBtn" onclick="owner?ownerLogout():ownerLogin()">👑 لوحة المدير</button></div></div>
+  <div style="margin-bottom:10px"><select id="who" style="max-width:320px" onchange="who=this.value;try{localStorage.setItem('who_'+role,who)}catch(e){}"></select><div id="whoBox" style="display:none;flex-wrap:wrap;gap:6px;align-items:center"></div></div>
   <nav>
     <button data-v="tele">التيليسيلز</button>
     <button data-v="log">اللوجيستك</button>
@@ -259,13 +259,14 @@ const NEV=[
  {k:"acc_hold",l:"الحسابات منعت الشحن لحين السداد (أو رفعت المنع)",def:{girl:1,log:1,wm:1,wo:1,wa:1}},
  {k:"acc_confirm",l:"الحسابات أكدت التحصيل",def:{girl:1,log:1,wm:1}},
  {k:"wm_edit",l:"مخزن مشعل عدّل",def:{log:1,girl:1}},
+ {k:"feed_done",l:"اكتملت كل مكونات طلب عميل من أكتوبر وأبو صير (جاهز لمشعل واللوجيستك للشحن)",def:{log:1,wm:1}},
  {k:"wo_ship",l:"مخزن أكتوبر شحن الكميات لمخزن مشعل",def:{log:1,wm:1}},
  {k:"wo_edit",l:"مخزن أكتوبر عدّل",def:{log:1}},
  {k:"wa_ship",l:"مخزن أبو صير شحن الكميات لمخزن مشعل",def:{log:1,wm:1}},
  {k:"wa_edit",l:"مخزن أبو صير عدّل",def:{log:1}}
 ];
 const NRC=[["girl","البنت صاحبة الطلب"],["log","مروان"],["acc","الحسابات"],["wm","مخزن مشعل"],["wo","مخزن أكتوبر"],["wa","مخزن أبو صير"]];
-let nperms={},fleet={drivers:[],cars:[],dests:[SOHAG]},ff={car:"",driver:"",from:"",to:""};
+let nperms={},fleet={drivers:[],cars:[],dests:[SOHAG],staff:[]},ff={car:"",driver:"",from:"",to:""};
 
 const nVal=(ev,rc)=>{const o=(nperms[ev]||{})[rc];if(o!==undefined)return !!o;return !!((NEV.find(x=>x.k===ev)||{def:{}}).def[rc])};
 async function setNotif(ev,rc,v){
@@ -278,7 +279,7 @@ function targets(r,o,text){
   let ev="";
   if(r==="tele")ev=/^التحصيل/.test(text)?"tele_collect":/^إلغاء/.test(text)?"tele_cancel":"tele_edit";
   else if(r==="log")ev=/^(تحويل|تحديث الأصناف|تعديل \(اللوجيستك\): تحديث الأصناف)/.test(text)?"log_assign":"log_edit";
-  else if(r==="acc")ev=/عدم الشحن|رفع منع/.test(text)?"acc_hold":"acc_confirm";else if(r==="wm")ev="wm_edit";else if(r==="wo")ev=/تم الشحن/.test(text)?"wo_ship":"wo_edit";else if(r==="wa")ev=/تم الشحن/.test(text)?"wa_ship":"wa_edit";
+  else if(r==="acc")ev=/عدم الشحن|رفع منع/.test(text)?"acc_hold":"acc_confirm";else if(r==="wm")ev="wm_edit";else if(r==="wo")ev=/اكتملت مكونات/.test(text)?"feed_done":/تم الشحن/.test(text)?"wo_ship":"wo_edit";else if(r==="wa")ev=/اكتملت مكونات/.test(text)?"feed_done":/تم الشحن/.test(text)?"wa_ship":"wa_edit";
   let tg=evTargets(ev,o,(ev==="log_assign"||ev==="acc_hold")?whs:WHROLES);
   if(isTr(o)){tg=tg.filter(k=>k.indexOf("tele:")!==0&&k!=="acc"&&!(k==="wm"&&o.destType!=="wm"))}
   return tg;
@@ -371,8 +372,8 @@ async function saveFleet(f){
   if(!db)return toast("الحفظ غير متاح");
   try{await db.collection("settings").doc("fleet").set(f);toast("تم الحفظ ✔",true)}catch(e){toast("تعذر الحفظ: "+(e.message||e.code))}
 }
-const addFleet=k=>{const e=$("#fl-"+k),v=(e.value||"").trim();if(!v)return toast("اكتب الاسم");if(fleet[k].includes(v))return toast("موجود قبل كده");saveFleet({...fleet,[k]:[...fleet[k],v]})};
-const delFleet=(k,i)=>saveFleet({...fleet,[k]:fleet[k].filter((_,x)=>x!==i)});
+const addFleet=k=>{const e=$("#fl-"+k),v=(e.value||"").trim();if(!v)return toast("اكتب الاسم");if((fleet[k]||[]).includes(v))return toast("موجود قبل كده");saveFleet({...fleet,[k]:[...(fleet[k]||[]),v]})};
+const delFleet=(k,i)=>saveFleet({...fleet,[k]:(fleet[k]||[]).filter((_,x)=>x!==i)});
 function fleetRows(){
   const out=[];
   orders.forEach(o=>PACKWH.forEach(w=>{const sh=(o.ship||{})[w];if(!(sh&&sh.done&&(sh.car||sh.driver)))return;
@@ -385,7 +386,9 @@ const fday=t=>new Date(t).toLocaleDateString("ar-EG",{day:"numeric",month:"short
 function fleetCard(){
   const rows=fleetRows(),by={};rows.forEach(r=>{const g=by[r.car]=by[r.car]||{n:0,days:new Set(),drv:new Set()};g.n++;g.days.add(fday(r.t));g.drv.add(r.driver)});
   const opt=(arr,cur)=>arr.map(x=>`<option ${x===cur?"selected":""}>${esc(x)}</option>`).join("");
-  return `<div class="card"><b>السائقين وسيارات الشركة</b><div class="mut">أضف الأسماء هنا، والمخزن بيختار منها لما يدوس «تم الخروج».</div>
+  return `<div class="card"><b>أسماء موظفي الشركة (لشاشات اللوجيستك والمخازن والحسابات)</b><div class="mut">اللي بتضيفه هنا بيظهر في قايمة «اسمك» فوق كل شاشة، والموظف لازم يختار اسمه قبل أي حفظ. البنات بتدخل بأسمائها وأرقامها السرية من كارت أرقام البنات.</div>
+  ${(fleet.staff||[]).map((d,i)=>`<div class="row" style="margin-top:4px"><span>${esc(d)}</span><button class="b s x" onclick="delFleet('staff',${i})">حذف</button></div>`).join("")||'<div class="mut">لسه مفيش أسماء</div>'}<div class="row" style="margin-top:6px"><input id="fl-staff" placeholder="اسم موظف"><button class="b x" onclick="addFleet('staff')">إضافة</button></div></div>
+  <div class="card"><b>السائقين وسيارات الشركة</b><div class="mut">أضف الأسماء هنا، والمخزن بيختار منها لما يدوس «تم الخروج».</div>
   <div class="g2" style="margin-top:8px"><div><label>السائقين</label>${fleet.drivers.map((d,i)=>`<div class="row" style="margin-top:4px"><span>${esc(d)}</span><button class="b s x" onclick="delFleet('drivers',${i})">حذف</button></div>`).join("")||'<div class="mut">لسه مفيش</div>'}<div class="row" style="margin-top:6px"><input id="fl-drivers" placeholder="اسم سائق"><button class="b x" onclick="addFleet('drivers')">إضافة</button></div></div>
   <div><label>السيارات</label>${fleet.cars.map((d,i)=>`<div class="row" style="margin-top:4px"><span>${esc(d)}</span><button class="b s x" onclick="delFleet('cars',${i})">حذف</button></div>`).join("")||'<div class="mut">لسه مفيش</div>'}<div class="row" style="margin-top:6px"><input id="fl-cars" placeholder="اسم / رقم سيارة"><button class="b x" onclick="addFleet('cars')">إضافة</button></div></div></div>
 </div>
@@ -535,16 +538,17 @@ function printReport(){
 let editItems=null;
 const ar2en=s=>String(s).replace(/[٠-٩]/g,d=>"٠١٢٣٤٥٦٧٨٩".indexOf(d)).replace(/[۰-۹]/g,d=>"۰۱۲۳۴۵۶۷۸۹".indexOf(d)).replace(/٫/g,".");
 const isNum=s=>s!==""&&!isNaN(+String(s).replace(",","."));
+const normUnit=u=>/كرتون/.test(u||"")?"كرتونة":/عبو/.test(u||"")?"عبوة":/قطع|حبة|حبه|وحدة/.test(u||"")?"قطعة":"";
 function parseItems(txt){
   const items=[],bad=[],lines=ar2en(txt).split(/\r?\n/).filter(l=>l.trim());
   const cellsOf=l=>l.indexOf("\t")>=0?l.split("\t").map(s=>s.trim()):l.split(/[,;،]/).map(s=>s.trim());
-  let map={o:0,c:1,n:2,q:3},start=0;
+  let map={o:0,c:1,n:2,q:3,u:4},start=0;
   if(lines.length){
     const h=cellsOf(lines[0]),m={};
-    h.forEach((x,i)=>{if(/طلب|order/i.test(x))m.o=i;else if(/كود|code|sku|باركود/i.test(x))m.c=i;else if(/كمي|qty|quantity|عدد/i.test(x))m.q=i;else if(/صنف|اسم|item|name|بيان|منتج/i.test(x))m.n=i});
+    h.forEach((x,i)=>{if(/طلب|order/i.test(x))m.o=i;else if(/كود|code|sku|باركود/i.test(x))m.c=i;else if(/وحد|unit/i.test(x))m.u=i;else if(/كمي|qty|quantity|عدد/i.test(x))m.q=i;else if(/صنف|اسم|item|name|بيان|منتج/i.test(x))m.n=i});
     if(Object.keys(m).length&&!h.some(x=>isNum(x))){
       start=1;
-      if(m.o!==undefined&&m.n!==undefined&&m.q!==undefined)map={o:m.o,c:m.c,n:m.n,q:m.q};
+      if(m.o!==undefined&&m.n!==undefined&&m.q!==undefined)map={o:m.o,c:m.c,n:m.n,q:m.q,u:m.u};
       else bad.push(lines[0]);
     }
   }
@@ -552,12 +556,12 @@ function parseItems(txt){
   lines.slice(start).forEach(line=>{
     const c=cellsOf(line);
     const od=c[map.o]||"",n=c[map.n]||"",q=c[map.q]||"",code=map.c!==undefined?(c[map.c]||""):"";
-    if(c.length>=need&&od&&n&&isNum(q)&&+q.replace(",",".")>0)items.push({order:od,name:n,code:code,qty:+q.replace(",",".")});
+    if(c.length>=need&&od&&n&&isNum(q)&&+q.replace(",",".")>0)items.push({order:od,name:n,code:code,qty:+q.replace(",","."),unit:normUnit(map.u!==undefined?c[map.u]:"")});
     else bad.push(line);
   });
   return {items,bad};
 }
-const itemsTsv=o=>(o.items||[]).map(i=>o.num+"\t"+(i.code||"")+"\t"+i.name+"\t"+i.qty).join("\n");
+const itemsTsv=o=>(o.items||[]).map(i=>o.num+"\t"+(i.code||"")+"\t"+i.name+"\t"+i.qty+(unitOf(i)?"\t"+unitOf(i):"")).join("\n");
 let pendWh={},pendPick={},pendReason={},pendUnit={};
 const ROWBG={ok:"rgba(47,125,91,.22)",part:"rgba(181,122,44,.24)",bad:"rgba(184,65,47,.18)",un:"transparent",no:"transparent"};
 const PACK={"1":{g:1000,n:"عبوة كيلو"},"2":{g:500,n:"عبوة نص كيلو"},"4":{g:250,n:"عبوة ربع كيلو"},"100":{g:100,n:"عبوة 100 جرام"},"50":{g:50,n:"عبوة 50 جرام"},"5":{g:5000,n:"عبوة 5 كيلو"},"25":{g:25000,n:"برميل 25 كيلو"}};
@@ -582,11 +586,14 @@ function recalc(o){
   const it=o.items||[];if(!it.length||it.some(i=>!i.wh))return;
   if(o.stage==="hold"&&o.holdReason&&!/^مخزن/.test(o.holdReason))return; /* توقف يدوي من اللوجيستك */
   const ready=it.every(i=>+i.qty>0&&+i.picked>=+i.qty),inv=[...new Set(it.map(i=>i.wh))],sh=o.ship||{};
-  const all=inv.every(w=>sh[w]&&sh[w].done),any=inv.some(w=>sh[w]&&sh[w].done);
+  let all=inv.every(w=>sh[w]&&sh[w].done),any=inv.some(w=>sh[w]&&sh[w].done),rdy=ready;
+  if(noT(o)){ /* طلب عميل: الشحن للعميل من مشعل. خروج أكتوبر/أبو صير = توريد لمشعل مش شحن للعميل */
+    const fdOk=inv.filter(isFd).every(w=>sh[w]&&sh[w].done),wmD=!!(sh.wm&&sh.wm.done);
+    all=wmD&&fdOk;any=wmD;rdy=ready&&fdOk}
   const short=it.find(i=>(+i.picked||0)<(+i.qty)&&i.reason);
   if(all&&ready){o.stage="shipped";o.holdReason=""}
   else if(any){o.stage="partial";o.holdReason=""}
-  else if(ready){o.stage="ready";o.holdReason=""}
+  else if(rdy){o.stage="ready";o.holdReason=""}
   else if(short){o.stage="hold";o.holdReason=WHN[short.wh]+": "+short.name+" – "+short.reason}
   else{o.stage="checking";o.holdReason=""}
   if(o.stage==="shipped")o.shippedAt=o.shippedAt||Date.now();else o.shippedAt=0;
@@ -606,8 +613,8 @@ function itemsBox(o){
     ${it.length?`<div class="row" style="margin-top:6px"><span class="x mut">اختيار سريع للمخزن:</span><button class="b s x" onclick="allWh('${o.id}','wm')">كل الأصناف ← مشعل</button><button class="b s x" onclick="allWh('${o.id}','wo')">كل الأصناف ← أكتوبر</button><button class="b s x" onclick="allWh('${o.id}','wa')">كل الأصناف ← أبو صير</button><button class="b ok x" onclick="saveWh('${o.id}')">حفظ توزيع المخازن</button></div>`:""}
     <button class="b s" style="margin-top:6px" onclick="editItems='${o.id}';render()">${it.length?"تعديل / لصق من جديد":"📋 لصق الأصناف من الإكسيل"}</button></div>`;
   }
-  return `<div><b>الأصناف والكميات</b><div class="mut">انسخ من الإكسيل 4 أعمدة بالترتيب: رقم الطلب ثم كود الصنف ثم اسم الصنف ثم الكمية. رقم الطلب لازم يكون نفس الطلب ده. الأصناف اللي ليها نفس الكود بتحتفظ بمخزنها وتحضيرها.</div>
-  <textarea class="wi" id="it-${o.id}" rows="7" placeholder="مثال (رقم الطلب ثم الكود ثم الصنف ثم الكمية):&#10;300&#9;1000/1&#9;زيت خام&#9;20&#10;300&#9;1000/2&#9;زيت خام&#9;10" style="margin-top:6px">${esc(itemsTsv(o))}</textarea>
+  return `<div><b>الأصناف والكميات</b><div class="mut">انسخ من الإكسيل الأعمدة بالترتيب: رقم الطلب ثم كود الصنف ثم اسم الصنف ثم الكمية ثم الوحدة (عبوة / قطعة / كرتونة، والوحدة اختيارية). رقم الطلب لازم يكون نفس الطلب ده. الأصناف اللي ليها نفس الكود بتحتفظ بمخزنها وتحضيرها.</div>
+  <textarea class="wi" id="it-${o.id}" rows="7" placeholder="مثال (رقم الطلب ثم الكود ثم الصنف ثم الكمية ثم الوحدة):&#10;300&#9;1000/1&#9;زيت خام&#9;20&#9;عبوة&#10;300&#9;1000/2&#9;زيت خام&#9;10&#9;عبوة" style="margin-top:6px">${esc(itemsTsv(o))}</textarea>
   <div class="row" style="margin-top:6px"><button class="b ok" onclick="saveItems('${o.id}')">حفظ الأصناف</button><button class="b s" onclick="editItems=null;render()">إلغاء</button></div></div>`;
 }
 const allWh=(oid,w)=>{((orders.find(x=>x.id===oid)||{}).items||[]).forEach((_,x)=>pendWh[oid+"-"+x]=w);render()};
@@ -622,10 +629,10 @@ function saveWh(oid){
 }
 function buildNext(prev,rows){
   const keyOf=i=>i.code?"c:"+i.code:"n:"+i.name;
-  const merged=[];rows.forEach(r=>{const m=merged.find(x=>keyOf(x)===keyOf(r)&&x.name===r.name);if(m)m.qty+=r.qty;else merged.push({name:r.name,code:r.code||"",qty:r.qty})});
+  const merged=[];rows.forEach(r=>{const m=merged.find(x=>keyOf(x)===keyOf(r)&&x.name===r.name);if(m)m.qty+=r.qty;else merged.push({name:r.name,code:r.code||"",qty:r.qty,unit:r.unit||""})});
   const pm={};prev.forEach(p=>pm[keyOf(p)]=p);
-  const next=merged.map(i=>{const p=pm[keyOf(i)];return {name:i.name,code:i.code,qty:i.qty,wh:p?p.wh||"":"",...(p&&p.unit?{unit:p.unit}:{}),picked:p?(+p.picked||0):0,reason:p?p.reason||"":""}});
-  const sig=l=>JSON.stringify(l.map(i=>[i.name,i.code||"",+i.qty]));
+  const next=merged.map(i=>{const p=pm[keyOf(i)];const un=i.unit||(p&&p.unit)||"";return {name:i.name,code:i.code,qty:i.qty,wh:p?p.wh||"":"",...(un?{unit:un}:{}),picked:p?(+p.picked||0):0,reason:p?p.reason||"":""}});
+  const sig=l=>JSON.stringify(l.map(i=>[i.name,i.code||"",+i.qty,i.unit||""]));
   const same=prev.length>0&&sig(prev)===sig(next),reset=new Set();
   next.forEach(i=>{const p=pm[keyOf(i)];if((!p||+p.qty!==+i.qty)&&i.wh)reset.add(i.wh)});
   prev.forEach(p=>{if(p.wh&&!next.some(n=>keyOf(n)===keyOf(p)))reset.add(p.wh)});
@@ -655,8 +662,8 @@ let showPaste=false,pasteLeft="";
 function pasteCard(){
   if(!showPaste)return `<div class="card"><button class="b" onclick="showPaste=true;render()">📋 لصق أصناف من الإكسيل (طلب أو أكتر مرة واحدة)</button></div>`;
   return `<div class="card"><b>لصق أصناف من الإكسيل</b>
-  <div class="mut">انسخ الأعمدة بالترتيب: <b>رقم الطلب – كود الصنف – اسم الصنف – الكمية</b> (ينفع طلبات كتير مع بعض). كل طلب بتتبدّل أصنافه بالأصناف اللي هتلصقها، فالصق كل أصناف الطلب.</div>
-  <textarea class="wi" id="gpaste" rows="8" placeholder="300&#9;1000/1&#9;زيت خام&#9;20&#10;300&#9;1000/2&#9;زيت خام&#9;10&#10;301&#9;A101&#9;كرتونة مياه&#9;5" style="margin-top:6px">${esc(pasteLeft)}</textarea>
+  <div class="mut">انسخ الأعمدة بالترتيب: <b>رقم الطلب – كود الصنف – اسم الصنف – الكمية – الوحدة (عبوة / قطعة / كرتونة)</b> (ينفع طلبات كتير مع بعض). كل طلب بتتبدّل أصنافه بالأصناف اللي هتلصقها، فالصق كل أصناف الطلب.</div>
+  <textarea class="wi" id="gpaste" rows="8" placeholder="300&#9;1000/1&#9;زيت خام&#9;20&#9;عبوة&#10;300&#9;1000/2&#9;زيت خام&#9;10&#9;عبوة&#10;301&#9;A101&#9;مياه&#9;5&#9;كرتونة" style="margin-top:6px">${esc(pasteLeft)}</textarea>
   <div class="row" style="margin-top:6px"><button class="b ok" onclick="savePaste()">حفظ الأصناف</button><button class="b s" onclick="showPaste=false;pasteLeft='';render()">إلغاء</button></div></div>`;
 }
 async function savePaste(){
@@ -668,7 +675,7 @@ async function savePaste(){
   const done=[],same=[],missing=[],left=[];
   for(const [num,rows] of Object.entries(by)){
     const o=orders.find(x=>String(x.num).trim()===num);
-    if(!o||["delivered","cancelled"].includes(o.stage)){missing.push(num+(o?" (مقفول)":""));rows.forEach(i=>left.push(i.order+"\t"+i.code+"\t"+i.name+"\t"+i.qty));continue}
+    if(!o||["delivered","cancelled"].includes(o.stage)){missing.push(num+(o?" (مقفول)":""));rows.forEach(i=>left.push(i.order+"\t"+i.code+"\t"+i.name+"\t"+i.qty+(i.unit?"\t"+i.unit:"")));continue}
     const st=await commitItems(o.id,rows,true);(st==="same"?same:done).push(num);
   }
   pasteLeft=left.join("\n");showPaste=!!left.length;
@@ -676,7 +683,7 @@ async function savePaste(){
   toast("اتحدّث "+done.length+" طلب"+(same.length?" · "+same.length+" من غير تغيير":"")+(missing.length?" · طلبات مش موجودة: "+missing.join("، ")+" (سيبتها في الخانة)":""),!missing.length);
 }
 
-document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{view=b.dataset.v;qNum="";qGirl="";try{localStorage.setItem("v",view)}catch(e){}render()});
+document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{view=b.dataset.v;showHelp=false;qNum="";qGirl="";try{localStorage.setItem("v",view)}catch(e){}render()});
 
 function pickGirl(i){if(!owner)return;const v=namesList()[i];if(!v)return;who=v;$("#who").value=v;try{localStorage.setItem("who_tele",v)}catch(e){};render()}
 function needName(){
@@ -686,7 +693,7 @@ function needName(){
   }
   const v=(role==="tele"?who:$("#who").value).trim();
   if(v){who=v;try{localStorage.setItem("who_"+role,who)}catch(e){}return true}
-  toast(role==="tele"?"دوسي على «تغيير الشاشة» وادخلي باسمك والرقم السري":"اكتب اسمك في الخانة اللي فوق الأول");return false;
+  toast(role==="tele"?"دوسي على «تسجيل خروج» وادخلي باسمك والرقم السري":"اختار اسمك من القايمة اللي فوق الأول (لو اسمك مش موجود كلّم المدير يضيفه)");return false;
 }
 
 
@@ -729,8 +736,8 @@ function teleView(){
   <div><label>طريقة الشحن</label><select id="sm" onchange="shipUi()"><option value="">— اختاري —</option>${SHIPM.map(m=>`<option>${m}</option>`).join("")}</select></div>
   <div id="scBox"><label>اسم شركة الشحن (لو الشحن بشركة)</label><input id="sc"></div>
   <div id="addrBox" style="grid-column:1/-1"><b style="font-size:14px">عنوان التسليم</b>${addrInputs("a-",{})}</div></div>
-  <label style="margin-top:12px">الأصناف والكميات (اختياري – انسخي من الإكسيل: رقم الطلب – كود الصنف – اسم الصنف – الكمية)</label>
-  <textarea class="wi" id="itx" rows="5" placeholder="رقم الطلب ثم الكود ثم الصنف ثم الكمية – سطر لكل صنف (رقم الطلب لازم يطابق اللي فوق)"></textarea>
+  <label style="margin-top:12px">الأصناف والكميات (اختياري – انسخي من الإكسيل: رقم الطلب – كود الصنف – اسم الصنف – الكمية – الوحدة)</label>
+  <textarea class="wi" id="itx" rows="5" placeholder="رقم الطلب ثم الكود ثم الصنف ثم الكمية ثم الوحدة (عبوة / قطعة / كرتونة) – سطر لكل صنف (رقم الطلب لازم يطابق اللي فوق)"></textarea>
   <div style="margin-top:12px"><button class="b" onclick="newOrder()">إرسال للوجيستك</button></div></div>
   <div class="card"><b>طلباتي</b>${list(mine,"tele")}</div>`;
 }
@@ -778,12 +785,19 @@ function parseTransfer(txt){
 function transferCard(){
   return `<details class="card"><summary>🔁 أمر نقل داخلي – طلب تحضير كميات من أكتوبر أو أبو صير</summary>
   <div class="mut" style="margin-top:6px">للاستوك في مشعل، أو لفرع، أو لمكتب الشركة. مش طلب عميل، فمفيش فيه بيانات عميل ولا تحصيل.</div>
-  <div><label>الجهة / الوجهة</label><select id="tf-dest"><option value="">— اختار —</option>${destList().map(d=>`<option>${esc(d)}</option>`).join("")}</select></div>
-  <div class="g2" style="margin-top:6px"><div><label>أصناف مخزن أكتوبر (كود – اسم الصنف – كمية)</label><textarea class="wi" id="tf-txt-wo" rows="5" placeholder="1000/1&#9;زيت خام&#9;20"></textarea></div>
+  <div><label>الجهة / الوجهة</label><select id="tf-dest"><option value="">— اختار —</option>${destList().map(d=>`<option${d===window._pendDest?" selected":""}>${esc(d)}</option>`).join("")}</select>${owner?`<div class="row" style="margin-top:6px"><input id="tf-newdest" placeholder="➕ جهة جديدة (فرع / مكتب / عميل جملة)"><button class="b s" type="button" onclick="addDestInline()">إضافة الجهة</button></div>`:""}</div>
+  <div class="g2" style="margin-top:6px"><div><label>أصناف مخزن أكتوبر (كود – اسم الصنف – كمية – وحدة: عبوة / قطعة / كرتونة)</label><textarea class="wi" id="tf-txt-wo" rows="5" placeholder="1000/1&#9;زيت خام&#9;20&#9;عبوة"></textarea></div>
   <div><label>أصناف مخزن أبو صير (كود – اسم الصنف – كمية – وحدة: عبوة / قطعة / كرتونة)</label><textarea class="wi" id="tf-txt-wa" rows="5" placeholder="S1&#9;صابون&#9;10&#9;كرتونة"></textarea></div></div>
   <div class="mut">املا خانة مخزن واحد أو الاتنين. كل مخزن بيشوف أصنافه بس.</div>
   <label>ملاحظة (اختياري)</label><input id="tf-note">
   <div style="margin-top:10px"><button class="b" onclick="createTransfer()">إرسال أمر التحضير للمخزن</button></div></details>`;
+}
+async function addDestInline(){
+  const e=$("#tf-newdest"),v=(e?.value||"").trim();
+  if(!v)return toast("اكتب اسم الجهة");
+  if(destList().includes(v)){window._pendDest=v;const sel=$("#tf-dest");if(sel)sel.value=v;return toast("الجهة موجودة وتم اختيارها")}
+  window._pendDest=v;
+  await saveFleet({...fleet,dests:[...(fleet.dests||[]),v]});
 }
 async function createTransfer(){
   if(!needName())return;
@@ -809,7 +823,7 @@ function logView(){
   const act=orders.filter(o=>!["delivered","cancelled"].includes(o.stage)&&match(o));
   if(!act.length)return transferCard()+searchBar()+pasteCard()+`<div class="card empty">مفيش طلبات مطابقة</div>`;
   return printBar()+transferCard()+searchBar()+pasteCard()+act.map(o=>`<div class="card" style="${can("cdue","log")?lateStyle(o):""}"><div class="row"><div><b>${cT(o,"log")}</b>${isTr(o)?` <span class="tag" style="background:#3d6f8e">أمر نقل داخلي</span> <span class="mut">← ${esc(o.dest||"")}</span>`:""}<div class="mut">${metaLine(o,"log")}</div></div><div class="x">${tag(o.stage)} ${mods(o).length?`<span class="mod">${mods(o).length} تعديل</span>`:""}</div></div>
-  <div class="mut">${whTxt(o)}</div>${can("cdue","log")?dueBadge(o):""}${holdBanner(o)}<div style="margin-top:4px">${can("cship","log")&&noT(o)?shipBox(o):""}${can("cwaybill","log")&&noT(o)?`<button class="b s x" onclick="printWaybill('${o.id}')">🖨 بوليصة شحن</button>`:""}</div>${!(o.items||[]).length?`<div class="hold">⚠ لسه ما اتسجلتش أصناف للطلب (الصق الأصناف من الإكسيل)</div>`:(o.items||[]).some(i=>!i.wh)?`<div class="hold">⚠ فيه أصناف لسه ما اتحدّدش لها مخزن</div>`:""}${o.stage==="modified"?`<div class="hold" style="color:#8a4fd6">⚠ آخر تعديل: ${esc(mods(o).slice(-1)[0]?.text)}</div>`:""}
+  <div class="mut">${whTxt(o)}</div>${can("cdue","log")?dueBadge(o):""}${holdBanner(o)}<div style="margin-top:4px">${can("cship","log")&&noT(o)?shipBox(o):""}${compBanner(o)}${can("cwaybill","log")&&noT(o)?`<button class="b s x" onclick="printWaybill('${o.id}')">🖨 بوليصة شحن</button>`:""}</div>${!(o.items||[]).length?`<div class="hold">⚠ لسه ما اتسجلتش أصناف للطلب (الصق الأصناف من الإكسيل)</div>`:(o.items||[]).some(i=>!i.wh)?`<div class="hold">⚠ فيه أصناف لسه ما اتحدّدش لها مخزن</div>`:""}${o.stage==="modified"?`<div class="hold" style="color:#8a4fd6">⚠ آخر تعديل: ${esc(mods(o).slice(-1)[0]?.text)}</div>`:""}
   <div class="g2"><div><label>حالة الطلب</label><select onchange="setStage('${o.id}',this.value)">${Object.entries(STAGES).map(([v,s])=>`<option value="${v}" ${o.stage===v?"selected":""}>${s[0]}</option>`).join("")}</select></div>
   <div><label>سبب التوقف</label>${reasonSel("hr-"+o.id,o.holdReason,"setHold('"+o.id+"',this.value)")}</div>
   <div><label>رقم الشحنة</label><input value="${esc(o.shipRef)}" onchange="setShip('${o.id}',this.value)"></div>
@@ -864,6 +878,23 @@ function woSummary(wid){
   return `<div class="card"><b>إجمالي المطلوب من كل صنف (كل الطلبات الشغالة)</b><div class="tw"><table><tr><th>الكود</th><th>اسم الصنف</th><th>إجمالي المطلوب</th><th>المتحضّر</th><th>توزيع العبوات المطلوبة</th></tr>${L.map(G=>`<tr><td><b class="craw">${esc(G.base)}</b></td><td><b class="craw">${esc(G.name)}</b></td><td><b>${fmtW(G.req)}</b></td><td>${fmtW(G.pick)}</td><td>${esc(byPackTxt(G.by))}</td></tr>`).join("")}</table></div></div>`;
 }
 const PACKLEGEND=`<details class="card"><summary>دليل أكواد العبوات (الكود الأساسي / رقم العبوة)</summary><div class="mut" style="margin-top:6px">/1 = عبوة كيلو · /2 = عبوة نص كيلو · /4 = عبوة ربع كيلو · /100 = عبوة 100 جرام · /50 = عبوة 50 جرام · /5 أو P5 = عبوة 5 كيلو · /25 = برميل 25 كيلو. الكمية المكتوبة = عدد العبوات.</div></details>`;
+/* اكتمال مكونات طلب العميل عند مشعل (أكتوبر + أبو صير) */
+function feedSt(o){
+  if(!noT(o))return null;
+  const feeds=[...new Set((o.items||[]).map(i=>i.wh).filter(isFd))];if(!feeds.length)return null;
+  const sh=o.ship||{},done=feeds.filter(w=>sh[w]&&sh[w].done),missing=feeds.filter(w=>!(sh[w]&&sh[w].done));
+  return {feeds,done,missing,complete:!missing.length,wmDone:!!(sh.wm&&sh.wm.done)};
+}
+function compList(o,f){
+  const rows=(o.items||[]).filter(i=>f.feeds.includes(i.wh));
+  return `<details style="margin-top:4px"><summary class="mut">تفاصيل المكونات والكميات</summary><div class="tw"><table><tr><th>المخزن</th><th>الكود</th><th>الصنف</th><th>المطلوب</th><th>المشحون</th></tr>${rows.map(i=>`<tr><td>${esc(WHN[i.wh])}</td><td>${esc(i.code||"")}</td><td>${esc(i.name)}</td><td>${esc(i.qty)} ${esc(unitOf(i)||"")}</td><td><b>${esc(+i.picked||0)}</b></td></tr>`).join("")}</table></div></details>`;
+}
+function compBanner(o){
+  const f=feedSt(o);if(!f||f.wmDone||["cancelled","delivered"].includes(o.stage))return "";
+  const wmOwn=(o.items||[]).filter(i=>i.wh==="wm"),wmOk=wmOwn.every(i=>+i.qty>0&&+i.picked>=+i.qty);
+  if(f.complete)return `<div style="margin-top:6px;border:2px solid var(--ok);background:rgba(47,125,91,.12);border-radius:8px;padding:6px 10px;font-weight:700">✅ مكونات طلب العميل رقم ${esc(o.num)} اكتملت بكمياتها من ${f.feeds.map(w=>WHN[w]).join(" و")}${wmOk?" – جاهز للخروج للشحن":" – باقي تحضير أصناف مشعل"}${compList(o,f)}</div>`;
+  return `<div class="mut" style="margin-top:6px">⏳ مكونات الطلب رقم ${esc(o.num)}: ${f.done.length?"وصل "+f.done.map(w=>WHN[w]).join(" و")+" · ":""}بانتظار خروج ${f.missing.map(w=>WHN[w]).join(" و")}${compList(o,f)}</div>`;
+}
 const woShipped=o=>PACKWH.some(w=>(o.ship||{})[w]&&o.ship[w].done);
 function woBox(o){
   return PACKWH.filter(w=>(o.ship||{})[w]&&o.ship[w].done).map(w=>{
@@ -891,13 +922,13 @@ function whView(wid){
       <div class="mut">التوزيع: ${esc(byPackTxt(by))}</div>
       <div class="tw"><table>${hdrPack}${G.rows.map(r=>whRow(o,r,done,r.p)).join("")}</table></div></div>`}).join("");
     const others=sp.other.length?`<div class="tw" style="margin-top:8px"><table>${hdrStd}${sp.other.map(z=>whRow(o,z,done,isPk(wid)?null:undefined)).join("")}</table></div>`:"";
-    return `<div class="card" style="${can("cdue",wid)?lateStyle(o):""}"><div class="row"><div><b>${cT(o,wid)}</b>${isTr(o)?` <span class="tag" style="background:#3d6f8e">أمر نقل داخلي</span>`:""}<div class="mut">${metaLine(o,wid)}</div></div><div class="x">${tag(o.stage)}</div></div>${can("cdue",wid)?dueBadge(o):""}${holdBanner(o)}<div style="margin-top:4px">${can("cship",wid)?shipLine(o):""}${wid==="wm"&&can("cwaybill",wid)?`<button class="b s x" onclick="printWaybill('${o.id}')">🖨 بوليصة شحن</button>`:""}</div>
+    return `<div class="card" style="${can("cdue",wid)?lateStyle(o):""}"><div class="row"><div><b>${cT(o,wid)}</b>${isTr(o)?` <span class="tag" style="background:#3d6f8e">أمر نقل داخلي</span>`:""}<div class="mut">${metaLine(o,wid)}</div></div><div class="x">${tag(o.stage)}</div></div>${can("cdue",wid)?dueBadge(o):""}${holdBanner(o)}${wid==="wm"?compBanner(o):""}<div style="margin-top:4px">${can("cship",wid)?shipLine(o):""}${wid==="wm"&&can("cwaybill",wid)?`<button class="b s x" onclick="printWaybill('${o.id}')">🖨 بوليصة شحن</button>`:""}</div>
     ${lm&&(can("cship",wid)||/الأصناف|الكميات|تحضير/.test(lm.text))&&!(isFd(wid)&&/بيانات الشحن/.test(lm.text))?`<div class="hold" style="color:#7b5aa6">آخر تعديل: ${esc(lm.text)}</div>`:""}
     <div class="mut" style="margin-top:6px">جاهز ${rd} من ${mi.length} صنف عندك${done?" · <b>تم الشحن</b>"+(sh.ref?" (شحنة "+esc(sh.ref)+")":"")+(sh.driver?" · السائق "+esc(sh.driver)+" · "+esc(sh.car):""):""}</div>
     ${wid==="wm"?woBox(o):""}${groups}${others}
     ${done?`<div class="row" style="margin-top:8px"><span class="mut">الأصناف اتشحنت. لو عايز تعدّل التحضير الغي الشحن الأول.</span><button class="b s x" onclick="whUnship('${o.id}','${wid}')">إلغاء الشحن</button></div>`
-    :`<div class="row" style="margin-top:8px"><button class="b ok x" onclick="wholeDone('${o.id}','${wid}')">تم التحضير بالكامل</button><button class="b x" onclick="savePick('${o.id}','${wid}')">حفظ التحضير (كميات مختلفة)</button></div>
-    <div class="row" style="margin-top:8px"><input class="wi" id="ws-${o.id}" placeholder="رقم الشحنة (اختياري)">${isFd(wid)?`<select class="wi" id="wd-${o.id}"><option value="">— اسم السائق —</option>${fleet.drivers.map(d=>`<option>${esc(d)}</option>`).join("")}</select><select class="wi" id="wc-${o.id}"><option value="">— اسم السيارة —</option>${fleet.cars.map(d=>`<option>${esc(d)}</option>`).join("")}</select>`:""}<button class="b x" onclick="whShip('${o.id}','${wid}')">${isFd(wid)?"تم الخروج":"تم شحن الكميات المتحضّرة"}</button></div>`}</div>`}).join("");
+    :`${wid==="wm"&&!mi.length?"":`<div class="row" style="margin-top:8px"><button class="b ok x" onclick="wholeDone('${o.id}','${wid}')">تم التحضير بالكامل</button><button class="b x" onclick="savePick('${o.id}','${wid}')">حفظ التحضير (كميات مختلفة)</button></div>`}
+    <div class="row" style="margin-top:8px"><input class="wi" id="ws-${o.id}" placeholder="رقم الشحنة (اختياري)">${isFd(wid)?`<select class="wi" id="wd-${o.id}"><option value="">— اسم السائق —</option>${fleet.drivers.map(d=>`<option>${esc(d)}</option>`).join("")}</select><select class="wi" id="wc-${o.id}"><option value="">— اسم السيارة —</option>${fleet.cars.map(d=>`<option>${esc(d)}</option>`).join("")}</select>`:""}<button class="b x" onclick="whShip('${o.id}','${wid}')">${isFd(wid)?"تم الخروج":wid==="wm"&&!mi.length?"تم الخروج للشحن للعميل":"تم شحن الكميات المتحضّرة"}</button></div>`}</div>`}).join("");
 }
 const pickFull=(oid,x)=>{const o=orders.find(z=>z.id===oid);if(!o)return;pendPick[oid+"-"+x]=o.items[x].qty;render()};
 const pickAll=(oid,wid)=>{const o=orders.find(z=>z.id===oid);if(!o)return;mineItems(o,wid).forEach(z=>pendPick[oid+"-"+z.x]=z.i.qty);render()};
@@ -920,7 +951,9 @@ function savePick(oid,wid){
 function whShip(oid,wid){
   const o0=orders.find(x=>x.id===oid);if(!o0||!needName())return;
   if(hasPend(o0,wid))return toast("احفظ التحضير الأول بزرار «حفظ التحضير»");
-  if(!mineItems(o0,wid).some(z=>+z.i.picked>0))return toast("سجّل الكمية المتحضّرة واحفظها الأول");
+  const f0=feedSt(o0);
+  if(wid==="wm"&&!mineItems(o0,wid).length&&f0){if(!f0.complete)return toast("لسه مكونات الطلب ما اكتملتش: بانتظار "+f0.missing.map(w=>WHN[w]).join(" و"))}
+  else if(!mineItems(o0,wid).some(z=>+z.i.picked>0))return toast("سجّل الكمية المتحضّرة واحفظها الأول");
   if(o0.noShip)return toast("🚫 الحسابات منعت شحن الطلب ده لحين سداد كامل القيمة");
   const r=($("#ws-"+oid)?.value||"").trim();let dr="",car="";
   if(isFd(wid)){
@@ -928,7 +961,7 @@ function whShip(oid,wid){
     dr=$("#wd-"+oid)?.value||"";car=$("#wc-"+oid)?.value||"";
     if(!dr||!car)return toast("اختار اسم السائق واسم السيارة قبل تأكيد الخروج");
   }
-  upd(oid,o=>{o.ship={...(o.ship||{}),[wid]:{done:true,ref:r,t:Date.now(),by:actor(),...(isFd(wid)?{driver:dr,car}:{})}};recalc(o)},WHN[wid]+": تم الشحن"+(r?" – شحنة "+r:"")+(dr?" – السائق "+dr+" – السيارة "+car:""));
+  upd(oid,o=>{o.ship={...(o.ship||{}),[wid]:{done:true,ref:r,t:Date.now(),by:actor(),...(isFd(wid)?{driver:dr,car}:{})}};recalc(o)},WHN[wid]+": تم الشحن"+(r?" – شحنة "+r:"")+(dr?" – السائق "+dr+" – السيارة "+car:"")+(isFd(wid)&&(fs=>fs&&fs.missing.every(w=>w===wid)&&noT(o0))(feedSt(o0))?" – ✅ اكتملت مكونات طلب العميل رقم "+o0.num+" بكمياتها وجاهزة لمشعل":""));
 }
 const whUnship=(oid,wid)=>upd(oid,o=>{if(isFd(wid)&&o.wmRecv&&!o.wmRecv.t){o.wmRecv={...o.wmRecv};delete o.wmRecv[wid]}else if(isFd(wid))o.wmRecv=null;o.ship={...(o.ship||{}),[wid]:{...((o.ship||{})[wid]||{}),done:false}};recalc(o)},WHN[wid]+": إلغاء الشحن");
 
@@ -1017,7 +1050,7 @@ function chooser(){
   <div class="pills">${names.map((n,i)=>`<button class="b ${n===selGirl?"ok":"s"}" onclick="selGirl=namesList()[${i}];render()">${n===selGirl?"✓ ":""}${esc(n)}</button>`).join("")||'<span class="mut">مفيش أسماء مسجلة. المدير يضيفها من الإدارة.</span>'}</div>
   ${selGirl?`<div class="row" style="margin-top:12px">${pinOf(selGirl)?'<input class="ci" id="pint" type="password" placeholder="الرقم السري بتاعك">':""}<button class="b x" style="flex:1" onclick="pick('tele')">دخول باسم ${esc(selGirl)}</button></div>`:""}</div>
   <div class="tiles">${tile("log","اللوجيستك","توزيع الأصناف على المخازن ومتابعة الحالة")}${tile("acc","الحسابات","تأكيد التحصيل")}${tile("wm","مخزن مشعل","تجهيز الأصناف وطباعة البوليصة")}${tile("wo","مخزن أكتوبر","تجهيز الأصناف حسب العبوات")}${tile("wa","مخزن أبو صير","تجهيز الأصناف حسب العبوات")}</div>
-  <div class="mut" style="margin-top:14px;text-align:center">الإدارة متاحة للمدير فقط، من زر «دخول المدير» فوق.</div></div>`}
+  <div class="mut" style="margin-top:14px;text-align:center">الإدارة متاحة للمدير فقط، من زر «لوحة المدير» فوق.</div></div>`}
 function pick(r){
   if(r==="tele"){
     if(!selGirl)return toast("دوسي على اسمك الأول");
@@ -1028,7 +1061,7 @@ function pick(r){
     let nm;
     if(r==="tele"){nm=selGirl;try{localStorage.setItem("who_tele",nm)}catch(e){}}
     else{nm=({log:"مروان",acc:"شيماء",wa:"أبو علي"})[r];if(!nm){try{nm=localStorage.getItem("who_"+r)||""}catch(e){nm=""}}}
-    who=nm;$("#who").value=nm;
+    who=nm;
   }
   render();
 }
@@ -1048,17 +1081,25 @@ async function savePin(){
   if(!db)return toast("الحفظ غير متاح");
   try{await db.collection("settings").doc("pins").set({log:$("#pinin").value.trim(),wm:$("#pinwm").value.trim(),wo:$("#pinwo").value.trim(),acc:$("#pinacc").value.trim()});toast("تم حفظ الرقم السري ✔",true)}catch(e){toast("تعذر الحفظ: "+(e.message||e.code))}
 }
+const HELP={"tele": {"t": "التيليسيلز – تسجيل الطلب ومتابعته", "s": ["اكتبي رقم الطلب، كود العميل، اسم العميل، التليفون، قيمة الطلب.", "اختاري طريقة الشحن (واسم الشركة لو الشحن بشركة) واكتبي العنوان: المحافظة والمركز والشارع.", "لو معاكي الأصناف الصقيها من الإكسيل (اختياري، ومروان ممكن يلصقها). الوحدة: عبوة / قطعة / كرتونة.", "دوسي «إرسال للوجيستك».", "لما العميل يدفع اكتبي المبلغ ودوسي «سجّل تحصيل»، وشيماء هتأكده.", "لو العميل طلب الإلغاء دوسي «تأكيد الإلغاء بطلب العميل»."], "e": "<div class=\"mut\" style=\"direction:rtl;background:rgba(0,0,0,.05);padding:8px 10px;border-radius:8px;white-space:pre;overflow-x:auto;margin:8px 0\">رقم الطلب   كود الصنف   اسم الصنف   الكمية   الوحدة\n300   1000/1   زيت خام   20   عبوة\n300   A101   مياه   5   كرتونة</div>", "n": "كود العميل ورقم الطلب مينفعش يتكرروا. مفيش تعديل غير في طلباتك إنتي. أكدي استلام الإشعارات اللي بتوصلك من مروان والمخازن."}, "log": {"t": "اللوجيستك – توزيع الأصناف ومتابعة الطلب", "s": ["اختار اسمك من قايمة «اسمك» فوق (لازم قبل أي حفظ).", "الصق الأصناف من الإكسيل بالأعمدة بالترتيب (ينفع طلبات كتير مرة واحدة).", "حدّد مخزن كل صنف (مشعل / أكتوبر / أبو صير) واختار الوحدة، ودوس «حفظ توزيع المخازن». كل مخزن بيشوف أصنافه بس.", "تابع الحالة على الكارت. لما أكتوبر وأبو صير يخرّجوا هتظهر رسالة خضرا «مكونات الطلب اكتملت بكمياتها».", "املا بيانات الشحن واطبع بوليصة الشحن. مشعل هو اللي بيشحن للعميل.", "لنقل كميات لمشعل أو فرع أو مكتب استخدم «أمر نقل داخلي» واختار الوجهة."], "e": "<div class=\"mut\" style=\"direction:rtl;background:rgba(0,0,0,.05);padding:8px 10px;border-radius:8px;white-space:pre;overflow-x:auto;margin:8px 0\">رقم الطلب   كود الصنف   اسم الصنف   الكمية   الوحدة\n300   1000/1   زيت خام   20   عبوة\n300   A101   مياه   5   كرتونة</div>", "n": "أصناف أكتوبر اللي كودها فيه شرطة (زي 1000/1) وحدتها من الكود. لو غيرت كمية أو مخزن صنف اتحضّر، التحضير بيتصفّر. لو الحسابات منعت الشحن (🚫) محدش يقدر يشحن."}, "wm": {"t": "مخزن مشعل", "s": ["اختار اسمك من القايمة فوق.", "حضّر أصنافك: اكتب الكمية المتحضّرة أو «تم التحضير بالكامل» وبعدين «حفظ التحضير». لو في نقص اختار السبب.", "لما أكتوبر أو أبو صير يشحنوا لك هتلاقي كارت فيه الأصناف والسواق والسيارة. لما توصل دوس «تم استلام كميات …».", "لما تظهر الرسالة الخضرا «مكونات طلب العميل اكتملت» اطبع بوليصة الشحن.", "سلّم الشحنة واكتب رقمها لو فيه ودوس «تم الخروج للشحن للعميل»."], "e": "", "n": "الزرار الأخير مش بيشتغل لو مكونات أكتوبر أو أبو صير ما اكتملتش أو لو الحسابات منعت الشحن. لو دوست بالغلط استخدم «إلغاء الشحن». المهلة المتبقية بتظهر على الكارت وبتحمر لو اتأخرت."}, "wo": {"t": "مخزن أكتوبر", "s": ["اختار اسمك من القايمة فوق.", "كل طلب فيه أصنافك بس، وفوق إجمالي المطلوب من كل صنف. الكود «أساسي / رقم العبوة» (1000/1 عبوة كيلو، 1000/2 نص كيلو).", "حضّر واكتب عدد العبوات المتحضّرة أو «تم التحضير بالكامل» وبعدين «حفظ التحضير». لو في نقص اختار السبب.", "اختار اسم السواق واسم السيارة من القايمة، واكتب رقم الشحنة لو فيه، ودوس «تم الخروج»."], "e": "", "n": "مينفعش «تم الخروج» من غير سواق وسيارة. لو القوايم فاضية كلّم المدير. لو دوست بالغلط استخدم «إلغاء الشحن». لما أكتوبر وأبو صير يخلصوا الاتنين، مروان ومشعل بيعرفوا إن الطلب جاهز."}, "wa": {"t": "مخزن أبو صير", "s": ["اختار اسمك من القايمة فوق.", "الأصناف بالوحدة (قطعة / كرتونة / عبوة).", "حضّر واكتب الكمية المتحضّرة أو «تم التحضير بالكامل» وبعدين «حفظ التحضير». لو في نقص اختار السبب.", "اختار السواق والسيارة، واكتب رقم الشحنة لو فيه، ودوس «تم الخروج»."], "e": "", "n": "شغلك زي مخزن أكتوبر: بتشحن لمخزن مشعل مش للعميل. لو دوست بالغلط استخدم «إلغاء الشحن»."}, "acc": {"t": "الحسابات", "s": ["اختار اسمك من القايمة فوق.", "شوف قيمة الطلب وإيه اللي البنت بلّغت بيه.", "أكد التحصيل: «تأكيد تحصيل كامل»، أو اكتب المبلغ ودوس «تأكيد المبلغ المحصّل» لو جزئي. من هنا بتبدأ مهلة خروج البضاعة.", "لو العميل لسه ما سددش دوس «🚫 عدم الشحن لحين سداد كامل القيمة»، ولما يسدد دوس «رفع منع الشحن»."], "e": "", "n": "المهلة مبتبدأش قبل تأكيدك. لو صححت مبلغ استخدم «حفظ التصحيح» أو «إلغاء تأكيد التحصيل»."}, "dash": {"t": "الإدارة", "s": ["هنا بتشوف كل الطلبات وحالتها والمتأخر والغير محصّل، وبتطبع تقرير الموقف.", "ضيف البنات وغيّر أرقامهم السرية، وحدد الأرقام السرية لباقي الشاشات.", "ضيف أسماء موظفي الشركة (لوجيستك ومخازن وحسابات) وهيختاروها من قايمة «اسمك».", "ضيف السائقين والسيارات (المخازن بتختار منهم) وجهات أوامر النقل الداخلي.", "حدد أسباب التوقف والنقص، ومدة مهلة خروج البضاعة، وصلاحيات كل شاشة، وإعدادات الإشعارات، ورقم تليفون مروان للبوليصة.", "تقدر تحذف طلب، وتدخل أي شاشة تانية من الشريط اللي فوق."], "e": "", "n": "في «أمر نقل داخلي» تقدر تضيف جهة جديدة مباشرة من نفس الخانة."}};
+let showHelp=false;
+function helpBar(){
+  const h=HELP[view];if(!h)return "";
+  const btn=`<div style="margin-bottom:10px"><button class="b ${showHelp?"ok":"s"}" style="width:100%;padding:12px;font-size:16px" onclick="showHelp=!showHelp;render()">📖 تعليمات الاستخدام${showHelp?" (إغلاق)":""}</button></div>`;
+  if(!showHelp)return btn;
+  return btn+`<div class="card" style="border:2px solid var(--ok)"><b style="font-size:17px">${h.t}</b><ol style="margin:10px 0;padding-inline-start:22px;line-height:2">${h.s.map(x=>`<li>${esc(x)}</li>`).join("")}</ol>${h.e}<div class="hold" style="margin-top:8px">⚠ ${esc(h.n)}</div><button class="b s" style="margin-top:10px" onclick="showHelp=false;render()">إغلاق التعليمات</button></div>`;
+}
 function render(){
   try{render0()}catch(e){const m=$("#msg");if(m){m.style.display="block";m.textContent="حصل خطأ في عرض الشاشة: "+(e.message||e)}}
 }
 function shipUi(){const v=$("#sm")?.value||"",h=v==="تسليم الشركة";const a=$("#scBox"),b=$("#addrBox");if(a)a.style.display=h?"none":"";if(b)b.style.display=h?"none":""}
 function render0(){
   const al=allowed();
-  $("#ownerBtn").textContent=owner?"خروج المدير":"دخول المدير";
+  $("#ownerBtn").textContent=owner?"👑 خروج المدير":"👑 لوحة المدير";
   const tl=(owner?view==="tele":role==="tele"),box=$("#whoBox");
-  $("#who").style.display=tl?"none":"";box.style.display=tl?"flex":"none";
-  if(tl)box.innerHTML=owner?'<span class="mut" style="width:100%">اختار اسم البنت اللي الطلب يتسجّل عليها:</span>'+(namesList().map((n,i)=>`<button class="b ${n===who?"ok":"s"}" style="padding:12px 18px;font-size:16px" onclick="pickGirl(${i})">${n===who?"✓ ":""}${esc(n)}</button>`).join("")||'<span class="mut">مفيش أسماء مسجلة</span>'):'<span style="font-size:16px">👤 مسجّلة باسم: <b>'+esc(who||"—")+'</b></span>';
-  $("#names").innerHTML=contacts.map(c=>`<option value="${esc(c.name)}">`).join("");
+  $("#who").style.display=(tl||owner)?"none":"";box.style.display=(tl&&owner)?"flex":"none";
+  if(tl)box.innerHTML=owner?'<span class="mut" style="width:100%">اختار اسم البنت اللي الطلب يتسجّل عليها:</span>'+(namesList().map((n,i)=>`<button class="b ${n===who?"ok":"s"}" style="padding:12px 18px;font-size:16px" onclick="pickGirl(${i})">${n===who?"✓ ":""}${esc(n)}</button>`).join("")||'<span class="mut">مفيش أسماء مسجلة</span>'):'';
+  {const W=$("#who"),st=[...(fleet.staff||[])];if(who&&!st.includes(who))st.unshift(who);W.innerHTML='<option value="">— اختار اسمك (إجباري قبل أي حفظ) —</option>'+st.map(n=>`<option${n===who?" selected":""}>${esc(n)}</option>`).join("");W.value=who||""}
   $("#chg").style.display=(!owner&&role)?"":"none";
   document.querySelector("nav").style.display=al.length>1?"":"none";
   document.querySelector("#who").parentNode.style.display=al.length?"":"none";
@@ -1066,7 +1107,7 @@ function render0(){
   if(!al.includes(view))view=al[0];
   document.querySelectorAll("nav button").forEach(b=>{b.style.display=al.includes(b.dataset.v)?"":"none";b.classList.toggle("on",b.dataset.v===view)});
   const ae=document.activeElement&&document.activeElement.id;
-  $("#app").innerHTML=(owner?"":notifPanel()+inbox())+(view==="tele"?teleView():view==="log"?logView():WHROLES.includes(view)?whView(view):view==="acc"?accView():dashView());
+  $("#app").innerHTML=helpBar()+(owner?"":notifPanel()+inbox())+(view==="tele"?teleView():view==="log"?logView():WHROLES.includes(view)?whView(view):view==="acc"?accView():dashView());
   if(ae==="qn"||ae==="qg"){const e=document.getElementById(ae);if(e){e.focus();const n=e.value.length;try{e.setSelectionRange(n,n)}catch(x){}}}
   shipUi();
 }
@@ -1088,7 +1129,7 @@ function startListeners(){
   if(listening)return;listening=true;
   db=firebase.firestore();
   const err=e=>{const m=$("#msg");m.style.display="block";m.textContent="خطأ في الاتصال بقاعدة البيانات: "+(e.message||e.code)};
-  db.collection("settings").onSnapshot(x=>{pins={};shipHours=72;shipHoursBy={};perms={};nperms={};fleet={drivers:[],cars:[],dests:[SOHAG]};wbill={...WB_DEF};reasons=DEFAULT_REASONS.slice();x.docs.forEach(d=>{const v=d.data()||{};if(d.id==="reasons"){const l=toArr(v.list).filter(Boolean);reasons=l}else if(d.id==="rules"){const h=+v.shipHours;if(h>0)shipHours=h;shipHoursBy=v.byMethod||{}}else if(d.id==="perms"){perms=v}else if(d.id==="notif"){nperms=v}else if(d.id==="fleet"){fleet={drivers:toArr(v.drivers).filter(Boolean),cars:toArr(v.cars).filter(Boolean),dests:v.dests?toArr(v.dests).filter(Boolean):[SOHAG]}}else if(d.id==="waybill"){wbill={...WB_DEF,...v}}else if(v.phones)contacts=mergeC(toArr(v.phones).filter(x=>x&&x.name));else pins=v});refresh()},err);
+  db.collection("settings").onSnapshot(x=>{pins={};shipHours=72;shipHoursBy={};perms={};nperms={};fleet={drivers:[],cars:[],dests:[SOHAG],staff:[]};wbill={...WB_DEF};reasons=DEFAULT_REASONS.slice();x.docs.forEach(d=>{const v=d.data()||{};if(d.id==="reasons"){const l=toArr(v.list).filter(Boolean);reasons=l}else if(d.id==="rules"){const h=+v.shipHours;if(h>0)shipHours=h;shipHoursBy=v.byMethod||{}}else if(d.id==="perms"){perms=v}else if(d.id==="notif"){nperms=v}else if(d.id==="fleet"){fleet={drivers:toArr(v.drivers).filter(Boolean),cars:toArr(v.cars).filter(Boolean),dests:v.dests?toArr(v.dests).filter(Boolean):[SOHAG],staff:toArr(v.staff).filter(Boolean)}}else if(d.id==="waybill"){wbill={...WB_DEF,...v}}else if(v.phones)contacts=mergeC(toArr(v.phones).filter(x=>x&&x.name));else pins=v});refresh()},err);
   db.collection("orders").orderBy("createdAt","desc").onSnapshot(s=>{orders=s.docs.map(d=>d.data());checkNew();refresh()},err);
 }
 (function(){
