@@ -447,7 +447,7 @@ async function createOrder(o){
 }
 
 /* ---- مهلة خروج البضاعة + بيانات الشحن + الطباعة ---- */
-let shipHours=72,shipHoursBy={},editShip=null;
+let shipHours=72,shipHoursBy={},whHours={},editShip=null;
 const SHIPM=["شركة شحن","تسليم الشركة"],HR=3600000;
 const fmtDur=ms=>{ms=Math.abs(ms);const d=Math.floor(ms/864e5),h=Math.floor(ms%864e5/HR),m=Math.floor(ms%HR/6e4);return ((d?d+" يوم ":"")+(h?h+" ساعة ":"")+(!d?m+" دقيقة":"")).trim()};
 const hoursOf=o=>+shipHoursBy[o.shipMethod]>0?+shipHoursBy[o.shipMethod]:shipHours;
@@ -462,7 +462,24 @@ function dueInfo(o){
   if(left<=0)return {c:"late",t:"متأخر "+fmtDur(left)+" عن موعد خروج البضاعة",late:true};
   return {c:left<12*HR?"warn":"ok",t:"باقي "+fmtDur(left)+" على خروج البضاعة (آخر موعد "+fmt(due)+")"};
 }
-const isLate=o=>{const d=dueInfo(o);return !!(d&&d.late)};
+const whHrs=w=>+whHours[w]>0?+whHours[w]:0;
+const hoursOfWh=(o,w)=>whHrs(w)||hoursOf(o);
+function dueInfoWh(o,w){
+  if(o.stage==="cancelled")return null;
+  const h=hoursOfWh(o,w),sh=(o.ship||{})[w]||{},nm=WHN[w]||w;
+  if(!o.accAt)return {c:"wait",t:"مهلة "+nm+" ("+h+" ساعة) لسه ما بدأتش – بانتظار تأكيد الحسابات للتحصيل"};
+  const due=o.accAt+h*HR;
+  if(sh.done){const at=sh.t||0;if(!at)return {c:"ok",t:nm+": خرجت"};return at<=due?{c:"ok",t:nm+": خرجت في الوقت ✓"}:{c:"late",t:nm+": خرجت متأخرة "+fmtDur(at-due)}}
+  const left=due-Date.now();
+  if(left<=0)return {c:"late",t:nm+": متأخر "+fmtDur(left)+" عن مهلته",late:true};
+  return {c:left<12*HR?"warn":"ok",t:nm+": باقي "+fmtDur(left)+" (آخر موعد "+fmt(due)+")"};
+}
+const dueBadgeWh=(o,w)=>{const d=dueInfoWh(o,w);return d?`<div style="margin-top:4px"><span class="tag" style="background:${DUEBG[d.c]};white-space:normal">⏱ ${esc(d.t)}</span></div>`:""};
+const lateStyleWh=(o,w)=>{const d=dueInfoWh(o,w);return d&&d.late?"border:2px solid #d63b3b;background:rgba(214,59,59,.10)":""};
+const whInvolved=o=>[...new Set((o.items||[]).map(i=>i.wh).filter(Boolean))];
+const whLate=o=>whInvolved(o).some(w=>whHrs(w)&&(d=>d&&d.late)(dueInfoWh(o,w)));
+const whDueRows=o=>whInvolved(o).filter(w=>whHrs(w)).map(w=>dueBadgeWh(o,w)).join("");
+const isLate=o=>{const d=dueInfo(o);return !!(d&&d.late)||whLate(o)};
 const DUEBG={wait:"#6b7686",ok:"#1a9d55",warn:"#d98a00",late:"#d63b3b"};
 const dueBadge=o=>{const d=dueInfo(o);return d?`<div style="margin-top:4px"><span class="tag" style="background:${DUEBG[d.c]};white-space:normal">⏱ ${esc(d.t)}</span></div>`:""};
 const dueTxt=o=>{const d=dueInfo(o);return d?d.t:""};
@@ -486,7 +503,8 @@ async function saveRules(){
   if(!db)return toast("الحفظ غير متاح");
   const h=+$("#shh").value;if(!(h>0))return toast("اكتب عدد ساعات صحيح");
   const by={};SHIPM.forEach((m,i)=>{const v=+($("#shm-"+i)?.value||0);if(v>0)by[m]=v});
-  try{await db.collection("settings").doc("rules").set({shipHours:h,byMethod:by});toast("تم حفظ المهل ✔",true)}catch(e){toast("تعذر الحفظ: "+(e.message||e.code))}
+  const bw={};Object.keys(WHN).forEach(w=>{const v=+($("#shw-"+w)?.value||0);if(v>0)bw[w]=v});
+  try{await db.collection("settings").doc("rules").set({shipHours:h,byMethod:by,byWh:bw});toast("تم حفظ المهل ✔",true)}catch(e){toast("تعذر الحفظ: "+(e.message||e.code))}
 }
 function dashRows(){
   const unpaid=orders.filter(o=>o.acct!=="full"&&o.stage!=="cancelled"&&noT(o)),modded=orders.filter(o=>mods(o).length);
@@ -829,7 +847,7 @@ function logView(){
   const act=orders.filter(o=>!["delivered","cancelled"].includes(o.stage)&&match(o));
   if(!act.length)return orderForm(true)+transferCard()+searchBar()+pasteCard()+`<div class="card empty">مفيش طلبات مطابقة</div>`;
   return printBar()+orderForm(true)+transferCard()+searchBar()+pasteCard()+act.map(o=>`<div class="card" style="${can("cdue","log")?lateStyle(o):""}"><div class="row"><div><b>${cT(o,"log")}</b>${isTr(o)?` <span class="tag" style="background:#3d6f8e">أمر نقل داخلي</span> <span class="mut">← ${esc(o.dest||"")}</span>`:""}<div class="mut">${metaLine(o,"log")}</div></div><div class="x">${tag(o.stage)} ${mods(o).length?`<span class="mod">${mods(o).length} تعديل</span>`:""}</div></div>
-  <div class="mut">${whTxt(o)}</div>${can("cdue","log")?dueBadge(o):""}${holdBanner(o)}<div style="margin-top:4px">${can("cship","log")&&noT(o)?shipBox(o):""}${compBanner(o)}${can("cwaybill","log")&&noT(o)?`<button class="b s x" onclick="printWaybill('${o.id}')">🖨 بوليصة شحن</button>`:""}</div>${!(o.items||[]).length?`<div class="hold">⚠ لسه ما اتسجلتش أصناف للطلب (الصق الأصناف من الإكسيل)</div>`:(o.items||[]).some(i=>!i.wh)?`<div class="hold">⚠ فيه أصناف لسه ما اتحدّدش لها مخزن</div>`:""}${o.stage==="modified"?`<div class="hold" style="color:#8a4fd6">⚠ آخر تعديل: ${esc(mods(o).slice(-1)[0]?.text)}</div>`:""}
+  <div class="mut">${whTxt(o)}</div>${can("cdue","log")?dueBadge(o)+whDueRows(o):""}${holdBanner(o)}<div style="margin-top:4px">${can("cship","log")&&noT(o)?shipBox(o):""}${compBanner(o)}${can("cwaybill","log")&&noT(o)?`<button class="b s x" onclick="printWaybill('${o.id}')">🖨 بوليصة شحن</button>`:""}</div>${!(o.items||[]).length?`<div class="hold">⚠ لسه ما اتسجلتش أصناف للطلب (الصق الأصناف من الإكسيل)</div>`:(o.items||[]).some(i=>!i.wh)?`<div class="hold">⚠ فيه أصناف لسه ما اتحدّدش لها مخزن</div>`:""}${o.stage==="modified"?`<div class="hold" style="color:#8a4fd6">⚠ آخر تعديل: ${esc(mods(o).slice(-1)[0]?.text)}</div>`:""}
   <div class="g2"><div><label>حالة الطلب</label><select onchange="setStage('${o.id}',this.value)">${Object.entries(STAGES).map(([v,s])=>`<option value="${v}" ${o.stage===v?"selected":""}>${s[0]}</option>`).join("")}</select></div>
   <div><label>سبب التوقف</label>${reasonSel("hr-"+o.id,o.holdReason,"setHold('"+o.id+"',this.value)")}</div>
   <div><label>رقم الشحنة</label><input value="${esc(o.shipRef)}" onchange="setShip('${o.id}',this.value)"></div>
@@ -928,7 +946,7 @@ function whView(wid){
       <div class="mut">التوزيع: ${esc(byPackTxt(by))}</div>
       <div class="tw"><table>${hdrPack}${G.rows.map(r=>whRow(o,r,done,r.p)).join("")}</table></div></div>`}).join("");
     const others=sp.other.length?`<div class="tw" style="margin-top:8px"><table>${hdrStd}${sp.other.map(z=>whRow(o,z,done,isPk(wid)?null:undefined)).join("")}</table></div>`:"";
-    return `<div class="card" style="${can("cdue",wid)?lateStyle(o):""}"><div class="row"><div><b>${cT(o,wid)}</b>${isTr(o)?` <span class="tag" style="background:#3d6f8e">أمر نقل داخلي</span>`:""}<div class="mut">${metaLine(o,wid)}</div></div><div class="x">${tag(o.stage)}</div></div>${can("cdue",wid)?dueBadge(o):""}${holdBanner(o)}${wid==="wm"?compBanner(o):""}<div style="margin-top:4px">${can("cship",wid)?shipLine(o):""}${wid==="wm"&&can("cwaybill",wid)?`<button class="b s x" onclick="printWaybill('${o.id}')">🖨 بوليصة شحن</button>`:""}</div>
+    return `<div class="card" style="${can("cdue",wid)?lateStyleWh(o,wid):""}"><div class="row"><div><b>${cT(o,wid)}</b>${isTr(o)?` <span class="tag" style="background:#3d6f8e">أمر نقل داخلي</span>`:""}<div class="mut">${metaLine(o,wid)}</div></div><div class="x">${tag(o.stage)}</div></div>${can("cdue",wid)?dueBadgeWh(o,wid):""}${holdBanner(o)}${wid==="wm"?compBanner(o):""}<div style="margin-top:4px">${can("cship",wid)?shipLine(o):""}${wid==="wm"&&can("cwaybill",wid)?`<button class="b s x" onclick="printWaybill('${o.id}')">🖨 بوليصة شحن</button>`:""}</div>
     ${lm&&(can("cship",wid)||/الأصناف|الكميات|تحضير/.test(lm.text))&&!(isFd(wid)&&/بيانات الشحن/.test(lm.text))?`<div class="hold" style="color:#7b5aa6">آخر تعديل: ${esc(lm.text)}</div>`:""}
     <div class="mut" style="margin-top:6px">جاهز ${rd} من ${mi.length} صنف عندك${done?" · <b>تم الشحن</b>"+(sh.ref?" (شحنة "+esc(sh.ref)+")":"")+(sh.driver?" · السائق "+esc(sh.driver)+" · "+esc(sh.car):""):""}</div>
     ${wid==="wm"?woBox(o):""}${groups}${others}
@@ -1006,6 +1024,8 @@ function dashView(){
   <div class="card"><b>مهلة خروج البضاعة (أقصى مدة للشحن)</b><div class="mut">بتبدأ من أول تأكيد من الحسابات للتحصيل (كامل أو جزئي). تقدر تحدد مدة لكل طريقة شحن، والخانة الفاضية بتاخد المدة العامة.</div>
   <div class="row" style="margin-top:8px"><label class="x" style="margin:0">المدة العامة</label><input id="shh" type="number" min="1" value="${shipHours}"><span class="x">ساعة</span></div>
   ${SHIPM.map((m,i)=>`<div class="row" style="margin-top:6px"><label class="x" style="margin:0">${esc(m)}</label><input id="shm-${i}" type="number" min="1" placeholder="زي العامة" value="${shipHoursBy[m]||""}"><span class="x">ساعة</span></div>`).join("")}
+  <div class="mut" style="margin-top:12px"><b>مهلة كل مخزن (منفصلة)</b> – بتبدأ من نفس لحظة تأكيد الحسابات، وبتظهر على كارت المخزن ده بس. الخانة الفاضية بتاخد المدة العامة.</div>
+  ${Object.entries(WHN).map(([w,n])=>`<div class="row" style="margin-top:6px"><label class="x" style="margin:0">${esc(n)}</label><input id="shw-${w}" type="number" min="1" placeholder="زي العامة" value="${whHours[w]||""}"><span class="x">ساعة</span></div>`).join("")}
   <div style="margin-top:8px"><button class="b" onclick="saveRules()">حفظ المهل</button></div></div>
   <div class="card"><b>الصلاحيات – مين يشوف إيه</b><div class="mut">علّم ✔ على اللي تحب يظهر لكل شاشة. أنت بتشوف كل حاجة دايماً، والبنت بتشوف بيانات طلباتها هي. التغيير بيتطبّق فوراً.</div>
   <div class="tw"><table><tr><th>الصلاحية</th><th>اللوجيستك</th><th>الحسابات</th><th>مخزن مشعل</th><th>مخزن أكتوبر</th><th>مخزن أبو صير</th></tr>
@@ -1135,7 +1155,7 @@ function startListeners(){
   if(listening)return;listening=true;
   db=firebase.firestore();
   const err=e=>{const m=$("#msg");m.style.display="block";m.textContent="خطأ في الاتصال بقاعدة البيانات: "+(e.message||e.code)};
-  db.collection("settings").onSnapshot(x=>{pins={};shipHours=72;shipHoursBy={};perms={};nperms={};fleet={drivers:[],cars:[],dests:[SOHAG],staff:[]};wbill={...WB_DEF};reasons=DEFAULT_REASONS.slice();x.docs.forEach(d=>{const v=d.data()||{};if(d.id==="reasons"){const l=toArr(v.list).filter(Boolean);reasons=l}else if(d.id==="rules"){const h=+v.shipHours;if(h>0)shipHours=h;shipHoursBy=v.byMethod||{}}else if(d.id==="perms"){perms=v}else if(d.id==="notif"){nperms=v}else if(d.id==="fleet"){fleet={drivers:toArr(v.drivers).filter(Boolean),cars:toArr(v.cars).filter(Boolean),dests:v.dests?toArr(v.dests).filter(Boolean):[SOHAG],staff:toArr(v.staff).filter(Boolean)}}else if(d.id==="waybill"){wbill={...WB_DEF,...v}}else if(v.phones)contacts=mergeC(toArr(v.phones).filter(x=>x&&x.name));else pins=v});refresh()},err);
+  db.collection("settings").onSnapshot(x=>{pins={};shipHours=72;shipHoursBy={};whHours={};perms={};nperms={};fleet={drivers:[],cars:[],dests:[SOHAG],staff:[]};wbill={...WB_DEF};reasons=DEFAULT_REASONS.slice();x.docs.forEach(d=>{const v=d.data()||{};if(d.id==="reasons"){const l=toArr(v.list).filter(Boolean);reasons=l}else if(d.id==="rules"){whHours=v.byWh||{};const h=+v.shipHours;if(h>0)shipHours=h;shipHoursBy=v.byMethod||{}}else if(d.id==="perms"){perms=v}else if(d.id==="notif"){nperms=v}else if(d.id==="fleet"){fleet={drivers:toArr(v.drivers).filter(Boolean),cars:toArr(v.cars).filter(Boolean),dests:v.dests?toArr(v.dests).filter(Boolean):[SOHAG],staff:toArr(v.staff).filter(Boolean)}}else if(d.id==="waybill"){wbill={...WB_DEF,...v}}else if(v.phones)contacts=mergeC(toArr(v.phones).filter(x=>x&&x.name));else pins=v});refresh()},err);
   db.collection("orders").orderBy("createdAt","desc").onSnapshot(s=>{orders=s.docs.map(d=>d.data());checkNew();refresh()},err);
 }
 (function(){
