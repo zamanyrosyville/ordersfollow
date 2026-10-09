@@ -120,6 +120,7 @@ th{color:var(--mut);font-weight:600;font-size:12px;background:rgba(0,0,0,.025)}
     <button data-v="wa">مخزن أبو صير</button>
     <button data-v="acc">الحسابات</button>
     <button data-v="dash">الإدارة</button>
+    <button data-v="rep">📊 التقارير</button>
   </nav>
 </header>
 <main id="app"></main>
@@ -332,6 +333,7 @@ const mods=o=>(o.log||[]).filter(l=>l.kind==="mod");
 
 /* ---- الصلاحيات (المدير يتحكم فيها) ---- */
 const PERM_DEFS=[
+ {k:"srep",l:"شاشة التقارير (تشوفها ولا لأ)",roles:["log","acc","wm","wo","wa"],def:{}},
  {k:"cname",l:"اسم العميل",roles:["log","acc","wm"],def:{log:1,acc:1,wm:1}},
  {k:"cphone",l:"تليفون العميل",roles:["log","acc","wm"],def:{log:1,acc:0,wm:0}},
  {k:"cship",l:"بيانات الشحن (الطريقة / الشركة / العنوان)",roles:["log","acc","wm"],def:{log:1,acc:1,wm:1}},
@@ -348,7 +350,7 @@ const can=(k,scr)=>{
   if(owner)return true;
   const r=scr||role;
   if(isFd(r)&&FDHIDE.includes(k))return false;
-  if(r==="tele")return !["cdue","cwaybill","cprint"].includes(k);
+  if(r==="tele")return !["cdue","cwaybill","cprint","srep"].includes(k);
   return permVal(k,r);
 };
 const dnum=(o,scr)=>String(o.num)+((o.ccode&&can("cname",scr))?"/"+o.ccode:"");
@@ -471,8 +473,9 @@ async function createOrder(o){
 let shipHours=72,shipHoursBy={},whHours={},editShip=null;
 const SHIPM=["شركة شحن","تسليم الشركة"],HR=3600000;
 const fmtDur=ms=>{ms=Math.abs(ms);const d=Math.floor(ms/864e5),h=Math.floor(ms%864e5/HR),m=Math.floor(ms%HR/6e4);return ((d?d+" يوم ":"")+(h?h+" ساعة ":"")+(!d?m+" دقيقة":"")).trim()};
+function workDue(st,h){let t=st,rem=h*HR,g=0;while(rem>0&&g++<5000){const d=new Date(t),nm=new Date(d.getFullYear(),d.getMonth(),d.getDate()+1).getTime();if(d.getDay()===5){t=nm;continue}const ch=Math.min(rem,nm-t);t+=ch;rem-=ch}return t}
 const hoursOf=o=>+shipHoursBy[o.shipMethod]>0?+shipHoursBy[o.shipMethod]:shipHours;
-const dueAt=o=>o.accAt?o.accAt+hoursOf(o)*HR:0;
+const dueAt=o=>o.accAt?workDue(o.accAt,hoursOf(o)):0;
 const isDone=o=>["shipped","delivered"].includes(o.stage);
 function dueInfo(o){
   if(o.stage==="cancelled")return null;
@@ -490,7 +493,7 @@ function dueInfoWh(o,w){
   const h=hoursOfWh(o,w),sh=(o.ship||{})[w]||{},nm=WHN[w]||w;
   const st=isFd(w)?((o.sentAt||{})[w]||o.accAt):o.accAt;
   if(!st)return {c:"wait",t:"مهلة "+nm+" ("+h+" ساعة) لسه ما بدأتش"+(isFd(w)?" – بتبدأ لما اللوجيستك يبعتلها الأصناف":" – بانتظار تأكيد الحسابات للتحصيل")};
-  const due=st+h*HR;
+  const due=workDue(st,h);
   if(sh.done){const at=sh.t||0;if(!at)return {c:"ok",t:nm+": خرجت"};return at<=due?{c:"ok",t:nm+": خرجت في الوقت ✓"}:{c:"late",t:nm+": خرجت متأخرة "+fmtDur(at-due)}}
   const left=due-Date.now();
   if(left<=0)return {c:"late",t:nm+": متأخر "+fmtDur(left)+" عن مهلته",late:true};
@@ -501,6 +504,33 @@ const lateStyleWh=(o,w)=>{const d=dueInfoWh(o,w);return d&&d.late?"border:2px so
 const whInvolved=o=>[...new Set((o.items||[]).map(i=>i.wh).filter(Boolean))];
 const whLate=o=>whInvolved(o).some(w=>whHrs(w)&&(d=>d&&d.late)(dueInfoWh(o,w)));
 const whDueRows=o=>whInvolved(o).filter(w=>whHrs(w)).map(w=>dueBadgeWh(o,w)).join("");
+let fold={};
+const toggleFold=id=>{fold[id]=!fold[id];render()};
+const foldAll=(ids,on)=>{ids.forEach(i=>fold[i]=on);render()};
+const isArchived=(o,r)=>{
+  if(o.stage==="cancelled")return true;
+  const sh=o.ship||{};
+  if(o.stage==="delivered")return true;
+  if(r==="acc")return noT(o)&&o.acct==="full";
+  if(WHROLES.includes(r))return !!(sh[r]&&sh[r].done);
+  if(noT(o))return o.stage==="shipped"||!!(sh.wm&&sh.wm.done);
+  const w=whInvolved(o);return w.length>0&&w.every(x=>sh[x]&&sh[x].done);
+};
+const archBlock=(arr,fn,title)=>arr.length?`<details class="card" ${(qNum||qGirl)?"open":""}><summary><b>📦 ${title} – ${arr.length}</b></summary><div class="mut" style="margin:6px 0">الطلبات دي خلصت وراحت للأرشيف. البحث بيدوّر فيها كمان.</div>${arr.slice(0,100).map(fn).join("")}</details>`:"";
+const PLBL={none:"غير محضّر",part:"محضّر جزئي",full:"محضّر بالكامل"};
+function foldLine(o,r){
+  let pr;
+  if(WHROLES.includes(r)){
+    const mi=mineItems(o,r);
+    if(mi.length){const sh=((o.ship||{})[r]||{}).done;pr="التحضير: <b>"+PLBL[prepOf(o,r)]+"</b>"+(sh?" · خرج":"")}
+    else{const f=feedSt(o);pr=f?"المكونات: <b>"+(f.complete?"اكتملت":"بانتظار "+f.missing.map(w=>WHN[w]).join(" و"))+"</b>":""}
+  }else{
+    const ws=whInvolved(o);pr=ws.length?"التحضير: "+ws.map(w=>WHN[w].replace("مخزن ","")+" <b>"+PLBL[prepOf(o,w)]+"</b>"+(((o.ship||{})[w]||{}).done?" (خرج)":"")).join(" · "):"التحضير: <b>لسه ما اتوزّعتش أصناف</b>";
+  }
+  const pay=can("camt",r)&&noT(o)?"التحصيل: <b>"+esc(payTxt(o))+"</b>":"";
+  return `<div class="mut" style="margin-top:4px">مطوي – ${[pr,pay].filter(Boolean).join(" · ")}</div>`;
+}
+const prepOf=(o,w)=>{const it=(o.items||[]).filter(i=>!w||i.wh===w);if(!it.length)return "none";const f=it.filter(i=>+i.qty>0&&+i.picked>=+i.qty).length;return f===it.length?"full":(it.some(i=>+i.picked>0)?"part":"none")};
 const isLate=o=>{const d=dueInfo(o);return !!(d&&d.late)||whLate(o)};
 const DUEBG={wait:"#6b7686",ok:"#1a9d55",warn:"#d98a00",late:"#d63b3b"};
 const dueBadge=o=>{const d=dueInfo(o);return d?`<div style="margin-top:4px"><span class="tag" style="background:${DUEBG[d.c]};white-space:normal">⏱ ${esc(d.t)}</span></div>`:""};
@@ -777,7 +807,8 @@ async function doMod(id){
 /* ---- Telesales ---- */
 function teleView(){
   const me=who.trim(),mine=me?orders.filter(o=>o.createdBy===me):[];
-  return orderForm()+`<div class="card"><b>طلباتي</b>${list(mine,"tele")}</div>`;
+  const opn=mine.filter(o=>!isArchived(o,"tele")),arc=mine.filter(o=>isArchived(o,"tele"));
+  return orderForm()+`<div class="card"><b>طلباتي المفتوحة</b>${list(opn,"tele")}</div>`+(arc.length?`<details class="card"><summary><b>📦 الأرشيف (${arc.length}) – طلبات اتشحنت أو اتقفلت</b></summary>${list(arc,"tele")}</details>`:"");
 }
 function orderForm(inLog){
   return `<${inLog?'details':'div'} class="card"><${inLog?'summary':'b'}>${inLog?'➕ ':''}طلب عميل جديد${inLog?' (تسجيل طلب بنفسك)':''}</${inLog?'summary':'b'}>
@@ -869,16 +900,17 @@ async function createTransfer(){
 }
 const printBar=()=>can("cprint","log")?`<div class="card"><b>طباعة قوائم التجهيز</b><div class="row" style="margin-top:8px">${Object.entries(WHN).map(([w,n])=>`<button class="b s x" onclick="printWh('${w}','need')">🖨 المطلوب – ${n}</button><button class="b s x" onclick="printWh('${w}','done')">🖨 المجهّز – ${n}</button>`).join("")}</div></div>`:"";
 function logView(){
-  const act=orders.filter(o=>!["delivered","cancelled"].includes(o.stage)&&match(o));
-  if(!act.length)return orderForm(true)+transferCard()+searchBar()+pasteCard()+`<div class="card empty">مفيش طلبات مطابقة</div>`;
-  return printBar()+orderForm(true)+transferCard()+searchBar()+pasteCard()+act.map(o=>`<div class="card" style="${can("cdue","log")?lateStyle(o):""}"><div class="row"><div><b>${cT(o,"log")}</b>${isTr(o)?` <span class="tag" style="background:#3d6f8e">أمر نقل داخلي</span> <span class="mut">← ${esc(o.dest||"")}</span>`:""}<div class="mut">${metaLine(o,"log")}</div></div><div class="x">${tag(o.stage)} ${mods(o).length?`<span class="mod">${mods(o).length} تعديل</span>`:""}</div></div>
-  <div class="mut">${whTxt(o)}</div>${can("cdue","log")?dueBadge(o)+whDueRows(o):""}${holdBanner(o)}<div style="margin-top:4px">${can("cship","log")&&noT(o)?shipBox(o):""}${compBanner(o)}${can("cwaybill","log")&&noT(o)?`<button class="b s x" onclick="printWaybill('${o.id}')">🖨 بوليصة شحن</button>`:""}</div>${!(o.items||[]).length?`<div class="hold">⚠ لسه ما اتسجلتش أصناف للطلب (الصق الأصناف من الإكسيل)</div>`:(o.items||[]).some(i=>!i.wh)?`<div class="hold">⚠ فيه أصناف لسه ما اتحدّدش لها مخزن</div>`:""}${o.stage==="modified"?`<div class="hold" style="color:#8a4fd6">⚠ آخر تعديل: ${esc(mods(o).slice(-1)[0]?.text)}</div>`:""}
+  const rel=orders.filter(match),act=rel.filter(o=>!isArchived(o,"log")),arch=rel.filter(o=>isArchived(o,"log"));
+  const logCard=o=>`<div class="card" style="${can("cdue","log")?lateStyle(o):""}"><div class="row"><div><b>${cT(o,"log")}</b>${isTr(o)?` <span class="tag" style="background:#3d6f8e">أمر نقل داخلي</span> <span class="mut">← ${esc(o.dest||"")}</span>`:""}<div class="mut">${metaLine(o,"log")}</div></div><div class="x">${tag(o.stage)} ${mods(o).length?`<span class="mod">${mods(o).length} تعديل</span>`:""} <button class="b s x" onclick="toggleFold('${o.id}')">${fold[o.id]?"▸ فتح":"▾ طي"}</button></div></div>
+  <div class="mut">${whTxt(o)}</div>${can("cdue","log")?dueBadge(o)+whDueRows(o):""}${holdBanner(o)}${fold[o.id]?foldLine(o,"log"):""}<div ${fold[o.id]?'style="display:none"':""}><div style="margin-top:4px">${can("cship","log")&&noT(o)?shipBox(o):""}${compBanner(o)}${can("cwaybill","log")&&noT(o)?`<button class="b s x" onclick="printWaybill('${o.id}')">🖨 بوليصة شحن</button>`:""}</div>${!(o.items||[]).length?`<div class="hold">⚠ لسه ما اتسجلتش أصناف للطلب (الصق الأصناف من الإكسيل)</div>`:(o.items||[]).some(i=>!i.wh)?`<div class="hold">⚠ فيه أصناف لسه ما اتحدّدش لها مخزن</div>`:""}${o.stage==="modified"?`<div class="hold" style="color:#8a4fd6">⚠ آخر تعديل: ${esc(mods(o).slice(-1)[0]?.text)}</div>`:""}
   <div class="g2"><div><label>حالة الطلب</label><select onchange="setStage('${o.id}',this.value)">${Object.entries(STAGES).map(([v,s])=>`<option value="${v}" ${o.stage===v?"selected":""}>${s[0]}</option>`).join("")}</select></div>
   <div><label>سبب التوقف</label>${reasonSel("hr-"+o.id,o.holdReason,"setHold('"+o.id+"',this.value)")}</div>
   <div><label>رقم الشحنة</label><input value="${esc(o.shipRef)}" onchange="setShip('${o.id}',this.value)"></div>
   ${can("camt","log")&&noT(o)?`<div><label>التحصيل</label>${payTag(o)}</div>`:""}</div>
   <div style="margin-top:8px">${itemsBox(o)}</div>
-  <div style="margin-top:8px">${modBox(o,"log")}</div></div>`).join("");
+  <div style="margin-top:8px">${modBox(o,"log")}</div></div></div>`;
+  const foldBar=act.length?`<div class="row" style="margin:6px 0"><button class="b s x" onclick="foldAll([${act.map(o=>"'"+o.id+"'").join(",")}],true)">▾ طي كل الطلبات</button><button class="b s x" onclick="foldAll([${act.map(o=>"'"+o.id+"'").join(",")}],false)">▸ فتح الكل</button></div>`:"";
+  return printBar()+orderForm(true)+transferCard()+searchBar()+pasteCard()+foldBar+(act.length?act.map(logCard).join(""):`<div class="card empty">مفيش طلبات مفتوحة مطابقة</div>`)+archBlock(arch,logCard,"أرشيف الطلبات وأوامر النقل (اتشحنت)");
 }
 const setStage=(id,v)=>{const cur=orders.find(x=>x.id===id);if(cur&&cur.noShip&&["shipped","partial","delivered"].includes(v)){toast("🚫 الحسابات منعت شحن الطلب ده لحين سداد كامل القيمة");render();return}if(v==="hold"&&!(cur&&cur.holdReason)){toast("اختار سبب التوقف من القايمة الأول");render();return}return upd(id,o=>{o.stage=v;if(v==="shipped"){o.shippedAt=o.shippedAt||Date.now()}else if(v!=="delivered")o.shippedAt=0},"تغيير الحالة إلى: "+STAGES[v][0])};
 const setHold=(id,v)=>{if(!v){render();return}return upd(id,o=>{o.holdReason=v;o.stage="hold"},"سبب التوقف: "+v)};
@@ -921,11 +953,20 @@ function woSplit(mi){
   return {groups:Object.values(g),other};
 }
 const byPackTxt=by=>Object.keys(by).sort((a,b)=>PACK[b].g-PACK[a].g).map(k=>by[k]+" "+PACK[k].n).join(" + ");
+function whTotals(wid){
+  const g={};
+  orders.filter(o=>!["delivered","cancelled"].includes(o.stage)&&!((o.ship||{})[wid]||{}).done).forEach(o=>mineItems(o,wid).forEach(z=>{
+    if(isPk(wid)){const pp=packOf(z.i.code);if(pp&&pp.pack)return}
+    const u=unitOf(z.i)||"",k=(z.i.code||"")+"|"+z.i.name+"|"+u,G=g[k]=g[k]||{code:z.i.code||"",name:z.i.name,u,req:0,pk:0,c:0,t:0};
+    G.req+=+z.i.qty||0;G.pk+=Math.min(+z.i.picked||0,+z.i.qty||0);if(isTr(o))G.t++;else G.c++}));
+  const L=Object.values(g).sort((a,b)=>(b.req-b.pk)-(a.req-a.pk));if(!L.length)return "";
+  return `<details class="card" open><summary><b>إجمالي المطلوب من كل صنف في ${WHN[wid]} (طلبات عملاء + أوامر نقل، بيتحدّث لوحده)</b></summary><div class="tw"><table><tr><th>الكود</th><th>اسم الصنف</th><th>الوحدة</th><th>إجمالي المطلوب</th><th>اتحضّر</th><th>المتبقي</th><th>من كام طلب</th></tr>${L.map(G=>`<tr style="background:${G.req-G.pk<=0?"rgba(47,125,91,.12)":"transparent"}"><td>${esc(G.code)}</td><td>${esc(G.name)}</td><td>${esc(G.u||"—")}</td><td><b>${G.req}</b></td><td>${G.pk}</td><td><b>${Math.max(0,G.req-G.pk)}</b></td><td class="mut">${G.c?G.c+" طلب عميل":""}${G.c&&G.t?" + ":""}${G.t?G.t+" أمر نقل":""}</td></tr>`).join("")}</table></div><div class="mut">الطلبات اللي خرجت من عندك مش محسوبة.</div></details>`;
+}
 function woSummary(wid){
   const g={};
-  orders.filter(o=>!["delivered","cancelled"].includes(o.stage)).forEach(o=>mineItems(o,wid).forEach(z=>{const p=packOf(z.i.code);if(!(p&&p.pack))return;const G=g[p.base]=g[p.base]||{name:z.i.name,base:p.base,req:0,pick:0,by:{}};G.req+=(+z.i.qty)*p.pack.g;G.pick+=(+z.i.picked||0)*p.pack.g;G.by[p.suf]=(G.by[p.suf]||0)+(+z.i.qty)}));
+  orders.filter(o=>!["delivered","cancelled"].includes(o.stage)&&!((o.ship||{})[wid]||{}).done).forEach(o=>mineItems(o,wid).forEach(z=>{const p=packOf(z.i.code);if(!(p&&p.pack))return;const G=g[p.base]=g[p.base]||{name:z.i.name,base:p.base,req:0,pick:0,by:{}};G.req+=(+z.i.qty)*p.pack.g;G.pick+=(+z.i.picked||0)*p.pack.g;G.by[p.suf]=(G.by[p.suf]||0)+(+z.i.qty)}));
   const L=Object.values(g);if(!L.length)return "";
-  return `<div class="card"><b>إجمالي المطلوب من كل صنف (كل الطلبات الشغالة)</b><div class="tw"><table><tr><th>الكود</th><th>اسم الصنف</th><th>إجمالي المطلوب</th><th>المتحضّر</th><th>توزيع العبوات المطلوبة</th></tr>${L.map(G=>`<tr><td><b class="craw">${esc(G.base)}</b></td><td><b class="craw">${esc(G.name)}</b></td><td><b>${fmtW(G.req)}</b></td><td>${fmtW(G.pick)}</td><td>${esc(byPackTxt(G.by))}</td></tr>`).join("")}</table></div></div>`;
+  return `<div class="card"><b>إجمالي المطلوب من كل صنف (كل الطلبات الشغالة: طلبات عملاء وأوامر نقل)</b><div class="tw"><table><tr><th>الكود</th><th>اسم الصنف</th><th>إجمالي المطلوب</th><th>المتحضّر</th><th>المتبقي</th><th>توزيع العبوات المطلوبة</th></tr>${L.map(G=>`<tr><td><b class="craw">${esc(G.base)}</b></td><td><b class="craw">${esc(G.name)}</b></td><td><b>${fmtW(G.req)}</b></td><td>${fmtW(G.pick)}</td><td><b>${fmtW(Math.max(0,G.req-G.pick))}</b></td><td>${esc(byPackTxt(G.by))}</td></tr>`).join("")}</table></div></div>`;
 }
 const PACKLEGEND=`<details class="card"><summary>دليل أكواد العبوات (الكود الأساسي / رقم العبوة)</summary><div class="mut" style="margin-top:6px">/1 = عبوة كيلو · /2 = عبوة نص كيلو · /4 = عبوة ربع كيلو · /100 = عبوة 100 جرام · /50 = عبوة 50 جرام · /5 أو P5 = عبوة 5 كيلو · /25 = برميل 25 كيلو. الكمية المكتوبة = عدد العبوات.</div></details>`;
 /* اكتمال مكونات طلب العميل عند مشعل (أكتوبر + أبو صير) */
@@ -984,12 +1025,14 @@ function feedTbl(o){
 }
 function whView(wid){
   const rel=orders.filter(o=>(mineItems(o,wid).length||(wid==="wm"&&((noT(o)&&(o.items||[]).some(i=>i.wh))||(woShipped(o)&&o.destType==="wm"))))&&o.stage!=="cancelled"&&match(o));
-  const isArch=o=>wid==="wm"&&!!((o.ship||{}).wm||{}).done;
-  const act=rel.filter(o=>o.stage!=="delivered"&&!isArch(o)),arch=rel.filter(isArch).sort((a,b)=>(b.ship.wm.t||0)-(a.ship.wm.t||0));
+  const isArch=o=>!!((o.ship||{})[wid]||{}).done;
+  const act=rel.filter(o=>o.stage!=="delivered"&&!isArch(o)),arch=rel.filter(isArch).sort((a,b)=>(b.ship[wid].t||0)-(a.ship[wid].t||0));
   const pendOut=act.filter(o=>readyNotOut(o,wid));
-  const head=`<div class="card"><b>${WHN[wid]}</b> <span class="mut">– طلبات فيها أصناف عليك: ${act.length}</span>${can("cprint",wid)?`<div class="row" style="margin-top:8px"><button class="b s x" onclick="printWh('${wid}','need')">🖨 طباعة المطلوب تجهيزه</button><button class="b s x" onclick="printWh('${wid}','done')">🖨 طباعة المجهّز</button></div>`:""}</div>`+(isPk(wid)?woSummary(wid)+PACKLEGEND:"");
-  const top=(pendOut.length?`<div class="card" style="border:2px solid #d63b3b;background:rgba(214,59,59,.10)"><b>⏰ محضّرة ولسه ما خرجتش (${pendOut.length}):</b> ${pendOut.map(o=>"<b>#"+esc(o.num)+"</b>").join("، ")}<div class="mut">دوس زرار الخروج على كل طلب منهم عشان يتسجّل.</div></div>`:"");
-  const archHtml=arch.length?`<details class="card"><summary><b>📦 طلبات اتشحنت (أرشيف) – ${arch.length}</b></summary><div class="mut" style="margin-top:6px">الطلبات دي خرجت للشحن واتشالت من الشاشة الرئيسية. «استدعاء الطلب» بيرجّعه للقايمة.</div>${arch.slice(0,80).map(o=>{const sh=o.ship.wm;return `<div class="row" style="margin-top:6px;border-top:1px solid var(--bd);padding-top:6px"><div><b>${cT(o,wid)}</b><div class="mut">${metaLine(o,wid)} · خرج ${esc(fmt(sh.t))}${sh.ref?" · شحنة "+esc(sh.ref):""}${o.cartons?" · كراتين "+esc(o.cartons):""}</div></div><div class="x">${can("cwaybill",wid)?`<button class="b s x" onclick="printWaybill('${o.id}')">🖨 بوليصة</button>`:""}<button class="b s x" onclick="whUnship('${o.id}','wm')">↩ استدعاء الطلب</button></div></div>`}).join("")}</details>`:"";
+  const head=`<div class="card"><b>${WHN[wid]}</b> <span class="mut">– طلبات فيها أصناف عليك: ${act.length}</span> <button class="b s x" onclick="foldAll([${act.map(o=>"'"+o.id+"'").join(",")}],true)">▾ طي الكل</button><button class="b s x" onclick="foldAll([${act.map(o=>"'"+o.id+"'").join(",")}],false)">▸ فتح الكل</button>${can("cprint",wid)?`<div class="row" style="margin-top:8px"><button class="b s x" onclick="printWh('${wid}','need')">🖨 طباعة المطلوب تجهيزه</button><button class="b s x" onclick="printWh('${wid}','done')">🖨 طباعة المجهّز</button></div>`:""}</div>`+(isPk(wid)?woSummary(wid)+PACKLEGEND:"")+whTotals(wid);
+  const toDo=act.filter(o=>mineItems(o,wid).length&&prepOf(o,wid)!=="full"),lateN=toDo.filter(o=>{const d=dueInfoWh(o,wid);return d&&d.late}).length;
+  const statusCard=`<div class="card" style="border:2px solid ${lateN?"#d63b3b":"var(--bd)"}"><b>📊 موقف ${WHN[wid]} دلوقتي</b><div class="row" style="margin-top:6px"><span class="tag" style="background:#6f6459">غير محضّرة: ${toDo.length} طلب</span><span class="tag" style="background:${lateN?"#d63b3b":"#2f7d5b"}">متأخرة: ${lateN}</span><span class="tag" style="background:${pendOut.length?"#c97a1a":"#2f7d5b"}">محضّرة ولسه ما خرجتش: ${pendOut.length}</span></div></div>`;
+  const top=statusCard+(pendOut.length?`<div class="card" style="border:2px solid #d63b3b;background:rgba(214,59,59,.10)"><b>⏰ محضّرة ولسه ما خرجتش (${pendOut.length}):</b> ${pendOut.map(o=>"<b>#"+esc(o.num)+"</b>").join("، ")}<div class="mut">دوس زرار الخروج على كل طلب منهم عشان يتسجّل.</div></div>`:"");
+  const archHtml=arch.length?`<details class="card"><summary><b>📦 أرشيف – طلبات اتشحنت من عندك (${arch.length})</b></summary><div class="mut" style="margin-top:6px">الطلبات دي خرجت للشحن واتشالت من الشاشة الرئيسية. «استدعاء الطلب» بيرجّعه للقايمة.</div>${arch.slice(0,80).map(o=>{const sh=o.ship[wid];return `<div class="row" style="margin-top:6px;border-top:1px solid var(--bd);padding-top:6px"><div><b>${cT(o,wid)}</b><div class="mut">${metaLine(o,wid)} · خرج ${esc(fmt(sh.t))}${sh.ref?" · شحنة "+esc(sh.ref):""}${wid==="wm"&&o.cartons?" · كراتين "+esc(o.cartons):""}${sh.driver?" · "+esc(sh.driver)+" / "+esc(sh.car||""):""}</div></div><div class="x">${wid==="wm"&&can("cwaybill",wid)?`<button class="b s x" onclick="printWaybill('${o.id}')">🖨 بوليصة</button>`:""}<button class="b s x" onclick="whUnship('${o.id}','${wid}')">↩ استدعاء الطلب</button></div></div>`}).join("")}</details>`:"";
   if(!act.length)return head+top+searchBar()+`<div class="card empty">مفيش أصناف محوّلة لـ${WHN[wid]} دلوقتي</div>`+archHtml;
   const hdrStd=`<tr><th>الكود</th><th>اسم الصنف</th><th>الوحدة</th><th>المطلوب</th><th>المتحضّر (علّم ✓ لو كامل، أو اكتب الكمية)</th><th>سبب النقص</th></tr>`;
   const hdrPack=`<tr><th>الكود</th><th>اسم الصنف</th><th>الوحدة</th><th>الكمية المطلوبة (عبوات)</th><th>وزن المطلوب</th><th>المتحضّر (علّم ✓ لو كامل، أو اكتب عدد العبوات)</th><th>سبب النقص</th></tr>`;
@@ -1004,14 +1047,14 @@ function whView(wid){
       <div class="mut">التوزيع: ${esc(byPackTxt(by))}</div>
       <div class="tw"><table>${hdrPack}${G.rows.map(r=>whRow(o,r,done,r.p)).join("")}</table></div></div>`}).join("");
     const others=sp.other.length?`<div class="tw" style="margin-top:8px"><table>${hdrStd}${sp.other.map(z=>whRow(o,z,done,isPk(wid)?null:undefined)).join("")}</table></div>`:"";
-    return `<div class="card" style="${can("cdue",wid)?lateStyleWh(o,wid):""}"><div class="row"><div><b>${cT(o,wid)}</b>${isTr(o)?` <span class="tag" style="background:#3d6f8e">أمر نقل داخلي</span>`:""}<div class="mut">${metaLine(o,wid)}</div></div><div class="x">${tag(o.stage)}</div></div>${can("cdue",wid)?dueBadgeWh(o,wid):""}${readyBox(o,wid)}${isFd(wid)?(o.noShip?'<div class="hold" style="margin-top:6px">⛔ الشحن متوقف حالياً. كلّم مروان.</div>':""):holdBanner(o)}${wid==="wm"?payOkBanner(o)+compBanner(o):""}<div style="margin-top:4px">${can("cship",wid)?shipLine(o):""}${wid==="wm"&&can("cwaybill",wid)?`<button class="b s x" onclick="printWaybill('${o.id}')">🖨 بوليصة شحن</button>`:""}</div>
+    return `<div class="card" style="${can("cdue",wid)?lateStyleWh(o,wid):""}"><div class="row"><div><b>${cT(o,wid)}</b>${isTr(o)?` <span class="tag" style="background:#3d6f8e">أمر نقل داخلي</span>`:""}<div class="mut">${metaLine(o,wid)}</div></div><div class="x">${tag(o.stage)} <button class="b s x" onclick="toggleFold('${o.id}')">${fold[o.id]?"▸ فتح":"▾ طي"}</button></div></div>${can("cdue",wid)?dueBadgeWh(o,wid):""}${fold[o.id]?foldLine(o,wid):""}${readyBox(o,wid)}<div ${fold[o.id]?'style="display:none"':""}>${isFd(wid)?(o.noShip?'<div class="hold" style="margin-top:6px">⛔ الشحن متوقف حالياً. كلّم مروان.</div>':""):holdBanner(o)}${wid==="wm"?payOkBanner(o)+compBanner(o):""}<div style="margin-top:4px">${can("cship",wid)?shipLine(o):""}${wid==="wm"&&can("cwaybill",wid)?`<button class="b s x" onclick="printWaybill('${o.id}')">🖨 بوليصة شحن</button>`:""}</div>
     ${lm&&!(isFd(wid)&&/تحصيل|سداد|الحسابات|دفع/.test(lm.text))&&(can("cship",wid)||/الأصناف|الكميات|تحضير/.test(lm.text))&&!(isFd(wid)&&/بيانات الشحن/.test(lm.text))?`<div class="hold" style="color:#7b5aa6">آخر تعديل: ${esc(lm.text)}</div>`:""}
     <div class="mut" style="margin-top:6px">جاهز ${rd} من ${mi.length} صنف عندك${done?" · <b>تم الشحن</b>"+(sh.ref?" (شحنة "+esc(sh.ref)+")":"")+(sh.driver?" · السائق "+esc(sh.driver)+" · "+esc(sh.car):""):""}</div>
     ${wid==="wm"?prepBox(o)+cartonBox(o):""}
     ${wid==="wm"?woBox(o)+feedTbl(o):""}${groups}${others}
     ${done?`<div class="row" style="margin-top:8px"><span class="mut">الأصناف اتشحنت. لو عايز تعدّل التحضير الغي الشحن الأول.</span><button class="b s x" onclick="whUnship('${o.id}','${wid}')">إلغاء الشحن</button></div>`
     :`${wid==="wm"&&!mi.length?"":`<div class="row" style="margin-top:8px"><button class="b ok x" onclick="wholeDone('${o.id}','${wid}')">تم التحضير بالكامل</button><button class="b x" onclick="savePick('${o.id}','${wid}')">حفظ التحضير (كميات مختلفة)</button></div>`}
-    <div class="row" style="margin-top:8px"><input class="wi" id="ws-${o.id}" placeholder="رقم الشحنة (اختياري)">${isFd(wid)?`<select class="wi" id="wd-${o.id}"><option value="">— اسم السائق —</option>${fleet.drivers.map(d=>`<option>${esc(d)}</option>`).join("")}</select><select class="wi" id="wc-${o.id}"><option value="">— اسم السيارة —</option>${fleet.cars.map(d=>`<option>${esc(d)}</option>`).join("")}</select>`:""}<button class="b x" onclick="whShip('${o.id}','${wid}')">${isFd(wid)?"تم الخروج":wid==="wm"&&!mi.length?"تم الخروج للشحن للعميل":"تم شحن الكميات المتحضّرة"}</button></div>`}</div>`}).join("")+archHtml;
+    <div class="row" style="margin-top:8px"><input class="wi" id="ws-${o.id}" placeholder="رقم الشحنة (اختياري)">${isFd(wid)?`<select class="wi" id="wd-${o.id}"><option value="">— اسم السائق —</option>${fleet.drivers.map(d=>`<option>${esc(d)}</option>`).join("")}</select><select class="wi" id="wc-${o.id}"><option value="">— اسم السيارة —</option>${fleet.cars.map(d=>`<option>${esc(d)}</option>`).join("")}</select>`:""}<button class="b x" onclick="whShip('${o.id}','${wid}')">${isFd(wid)?"تم الخروج":wid==="wm"&&!mi.length?"تم الخروج للشحن للعميل":"تم شحن الكميات المتحضّرة"}</button></div>`}</div></div>`}).join("")+archHtml;
 }
 const pickFull=(oid,x)=>{const o=orders.find(z=>z.id===oid);if(!o)return;pendPick[oid+"-"+x]=o.items[x].qty;render()};
 const pickAll=(oid,wid)=>{const o=orders.find(z=>z.id===oid);if(!o)return;mineItems(o,wid).forEach(z=>pendPick[oid+"-"+z.x]=z.i.qty);render()};
@@ -1058,14 +1101,14 @@ function girlAmount(id){
 }
 function girlCollect(id){const c0=orders.find(x=>x.id===id);if(c0&&teleLocked(c0))return toast("الطلب اتشحن من مشعل، مفيش تعديل");const v=+($("#pc-"+id)?.value)||0;if(!v)return toast("اكتب المبلغ المحصّل");upd(id,o=>{o.collected=v},"التحصيل: بلّغت "+actor()+" إن العميل دفع "+v)}
 function accView(){
-  const act=orders.filter(o=>o.stage!=="cancelled"&&noT(o)&&match(o)).sort((a,b)=>(a.acct==="full")-(b.acct==="full"));
-  if(!act.length)return searchBar()+`<div class="card empty">مفيش طلبات مطابقة</div>`;
-  return searchBar()+act.map(o=>`<div class="card" style="${can("cdue","acc")?lateStyle(o):""}"><div class="row"><div><b>${cT(o,"acc")}</b><div class="mut">${[can("camt","acc")?"قيمة الطلب "+(o.amount||0)+" · بلّغت البنت تحصيل: "+(o.collected||0)+(o.collected?" ("+diffTxt(o.amount,o.collected).t+")":""):"",can("cgirl","acc")?"البنت: "+esc(o.createdBy):"",can("cphone","acc")?esc(o.phone):""].filter(Boolean).join(" · ")}</div></div><div class="x">${can("camt","acc")?payTag(o):""}</div></div>
+  const all=orders.filter(o=>o.stage!=="cancelled"&&noT(o)&&match(o)),act=all.filter(o=>o.acct!=="full"),arch=all.filter(o=>o.acct==="full");
+  const accCard=o=>`<div class="card" style="${can("cdue","acc")?lateStyle(o):""}"><div class="row"><div><b>${cT(o,"acc")}</b><div class="mut">${[can("camt","acc")?"قيمة الطلب "+(o.amount||0)+" · بلّغت البنت تحصيل: "+(o.collected||0)+(o.collected?" ("+diffTxt(o.amount,o.collected).t+")":""):"",can("cgirl","acc")?"البنت: "+esc(o.createdBy):"",can("cphone","acc")?esc(o.phone):""].filter(Boolean).join(" · ")}</div></div><div class="x">${can("camt","acc")?payTag(o):""}</div></div>
   ${can("cdue","acc")?dueBadge(o):""}${can("cship","acc")?shipLine(o):""}
   ${holdBanner(o)}
   <div class="row" style="margin-top:8px">${o.acct?"":`<button class="b ok" onclick="accFull('${o.id}')">تأكيد تحصيل كامل</button>`}<input class="wi" id="ap-${o.id}" type="number" placeholder="${o.acct?"تصحيح إجمالي المبلغ المحصّل":"إجمالي المبلغ المحصّل"}" value="${o.acct?esc(o.accAmt):""}" oninput="accDiff('${o.id}')"><button class="b" onclick="accPart('${o.id}')">${o.acct?"حفظ التصحيح":"تأكيد المبلغ المحصّل"}</button>${o.acct?`<button class="b s x" onclick="accReset('${o.id}')">إلغاء تأكيد التحصيل</button>`:""}</div>
   ${o.acct!=="full"?`<div class="row" style="margin-top:8px">${o.noShip?`<button class="b s x" onclick="accNoShip('${o.id}',false)">رفع منع الشحن</button>`:`<button class="b x" style="background:var(--bad)" onclick="accNoShip('${o.id}',true)">🚫 عدم الشحن لحين سداد كامل القيمة</button>`}</div>`:""}
-  <div id="ad-${o.id}" style="margin-top:6px"></div></div></div>`).join("");
+  <div id="ad-${o.id}" style="margin-top:6px"></div></div></div>`;
+  return searchBar()+(act.length?act.map(accCard).join(""):`<div class="card empty">مفيش تحصيلات مفتوحة</div>`)+archBlock(arch,accCard,"أرشيف التحصيلات المؤكدة (كامل)");
 }
 const payOkBanner=o=>noT(o)&&o.acct==="full"&&!o.noShip&&!["cancelled","delivered"].includes(o.stage)?`<div style="margin-top:6px;border:2px solid var(--ok);background:rgba(47,125,91,.14);border-radius:8px;padding:6px 10px;font-weight:700">💰 تم التحصيل – مصرّح بالشحن أو التسليم للعميل</div>`:"";
 const holdBanner=o=>o.noShip?`<div style="margin-top:6px;border:2px solid #b8412f;background:rgba(184,65,47,.12);color:#b8412f;border-radius:8px;padding:6px 10px;font-weight:700">🚫 ممنوع الشحن لحين سداد كامل القيمة${o.noShip.by?" (قرار الحسابات: "+esc(o.noShip.by)+")":""}</div>`:"";
@@ -1075,6 +1118,73 @@ function accNoShip(id,on){upd(id,o=>{o.noShip=on?{by:actor(),t:Date.now()}:null}
 function accDiff(id){const o=orders.find(x=>x.id===id);const v=$("#ap-"+id)?.value;const e=$("#ad-"+id);if(!e||!o)return;if(v===""){e.innerHTML="";return}const d=diffTxt(o.amount,+v);e.innerHTML=`<span class="tag" style="background:${d.c}">${d.t}</span>`}
 function accPart(id){const v=+($("#ap-"+id)?.value)||0;if(!v)return toast("اكتب المبلغ المحصّل");const a=orders.find(x=>x.id===id).amount||0,d=diffTxt(a,v),full=v>=a&&a>0;const was=orders.find(x=>x.id===id);upd(id,o=>{o.acct=full?"full":"partial";o.accAmt=v;o.paid=full;o.accAt=o.accAt||Date.now();if(full)o.noShip=null},(was&&was.acct?"الحسابات: تصحيح التحصيل من "+was.accAmt+" إلى "+v:"الحسابات: تأكيد تحصيل "+v)+" من "+a+" ("+d.t+")")}
 
+/* ---- Reports ---- */
+const REP0={type:"",stage:"",wh:"",prep:"",out:"",girl:"",method:"",pay:"",flag:"",from:"",to:"",q:"",ar:"all"};
+let rp={...REP0,ar:"open"};
+const goRep=p=>{rp={...REP0,...p};view="rep";showHelp=false;qNum="";qGirl="";try{localStorage.setItem("v","rep")}catch(e){}render();window.scrollTo(0,0)};
+const kpiGo=k=>goRep(k==="all"?{}:k==="modded"?{flag:"mod"}:k==="unpaid"?{pay:"unpaid"}:k==="late"?{flag:"late"}:{stage:k});
+const outOf=(o,w)=>w?!!((o.ship||{})[w]||{}).done:(noT(o)?(isDone(o)||!!((o.ship||{}).wm||{}).done):(whInvolved(o).length>0&&whInvolved(o).every(x=>((o.ship||{})[x]||{}).done)));
+function repRows(){
+  const R=owner?"log":role,q=(rp.q||"").trim().toLowerCase();
+  return orders.filter(o=>{
+    if(!owner&&WHROLES.includes(role)&&!(mineItems(o,role).length||(role==="wm"&&noT(o)&&(o.items||[]).some(i=>i.wh))))return false;
+    if(!owner&&role==="acc"&&!noT(o))return false;
+    if(rp.type==="c"&&!noT(o))return false;if(rp.type==="t"&&!isTr(o))return false;
+    if(rp.stage&&o.stage!==rp.stage)return false;
+    if(rp.wh&&!(o.items||[]).some(i=>i.wh===rp.wh))return false;
+    if(rp.prep&&prepOf(o,rp.wh)!==rp.prep)return false;
+    if(rp.out==="out"&&!outOf(o,rp.wh))return false;if(rp.out==="notout"&&outOf(o,rp.wh))return false;
+    if(rp.girl&&o.createdBy!==rp.girl)return false;
+    if(rp.method&&o.shipMethod!==rp.method)return false;
+    if(rp.pay){const nt=noT(o)&&o.stage!=="cancelled";
+      if(rp.pay==="full"&&!(noT(o)&&o.acct==="full"))return false;
+      if(rp.pay==="partial"&&!(noT(o)&&o.acct==="partial"))return false;
+      if(rp.pay==="unpaid"&&!(nt&&o.acct!=="full"))return false;
+      if(rp.pay==="none"&&!(nt&&!o.acct))return false;
+      if(rp.pay==="reported"&&!(nt&&!o.acct&&o.collected>0))return false;
+      if(rp.pay==="noship"&&!o.noShip)return false}
+    if(rp.flag==="late"&&!isLate(o))return false;if(rp.flag==="mod"&&!mods(o).length)return false;if(rp.flag==="hold"&&o.stage!=="hold")return false;
+    if(rp.flag==="noitems"&&(o.items||[]).length)return false;if(rp.flag==="unassigned"&&!(o.items||[]).some(i=>!i.wh))return false;
+    if(rp.ar==="open"&&isArchived(o,R))return false;if(rp.ar==="arch"&&!isArchived(o,R))return false;
+    if(rp.from&&o.createdAt<new Date(rp.from).getTime())return false;if(rp.to&&o.createdAt>=new Date(rp.to).getTime()+864e5)return false;
+    if(q){const hay=[o.num,can("cname")?o.ccode:"",can("cname")||isTr(o)?o.customer:"",...(o.items||[]).map(i=>(i.code||"")+" "+i.name)].join(" ").toLowerCase();if(!hay.includes(q))return false}
+    return true}).sort((a,b)=>b.createdAt-a.createdAt);
+}
+function repCols(){return [["رقم الطلب",o=>dnum(o)],["النوع",o=>isTr(o)?"أمر نقل":"طلب عميل"],[can("cname")?"العميل / الجهة":"الجهة",o=>isTr(o)?(o.dest||o.customer):(can("cname")?o.customer:"")],["البنت",o=>can("cgirl")?o.createdBy||"":""],["الحالة",o=>STAGES[o.stage][0]],["المخازن",o=>whInvolved(o).map(w=>WHN[w]).join(" + ")],["عدد الأصناف",o=>(o.items||[]).length],["قيمة الطلب",o=>can("camt")&&noT(o)?(o.amount||0):""],["المحصّل المؤكد",o=>can("camt")&&noT(o)?(o.acct?o.accAmt:0):""],["طريقة الشحن",o=>noT(o)&&can("cship")?(o.shipMethod||""):""],["تاريخ الإنشاء",o=>new Date(o.createdAt).toLocaleDateString("ar-EG")],["متأخر",o=>isLate(o)?"نعم":""]].filter(c=>!(c[0]==="البنت"&&!can("cgirl"))&&!(["قيمة الطلب","المحصّل المؤكد"].includes(c[0])&&!can("camt"))&&!(c[0]==="طريقة الشحن"&&!can("cship")))}
+function repCsv(){
+  const rows=repRows(),C=repCols().filter(c=>!(c[0]==="البنت"&&!can("cgirl"))&&!(["قيمة الطلب","المحصّل المؤكد"].includes(c[0])&&!can("camt")));
+  const q=v=>'"'+String(v==null?"":v).replace(/"/g,'""')+'"';
+  const csv="\ufeff"+[C.map(c=>q(c[0])).join(","),...rows.map(o=>C.map(c=>q(c[1](o))).join(","))].join("\r\n");
+  const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"}));a.download="تقرير-الطلبات.csv";document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500);
+}
+function repPrint(){const rows=repRows(),C=repCols().filter(c=>!(["قيمة الطلب","المحصّل المؤكد"].includes(c[0])&&!can("camt"))&&!(c[0]==="البنت"&&!can("cgirl")));doPrint("تقرير الطلبات ("+rows.length+")",`<table><tr>${C.map(c=>"<th>"+c[0]+"</th>").join("")}</tr>${rows.map(o=>"<tr>"+C.map(c=>"<td>"+esc(c[1](o))+"</td>").join("")+"</tr>").join("")}</table>`)}
+function repView(){
+  const rows=repRows(),sel=(k,l,opts)=>`<div><label>${l}</label><select onchange="rp.${k}=this.value;render()">${opts.map(([v,t])=>`<option value="${esc(v)}" ${rp[k]===v?"selected":""}>${esc(t)}</option>`).join("")}</select></div>`;
+  const girls=[...new Set(orders.map(o=>o.createdBy).filter(Boolean))];
+  const ca=can("camt"),tot=rows.filter(noT).reduce((t,o)=>t+(+o.amount||0),0),col=rows.filter(o=>noT(o)&&o.acct).reduce((t,o)=>t+(+o.accAmt||0),0);
+  const chip=(t,p)=>`<button class="b s x" onclick="goRep(${p})">${t}</button>`;
+  const whOpts=[["","كل المخازن"],...Object.entries(WHN).filter(([w])=>owner||!WHROLES.includes(role)||w===role||role==="wm")];
+  const C=repCols();
+  return `<div class="card"><b>📊 التقارير والفلاتر</b><div class="mut">اختار أي فلاتر، والنتيجة بتتحدّث فوراً. تقدر تطبع أو تنزّل الجدول للإكسيل.</div>
+  <div class="row" style="margin-top:8px">${chip("🟢 المفتوحة","{ar:'open'}")}${chip("🔴 المتأخرة","{flag:'late',ar:'open'}")}${chip("💰 غير المحصّلة","{pay:'unpaid',ar:'open'}")}${chip("🚚 اتشحنت","{ar:'arch'}")}${chip("🔁 أوامر النقل","{type:'t'}")}${chip("✏ اتعدّلت","{flag:'mod'}")}${chip("🚫 ممنوع الشحن","{pay:'noship'}")}</div>
+  <div class="g2" style="margin-top:10px">
+  ${sel("ar","المفتوح / الأرشيف",[["all","الكل"],["open","المفتوحة فقط"],["arch","الأرشيف فقط"]])}
+  ${sel("type","النوع",[["","طلبات العملاء + أوامر النقل"],["c","طلبات العملاء فقط"],["t","أوامر النقل فقط"]])}
+  ${sel("stage","الحالة",[["","كل الحالات"],...Object.entries(STAGES).map(([k,v])=>[k,v[0]])])}
+  ${sel("wh","المخزن",whOpts)}
+  ${sel("prep","التحضير (في المخزن المختار أو كله)",[["","الكل"],["none","غير محضّر"],["part","محضّر جزئي"],["full","محضّر بالكامل"]])}
+  ${sel("out","الخروج (من المخزن المختار أو للعميل)",[["","الكل"],["notout","لسه ما خرجش"],["out","خرج"]])}
+  ${can("cgirl")?sel("girl","البنت",[["","كل البنات"],...girls.map(g=>[g,g])]):""}
+  ${can("cship")?sel("method","طريقة الشحن",[["","الكل"],...SHIPM.map(m=>[m,m])]):""}
+  ${ca?sel("pay","التحصيل",[["","الكل"],["full","محصّل كامل"],["partial","محصّل جزئي"],["unpaid","غير محصّل (كامل)"],["none","لسه الحسابات ما أكدتش"],["reported","البنت بلّغت وبانتظار الحسابات"],["noship","ممنوع الشحن لحين السداد"]]):""}
+  ${sel("flag","حالات خاصة",[["","الكل"],["late","متأخرة"],["mod","اتعدّلت"],["hold","متوقفة"],["noitems","من غير أصناف"],["unassigned","فيها أصناف من غير مخزن"]])}
+  <div><label>من تاريخ</label><input type="date" value="${esc(rp.from)}" onchange="rp.from=this.value;render()"></div>
+  <div><label>إلى تاريخ</label><input type="date" value="${esc(rp.to)}" onchange="rp.to=this.value;render()"></div>
+  <div style="grid-column:1/-1"><label>بحث (رقم طلب${can("cname")?" / كود / اسم عميل":""} / كود أو اسم صنف) – اكتب واضغط Enter</label><input value="${esc(rp.q)}" onchange="rp.q=this.value;render()"></div></div>
+  <div class="row" style="margin-top:8px"><button class="b s x" onclick="goRep({ar:'open'})">مسح الفلاتر</button><button class="b x" onclick="repCsv()">⬇ تنزيل Excel</button><button class="b x" onclick="repPrint()">🖨 طباعة</button></div></div>
+  <div class="card"><b>النتيجة: ${rows.length} طلب</b>${ca?` · إجمالي القيمة: <b>${tot.toLocaleString("ar-EG")}</b> · المحصّل المؤكد: <b>${col.toLocaleString("ar-EG")}</b> · المتبقي: <b>${(tot-col).toLocaleString("ar-EG")}</b>`:""}
+  ${rows.length?`<div class="tw" style="margin-top:8px"><table><tr>${C.map(c=>`<th>${c[0]}</th>`).join("")}<th></th></tr>${rows.slice(0,300).map(o=>`<tr style="${isLate(o)?"background:rgba(214,59,59,.12)":""}">${C.map(c=>`<td>${c[0]==="الحالة"?tag(o.stage):esc(c[1](o))}</td>`).join("")}<td><details><summary>أصناف</summary>${itemsTbl(o)}</details></td></tr>`).join("")}</table></div>${rows.length>300?'<div class="mut">معروض أول 300 صف، ضيّق الفلاتر أو نزّل Excel للكل.</div>':""}`:'<div class="empty">مفيش طلبات بالفلاتر دي</div>'}</div>`;
+}
 /* ---- Dashboard ---- */
 function dashView(){
   const c=k=>orders.filter(o=>o.stage===k).length;
@@ -1084,12 +1194,12 @@ function dashView(){
   const rows=dashRows();
   const tm=orders.reduce((s,o)=>s+mods(o).length,0);
   const wc=k=>orders.filter(o=>!["delivered","cancelled"].includes(o.stage)&&(k?(o.items||[]).some(i=>i.wh===k):(!(o.items||[]).length||(o.items||[]).some(i=>!i.wh)))).length;
-  return searchBar()+`<div class="kpis">${kp.map(([k,t,n])=>`<div class="kpi ${filter===k?"on":""}" onclick="filter='${k}';render()"><b>${n}</b><span>${t}</span></div>`).join("")}</div>
+  return searchBar()+`<div class="kpis">${kp.map(([k,t,n])=>`<div class="kpi ${filter===k?"on":""}" title="اضغط لعرض الطلبات" onclick="kpiGo('${k}')"><b>${n}</b><span>${t}</span></div>`).join("")}</div>
   <div class="card mut">إجمالي التعديلات: <b style="color:var(--tx)">${tm}</b> · من العميل: <b style="color:var(--tx)">${cnt(SRC[0])}</b> · من اللوجيستك: <b style="color:var(--tx)">${cnt(SRC[1])}</b> · أخطاء تيليسيلز: <b style="color:var(--tx)">${cnt(SRC[2])}</b> · غير محصّل: <b style="color:var(--tx)">${unpaid.reduce((s,o)=>s+(o.amount||0)-(o.accAmt||0),0).toLocaleString("ar-EG")}</b></div>
-  <div class="card mut">الطلبات الشغالة عند: مخزن مشعل <b style="color:var(--tx)">${wc("wm")}</b> · مخزن أكتوبر <b style="color:var(--tx)">${wc("wo")}</b> · مخزن أبو صير <b style="color:var(--tx)">${wc("wa")}</b> · فيها أصناف لسه مش متوزّعة على مخزن <b style="color:var(--tx)">${wc("")}</b></div>
+  <div class="card mut">الطلبات الشغالة عند: مخزن مشعل <b style="color:var(--tx);cursor:pointer;text-decoration:underline" onclick="goRep({wh:'wm',ar:'open'})">${wc("wm")}</b> · مخزن أكتوبر <b style="color:var(--tx);cursor:pointer;text-decoration:underline" onclick="goRep({wh:'wo',ar:'open'})">${wc("wo")}</b> · مخزن أبو صير <b style="color:var(--tx);cursor:pointer;text-decoration:underline" onclick="goRep({wh:'wa',ar:'open'})">${wc("wa")}</b> · فيها أصناف لسه مش متوزّعة على مخزن <b style="color:var(--tx);cursor:pointer;text-decoration:underline" onclick="goRep({flag:'unassigned',ar:'open'})">${wc("")}</b></div>
   <div class="card mut">إشارات لم يُؤكَّد الاطلاع عليها: <b style="color:var(--tx)">${orders.reduce((n,o)=>n+pendKeys(o).length,0)}</b>${orders.filter(o=>pendKeys(o).length).map(o=>`<div>#${esc(o.num)}: بانتظار ${pendKeys(o).map(tlabel).join("، ")}</div>`).join("")}</div>
   <div class="card"><b>إدارة الطلبات (للمدير فقط)</b><div class="row" style="margin-top:8px">${wipeAsk?`<span class="hold">متأكد؟ هيتمسح ${orders.length} طلب نهائياً ومينفعش يرجعوا.</span><button class="b x" style="background:var(--bad)" onclick="wipeAll()">نعم، امسح الكل</button><button class="b s x" onclick="wipeAsk=false;render()">إلغاء</button>`:`<button class="b x" style="background:var(--bad)" onclick="wipeAsk=true;render()">🗑 مسح كل الطلبات (${orders.length})</button>`}</div></div>
-  <div class="card"><b>مهلة خروج البضاعة (أقصى مدة للشحن)</b><div class="mut">بتبدأ من أول تأكيد من الحسابات للتحصيل (كامل أو جزئي). تقدر تحدد مدة لكل طريقة شحن، والخانة الفاضية بتاخد المدة العامة.</div>
+  <div class="card"><b>مهلة خروج البضاعة (أقصى مدة للشحن)</b><div class="mut">يوم الجمعة إجازة ومش بيتحسب من المهلة. بتبدأ من أول تأكيد من الحسابات للتحصيل (كامل أو جزئي). تقدر تحدد مدة لكل طريقة شحن، والخانة الفاضية بتاخد المدة العامة.</div>
   <div class="row" style="margin-top:8px"><label class="x" style="margin:0">المدة العامة</label><input id="shh" type="number" min="1" value="${shipHours}"><span class="x">ساعة</span></div>
   ${SHIPM.map((m,i)=>`<div class="row" style="margin-top:6px"><label class="x" style="margin:0">${esc(m)}</label><input id="shm-${i}" type="number" min="1" placeholder="زي العامة" value="${shipHoursBy[m]||""}"><span class="x">ساعة</span></div>`).join("")}
   <div class="mut" style="margin-top:12px"><b>مهلة كل مخزن (منفصلة)</b> – بتبدأ من نفس لحظة تأكيد الحسابات، وبتظهر على كارت المخزن ده بس. الخانة الفاضية بتاخد المدة العامة.</div>
@@ -1134,7 +1244,7 @@ function list(rows,mode){
   ${openId===o.id?`<tr><td colspan="7">${mode==="dash"?shipLine(o):""}<b>الأصناف والكميات</b>${itemsTbl(o)}<div class="log" style="margin-top:8px">${(o.log||[]).map(x=>`${x.kind==="mod"?"🔧":"•"} ${fmt(x.t)} – ${esc(x.by)}${x.rl?" ("+esc(x.rl)+")":""}: ${esc(x.text)}`).join("<br>")}</div></td></tr>`:""}`}).join("")}</table></div>`;
 }
 
-const allowed=()=>owner?["tele","log","wm","wo","wa","acc","dash"]:["tele","log","wm","wo","wa","acc"].includes(role)?[role]:[];
+const allowed=()=>owner?["tele","log","wm","wo","wa","acc","dash","rep"]:["tele","log","wm","wo","wa","acc"].includes(role)?(can("srep")?[role,"rep"]:[role]):[];
 const PINID={log:"pin",wm:"pinwm",wo:"pinwo",wa:"pinwa",acc:"pina"};
 function chooser(){
   const tile=(r,title,sub)=>`<div class="card tile"><h3>${title}</h3><p>${sub}</p>${pins[r]?`<input class="ci" id="${PINID[r]}" type="password" placeholder="الرقم السري" style="margin-bottom:8px">`:""}<button class="b" style="width:100%" onclick="pick('${r}')">دخول</button></div>`;
@@ -1176,7 +1286,7 @@ async function savePin(){
   if(!db)return toast("الحفظ غير متاح");
   try{await db.collection("settings").doc("pins").set({log:$("#pinin").value.trim(),wm:$("#pinwm").value.trim(),wo:$("#pinwo").value.trim(),acc:$("#pinacc").value.trim()});toast("تم حفظ الرقم السري ✔",true)}catch(e){toast("تعذر الحفظ: "+(e.message||e.code))}
 }
-const HELP={"tele": {"t": "التيليسيلز – تسجيل الطلب ومتابعته", "s": ["اكتبي رقم الطلب، كود العميل، اسم العميل، التليفون، قيمة الطلب.", "اختاري طريقة الشحن (واسم الشركة لو الشحن بشركة) واكتبي العنوان: المحافظة والمركز والشارع.", "لو معاكي الأصناف الصقيها من الإكسيل (اختياري، ومروان ممكن يلصقها). الوحدة: عبوة / قطعة / كرتونة.", "دوسي «إرسال للوجيستك».", "لما العميل يدفع اكتبي المبلغ ودوسي «سجّل تحصيل»، وشيماء هتأكده.", "لو العميل طلب الإلغاء دوسي «تأكيد الإلغاء بطلب العميل».","تقدري تعدّلي طريقة الشحن والعنوان وقيمة الطلب والتحصيل طول ما الطلب لسه في التجهيز ومشعل ما شحنهوش. بعد الشحن بيتقفل التعديل."], "e": "<div class=\"mut\" style=\"direction:rtl;background:rgba(0,0,0,.05);padding:8px 10px;border-radius:8px;white-space:pre;overflow-x:auto;margin:8px 0\">رقم الطلب   كود الصنف   اسم الصنف   الكمية   الوحدة\n300   1000/1   زيت خام   20   عبوة\n300   A101   مياه   5   كرتونة</div>", "n": "كود العميل ورقم الطلب مينفعش يتكرروا. مفيش تعديل غير في طلباتك إنتي. أكدي استلام الإشعارات اللي بتوصلك من مروان والمخازن."}, "log": {"t": "اللوجيستك – توزيع الأصناف ومتابعة الطلب", "s": ["اختار اسمك من قايمة «اسمك» فوق (لازم قبل أي حفظ).", "الصق الأصناف من الإكسيل بالأعمدة بالترتيب (ينفع طلبات كتير مرة واحدة).", "حدّد مخزن كل صنف (مشعل / أكتوبر / أبو صير) واختار الوحدة، ودوس «حفظ توزيع المخازن». كل مخزن بيشوف أصنافه بس.", "تابع الحالة على الكارت. لما أكتوبر وأبو صير يخرّجوا هتظهر رسالة خضرا «مكونات الطلب اكتملت بكمياتها».", "املا بيانات الشحن واطبع بوليصة الشحن. مشعل هو اللي بيشحن للعميل.", "تقدر تسجّل طلب عميل بنفسك زي البنات من «➕ طلب عميل جديد» فوق.","الأصناف اللي كودها فيه /P1 أو /P5 وحدتها جرام أو عبوة، وتختارها من قايمة الوحدة.","لنقل كميات لمشعل أو فرع أو مكتب استخدم «أمر نقل داخلي» واختار الوجهة.","الوحدات: قطعة / عبوة / كرتونة / لتر / دستة (والمدير يقدر يضيف غيرها).","مهلة أكتوبر وأبو صير بتبدأ من لحظة ما تدوس «حفظ توزيع المخازن» وتبعتلهم الأصناف.","أكتوبر وأبو صير مش بيشوفوا أي بيانات عميل (اسم / تليفون / عنوان)."], "e": "<div class=\"mut\" style=\"direction:rtl;background:rgba(0,0,0,.05);padding:8px 10px;border-radius:8px;white-space:pre;overflow-x:auto;margin:8px 0\">رقم الطلب   كود الصنف   اسم الصنف   الكمية   الوحدة\n300   1000/1   زيت خام   20   عبوة\n300   A101   مياه   5   كرتونة</div>", "n": "أصناف أكتوبر اللي كودها فيه شرطة (زي 1000/1) وحدتها من الكود. لو غيرت كمية أو مخزن صنف اتحضّر، التحضير بيتصفّر. لو الحسابات منعت الشحن (🚫) محدش يقدر يشحن."}, "wm": {"t": "مخزن مشعل", "s": ["اختار اسمك من القايمة فوق.", "حضّر أصنافك: اكتب الكمية المتحضّرة أو «تم التحضير بالكامل» وبعدين «حفظ التحضير». لو في نقص اختار السبب.", "لما أكتوبر أو أبو صير يشحنوا لك هتلاقي كارت فيه الأصناف والسواق والسيارة. لما توصل دوس «تم استلام كميات …».", "لما تظهر الرسالة الخضرا «مكونات طلب العميل اكتملت» اطبع بوليصة الشحن.", "اكتب عدد الكراتين في خانة «عدد الكراتين» وهيظهر في بوليصة الشحن.","كل أصناف الطلب بتظهر لك. اللي هيجي من أكتوبر أو أبو صير مكتوب جنبه «سوف تأتي من مخزن …» وبعد ما يخرج يتغير لـ«وردت من مخزن …».","سلّم الشحنة واكتب رقمها لو فيه ودوس «تم الخروج للشحن للعميل». الطلب بعدها بيروح لقسم «📦 طلبات اتشحنت (أرشيف)» تحت وتقدر تدوس «استدعاء الطلب» لو احتجته.","بعد التحضير بيظهر تنبيه تفتكر تدوس زرار الخروج."], "e": "", "n": "الزرار الأخير مش بيشتغل لو مكونات أكتوبر أو أبو صير ما اكتملتش أو لو الحسابات منعت الشحن. لو دوست بالغلط استخدم «إلغاء الشحن». المهلة المتبقية بتظهر على الكارت وبتحمر لو اتأخرت."}, "wo": {"t": "مخزن أكتوبر", "s": ["اختار اسمك من القايمة فوق.", "كل طلب فيه أصنافك بس، وفوق إجمالي المطلوب من كل صنف. الكود «أساسي / رقم العبوة» (1000/1 عبوة كيلو، 1000/2 نص كيلو).", "حضّر واكتب عدد العبوات المتحضّرة أو «تم التحضير بالكامل» وبعدين «حفظ التحضير». لو في نقص اختار السبب.", "اختار اسم السواق واسم السيارة من القايمة، واكتب رقم الشحنة لو فيه، ودوس «تم الخروج».","مهلتك بتبدأ من لحظة ما مروان يبعتلك الأصناف.","بعد التحضير بيظهر تنبيه تفتكر تدوس «تم الخروج»، والطلب بيفضل عليه تنبيه أحمر لحد ما تدوسه.","بيانات العميل (اسم / تليفون / عنوان / مبالغ) مش بتظهر لك."], "e": "", "n": "مينفعش «تم الخروج» من غير سواق وسيارة. لو القوايم فاضية كلّم المدير. لو دوست بالغلط استخدم «إلغاء الشحن». لما أكتوبر وأبو صير يخلصوا الاتنين، مروان ومشعل بيعرفوا إن الطلب جاهز."}, "wa": {"t": "مخزن أبو صير", "s": ["اختار اسمك من القايمة فوق.", "الأصناف بالوحدة (قطعة / كرتونة / عبوة).", "حضّر واكتب الكمية المتحضّرة أو «تم التحضير بالكامل» وبعدين «حفظ التحضير». لو في نقص اختار السبب.", "اختار السواق والسيارة، واكتب رقم الشحنة لو فيه، ودوس «تم الخروج».","مهلتك بتبدأ من لحظة ما مروان يبعتلك الأصناف.","بعد التحضير بيظهر تنبيه تفتكر تدوس «تم الخروج»، والطلب بيفضل عليه تنبيه أحمر لحد ما تدوسه.","بيانات العميل (اسم / تليفون / عنوان / مبالغ) مش بتظهر لك."], "e": "", "n": "شغلك زي مخزن أكتوبر: بتشحن لمخزن مشعل مش للعميل. لو دوست بالغلط استخدم «إلغاء الشحن»."}, "acc": {"t": "الحسابات", "s": ["اختار اسمك من القايمة فوق.", "شوف قيمة الطلب وإيه اللي البنت بلّغت بيه.", "أكد التحصيل: «تأكيد تحصيل كامل»، أو اكتب المبلغ ودوس «تأكيد المبلغ المحصّل» لو جزئي. من هنا بتبدأ مهلة خروج البضاعة.", "لو العميل لسه ما سددش دوس «🚫 عدم الشحن لحين سداد كامل القيمة»، ولما يسدد دوس «رفع منع الشحن»."], "e": "", "n": "المهلة مبتبدأش قبل تأكيدك. لو صححت مبلغ استخدم «حفظ التصحيح» أو «إلغاء تأكيد التحصيل»."}, "dash": {"t": "الإدارة", "s": ["هنا بتشوف كل الطلبات وحالتها والمتأخر والغير محصّل، وبتطبع تقرير الموقف.", "ضيف البنات وغيّر أرقامهم السرية، وحدد الأرقام السرية لباقي الشاشات.", "ضيف أسماء موظفي الشركة (لوجيستك ومخازن وحسابات) وهيختاروها من قايمة «اسمك».", "ضيف السائقين والسيارات (المخازن بتختار منهم) وجهات أوامر النقل الداخلي.", "حدد أسباب التوقف والنقص، ومدة مهلة خروج البضاعة، وصلاحيات كل شاشة، وإعدادات الإشعارات، ورقم تليفون مروان للبوليصة.", "تقدر تحذف طلب، وتدخل أي شاشة تانية من الشريط اللي فوق.","من «وحدات الأصناف» تضيف وتعدّل وتحذف الوحدات (لتر، دستة، …)."], "e": "", "n": "في «أمر نقل داخلي» تقدر تضيف جهة جديدة مباشرة من نفس الخانة."}};
+const HELP={"rep":{"t":"شاشة التقارير","s":["اختار الفلاتر اللي عايزها (مفتوح/أرشيف، النوع، الحالة، المخزن، التحضير، الخروج، التحصيل، التاريخ…) والنتيجة بتتحدّث فوراً.","الأزرار السريعة فوق بتفتح أشهر التقارير بضغطة (المتأخرة، غير المحصّلة، اللي اتشحنت…).","دوس «أصناف» جنب أي طلب تشوف أصنافه.","نزّل الجدول للإكسيل أو اطبعه."],"e":"","n":"اللي بتشوفه هنا بيتحدد بصلاحياتك. المدير هو اللي بيحدد مين يشوف الشاشة دي وإيه البيانات اللي تظهر فيها."},"tele": {"t": "التيليسيلز – تسجيل الطلب ومتابعته", "s": ["اكتبي رقم الطلب، كود العميل، اسم العميل، التليفون، قيمة الطلب.", "اختاري طريقة الشحن (واسم الشركة لو الشحن بشركة) واكتبي العنوان: المحافظة والمركز والشارع.", "لو معاكي الأصناف الصقيها من الإكسيل (اختياري، ومروان ممكن يلصقها). الوحدة: عبوة / قطعة / كرتونة.", "دوسي «إرسال للوجيستك».", "لما العميل يدفع اكتبي المبلغ ودوسي «سجّل تحصيل»، وشيماء هتأكده.", "لو العميل طلب الإلغاء دوسي «تأكيد الإلغاء بطلب العميل».","تقدري تعدّلي طريقة الشحن والعنوان وقيمة الطلب والتحصيل طول ما الطلب لسه في التجهيز ومشعل ما شحنهوش. بعد الشحن بيتقفل التعديل."], "e": "<div class=\"mut\" style=\"direction:rtl;background:rgba(0,0,0,.05);padding:8px 10px;border-radius:8px;white-space:pre;overflow-x:auto;margin:8px 0\">رقم الطلب   كود الصنف   اسم الصنف   الكمية   الوحدة\n300   1000/1   زيت خام   20   عبوة\n300   A101   مياه   5   كرتونة</div>", "n": "كود العميل ورقم الطلب مينفعش يتكرروا. مفيش تعديل غير في طلباتك إنتي. أكدي استلام الإشعارات اللي بتوصلك من مروان والمخازن."}, "log": {"t": "اللوجيستك – توزيع الأصناف ومتابعة الطلب", "s": ["اختار اسمك من قايمة «اسمك» فوق (لازم قبل أي حفظ).", "الصق الأصناف من الإكسيل بالأعمدة بالترتيب (ينفع طلبات كتير مرة واحدة).", "حدّد مخزن كل صنف (مشعل / أكتوبر / أبو صير) واختار الوحدة، ودوس «حفظ توزيع المخازن». كل مخزن بيشوف أصنافه بس.", "تابع الحالة على الكارت. لما أكتوبر وأبو صير يخرّجوا هتظهر رسالة خضرا «مكونات الطلب اكتملت بكمياتها».", "املا بيانات الشحن واطبع بوليصة الشحن. مشعل هو اللي بيشحن للعميل.", "تقدر تسجّل طلب عميل بنفسك زي البنات من «➕ طلب عميل جديد» فوق.","الأصناف اللي كودها فيه /P1 أو /P5 وحدتها جرام أو عبوة، وتختارها من قايمة الوحدة.","لنقل كميات لمشعل أو فرع أو مكتب استخدم «أمر نقل داخلي» واختار الوجهة.","الوحدات: قطعة / عبوة / كرتونة / لتر / دستة (والمدير يقدر يضيف غيرها).","مهلة أكتوبر وأبو صير بتبدأ من لحظة ما تدوس «حفظ توزيع المخازن» وتبعتلهم الأصناف.","أكتوبر وأبو صير مش بيشوفوا أي بيانات عميل (اسم / تليفون / عنوان)."], "e": "<div class=\"mut\" style=\"direction:rtl;background:rgba(0,0,0,.05);padding:8px 10px;border-radius:8px;white-space:pre;overflow-x:auto;margin:8px 0\">رقم الطلب   كود الصنف   اسم الصنف   الكمية   الوحدة\n300   1000/1   زيت خام   20   عبوة\n300   A101   مياه   5   كرتونة</div>", "n": "أصناف أكتوبر اللي كودها فيه شرطة (زي 1000/1) وحدتها من الكود. لو غيرت كمية أو مخزن صنف اتحضّر، التحضير بيتصفّر. لو الحسابات منعت الشحن (🚫) محدش يقدر يشحن."}, "wm": {"t": "مخزن مشعل", "s": ["اختار اسمك من القايمة فوق.", "حضّر أصنافك: اكتب الكمية المتحضّرة أو «تم التحضير بالكامل» وبعدين «حفظ التحضير». لو في نقص اختار السبب.", "لما أكتوبر أو أبو صير يشحنوا لك هتلاقي كارت فيه الأصناف والسواق والسيارة. لما توصل دوس «تم استلام كميات …».", "لما تظهر الرسالة الخضرا «مكونات طلب العميل اكتملت» اطبع بوليصة الشحن.", "اكتب عدد الكراتين في خانة «عدد الكراتين» وهيظهر في بوليصة الشحن.","كل أصناف الطلب بتظهر لك. اللي هيجي من أكتوبر أو أبو صير مكتوب جنبه «سوف تأتي من مخزن …» وبعد ما يخرج يتغير لـ«وردت من مخزن …».","سلّم الشحنة واكتب رقمها لو فيه ودوس «تم الخروج للشحن للعميل». الطلب بعدها بيروح لقسم «📦 طلبات اتشحنت (أرشيف)» تحت وتقدر تدوس «استدعاء الطلب» لو احتجته.","بعد التحضير بيظهر تنبيه تفتكر تدوس زرار الخروج."], "e": "", "n": "الزرار الأخير مش بيشتغل لو مكونات أكتوبر أو أبو صير ما اكتملتش أو لو الحسابات منعت الشحن. لو دوست بالغلط استخدم «إلغاء الشحن». المهلة المتبقية بتظهر على الكارت وبتحمر لو اتأخرت."}, "wo": {"t": "مخزن أكتوبر", "s": ["اختار اسمك من القايمة فوق.", "كل طلب فيه أصنافك بس، وفوق إجمالي المطلوب من كل صنف. الكود «أساسي / رقم العبوة» (1000/1 عبوة كيلو، 1000/2 نص كيلو).", "حضّر واكتب عدد العبوات المتحضّرة أو «تم التحضير بالكامل» وبعدين «حفظ التحضير». لو في نقص اختار السبب.", "اختار اسم السواق واسم السيارة من القايمة، واكتب رقم الشحنة لو فيه، ودوس «تم الخروج».","مهلتك بتبدأ من لحظة ما مروان يبعتلك الأصناف.","بعد التحضير بيظهر تنبيه تفتكر تدوس «تم الخروج»، والطلب بيفضل عليه تنبيه أحمر لحد ما تدوسه.","بيانات العميل (اسم / تليفون / عنوان / مبالغ) مش بتظهر لك."], "e": "", "n": "مينفعش «تم الخروج» من غير سواق وسيارة. لو القوايم فاضية كلّم المدير. لو دوست بالغلط استخدم «إلغاء الشحن». لما أكتوبر وأبو صير يخلصوا الاتنين، مروان ومشعل بيعرفوا إن الطلب جاهز."}, "wa": {"t": "مخزن أبو صير", "s": ["اختار اسمك من القايمة فوق.", "الأصناف بالوحدة (قطعة / كرتونة / عبوة).", "حضّر واكتب الكمية المتحضّرة أو «تم التحضير بالكامل» وبعدين «حفظ التحضير». لو في نقص اختار السبب.", "اختار السواق والسيارة، واكتب رقم الشحنة لو فيه، ودوس «تم الخروج».","مهلتك بتبدأ من لحظة ما مروان يبعتلك الأصناف.","بعد التحضير بيظهر تنبيه تفتكر تدوس «تم الخروج»، والطلب بيفضل عليه تنبيه أحمر لحد ما تدوسه.","بيانات العميل (اسم / تليفون / عنوان / مبالغ) مش بتظهر لك."], "e": "", "n": "شغلك زي مخزن أكتوبر: بتشحن لمخزن مشعل مش للعميل. لو دوست بالغلط استخدم «إلغاء الشحن»."}, "acc": {"t": "الحسابات", "s": ["اختار اسمك من القايمة فوق.", "شوف قيمة الطلب وإيه اللي البنت بلّغت بيه.", "أكد التحصيل: «تأكيد تحصيل كامل»، أو اكتب المبلغ ودوس «تأكيد المبلغ المحصّل» لو جزئي. من هنا بتبدأ مهلة خروج البضاعة.", "لو العميل لسه ما سددش دوس «🚫 عدم الشحن لحين سداد كامل القيمة»، ولما يسدد دوس «رفع منع الشحن»."], "e": "", "n": "المهلة مبتبدأش قبل تأكيدك. لو صححت مبلغ استخدم «حفظ التصحيح» أو «إلغاء تأكيد التحصيل»."}, "dash": {"t": "الإدارة", "s": ["هنا بتشوف كل الطلبات وحالتها والمتأخر والغير محصّل، وبتطبع تقرير الموقف.", "ضيف البنات وغيّر أرقامهم السرية، وحدد الأرقام السرية لباقي الشاشات.", "ضيف أسماء موظفي الشركة (لوجيستك ومخازن وحسابات) وهيختاروها من قايمة «اسمك».", "ضيف السائقين والسيارات (المخازن بتختار منهم) وجهات أوامر النقل الداخلي.", "حدد أسباب التوقف والنقص، ومدة مهلة خروج البضاعة، وصلاحيات كل شاشة، وإعدادات الإشعارات، ورقم تليفون مروان للبوليصة.", "تقدر تحذف طلب، وتدخل أي شاشة تانية من الشريط اللي فوق.","من «وحدات الأصناف» تضيف وتعدّل وتحذف الوحدات (لتر، دستة، …)."], "e": "", "n": "في «أمر نقل داخلي» تقدر تضيف جهة جديدة مباشرة من نفس الخانة."}};
 let showHelp=false;
 function helpBar(){
   const h=HELP[view];if(!h)return "";
@@ -1202,7 +1312,7 @@ function render0(){
   if(!al.includes(view))view=al[0];
   document.querySelectorAll("nav button").forEach(b=>{b.style.display=al.includes(b.dataset.v)?"":"none";b.classList.toggle("on",b.dataset.v===view)});
   const ae=document.activeElement&&document.activeElement.id;
-  $("#app").innerHTML=helpBar()+(owner?"":notifPanel()+inbox())+(view==="tele"?teleView():view==="log"?logView():WHROLES.includes(view)?whView(view):view==="acc"?accView():dashView());
+  $("#app").innerHTML=helpBar()+(owner?"":notifPanel()+inbox())+(view==="tele"?teleView():view==="log"?logView():WHROLES.includes(view)?whView(view):view==="acc"?accView():view==="rep"?repView():dashView());
   if(ae==="qn"||ae==="qg"){const e=document.getElementById(ae);if(e){e.focus();const n=e.value.length;try{e.setSelectionRange(n,n)}catch(x){}}}
   shipUi();
 }
