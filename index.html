@@ -362,7 +362,8 @@ async function wipeAll(){
 }
 const DEFAULT_REASONS=["الصنف غير متوفر بالمخزن","الكمية غير كافية","العميل طلب التأجيل","العميل لا يرد","العنوان غير واضح","بانتظار تحصيل المبلغ"];
 let reasons=DEFAULT_REASONS.slice();
-const reasonSel=(id,cur,cb,noPay)=>`<select class="wi" id="${id}" ${cb?`onchange="${cb}"`:""}><option value="">— اختار السبب —</option>${[...new Set([...(cur&&!reasons.includes(cur)?[cur]:[]),...reasons])].filter(r=>!(noPay&&/تحصيل|سداد|دفع|الحسابات/.test(r))).map(r=>`<option ${r===cur?"selected":""}>${esc(r)}</option>`).join("")}</select>`;
+const OREASONS=["الكمية غير متوفرة","العميل لغاه","بناءً على اللوجستك"];
+const reasonSel=(id,cur,cb,noPay,fix)=>`<select class="wi" id="${id}" ${cb?`onchange="${cb}"`:""}><option value="">— اختار السبب —</option>${(fix?OREASONS:[...new Set([...(cur&&!reasons.includes(cur)?[cur]:[]),...reasons])]).filter(r=>!(noPay&&/تحصيل|سداد|دفع|الحسابات/.test(r))).map(r=>`<option ${r===cur?"selected":""}>${esc(r)}</option>`).join("")}</select>`;
 async function saveReasons(l){
   if(!db)return toast("الحفظ غير متاح");
   try{await db.collection("settings").doc("reasons").set({list:l});toast("تم حفظ الأسباب ✔",true)}catch(e){toast("تعذر الحفظ: "+(e.message||e.code))}
@@ -484,13 +485,15 @@ async function ack(oid,mid){
 const mods=o=>(o.log||[]).filter(l=>l.kind==="mod");
 
 /* ---- الصلاحيات (المدير يتحكم فيها) ---- */
-const APP_VER="2026-10-12";
+const APP_VER="2026-10-12b";
 let secOpen={};
 let accounts=[],announce=null,newsAll=false,selAcct="";
 const seenGet=k=>{try{return localStorage.getItem(k)||""}catch(e){return ""}};
 const seenSet=(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}};
 const curAcct=()=>role==="tele"?(accounts.find(a=>a.name===seenGet("acctn"))||null):null;
-const CHANGES=[{v:APP_VER,ts:Date.parse("2026-10-12T00:30:00Z"),d:"١٢ أكتوبر",items:[
+const CHANGES=[{v:APP_VER,ts:Date.parse("2026-10-12T11:00:00Z"),d:"١٢ أكتوبر",items:[
+ [["owner","wo"],"مخزن أكتوبر: جدول واحد للإجمالي بدل الجدولين (عمود لكل كود فيه سلاش + أخرى + إجمالي الزيوت بالكيلو بأوزان العبوات الفعلية). الأرقام هي المتبقي بعد التحضير، والطلب اللي يخرج بيتشال من الجدول."],
+ [["owner","log","wo"],"عند «تم الخروج» من أكتوبر لو فيه صنف ناقص، لازم تختار سبب من 3 أسباب: الكمية غير متوفرة / العميل لغاه / بناءً على اللوجستك، وبيتسجّل في السجل."],
  [["owner","log","wm","wo","wa","acc","rd"],"تنزيل التقارير بقى ملف Excel حقيقي (.xlsx) بالأعمدة المسموحة لدورك بس، وورقة تانية فيها الفلاتر وتاريخ التصدير. المدير بيتحكم في مين يقدر ينزّل من «الصلاحيات»."],
  [["owner","log","wm","wo","wa","acc","rd"],"التقارير: عمود وفلتر «تاريخ الشحن» بالوقت الفعلي لتسجيل الشحن (فاضي لغير المشحون)، وبيتصدّر للإكسيل بصيغة واضحة."],
  [["owner","log","wm","wo","wa"],"أولوية تجهيز الطلب (🔴 عاجل جدًا / 🟠 عاجل / 🟢 عادي): إلزامي في اللوجيستك قبل توزيع الأصناف، وبتظهر للمخازن وبترتّب الطلبات. المهلة والحالة ما اتغيّروش."],
@@ -1209,7 +1212,7 @@ function whRow(o,z,done,p){
   const full=(+i.qty>0)&&(+pv>=+i.qty);
   return `<tr style="background:${ROWBG[s.c]}">${first}
   <td><div style="display:flex;gap:8px;align-items:center"><input type="checkbox" title="تحضير كامل" aria-label="تحضير كامل" ${full?"checked":""} ${done?"disabled":""} onchange="pickTick('${o.id}',${z.x},this.checked)" style="width:24px;height:24px;flex:0 0 auto;padding:0"><input class="wi" type="number" min="0" step="any" style="width:90px;min-width:70px" ${done?"disabled":""} value="${esc(pv)}" oninput="pendPick['${k}']=this.value"></div></td>
-  <td>${reasonSel("rs-"+k,pr,"pendReason['"+k+"']=this.value",isFd(i.wh))}</td></tr>`;
+  <td>${reasonSel("rs-"+k,pr,"pendReason['"+k+"']=this.value",isFd(i.wh),isPk(i.wh))}</td></tr>`;
 }
 function pickTick(oid,x,on){
   const o=orders.find(z=>z.id===oid);if(!o)return;const k=oid+"-"+x,it=o.items[x];
@@ -1249,7 +1252,37 @@ function woSummary(wid){
   const L=Object.values(g);if(!L.length)return "";
   return `<div class="card"><b>إجمالي المطلوب من كل صنف (كل الطلبات الشغالة: طلبات عملاء وأوامر نقل)</b><div class="tw"><table><tr><th>الكود</th><th>اسم الصنف</th><th>إجمالي المطلوب</th><th>المتحضّر</th><th>المتبقي</th><th>توزيع العبوات المطلوبة</th></tr>${L.map(G=>`<tr><td><b class="craw">${esc(G.base)}</b></td><td><b class="craw">${esc(G.name)}</b></td><td><b>${fmtW(G.req)}</b></td><td>${fmtW(G.pick)}</td><td><b>${fmtW(Math.max(0,G.req-G.pick))}</b></td><td>${esc(byPackTxt(G.by))}</td></tr>`).join("")}</table></div></div>`;
 }
-const PACKLEGEND=`<details class="card"><summary>دليل أكواد العبوات (الكود الأساسي / رقم العبوة)</summary><div class="mut" style="margin-top:6px">/1 = عبوة كيلو · /2 = عبوة نص كيلو · /4 = عبوة ربع كيلو · /100 = عبوة 100 جرام · /50 = عبوة 50 جرام · /5 أو P5 = عبوة 5 كيلو · /25 = برميل 25 كيلو. الكمية المكتوبة = عدد العبوات.</div></details>`;
+
+/* جدول أكتوبر المدموج: عمود لكل كود فيه سلاش، والكميات = المتبقي بعد التحضير، والإجمالي بالكيلو من الأوزان الفعلية */
+const WCOLS=["1","2","P1","4","5","100","50","P5","25"],PW={"P1":1000,"P5":5000};
+function woCode(code){
+  const c=ar2en(String(code||"")).trim();
+  let m=c.match(/^(.+?)\s*[\/\\]\s*[pP]\s*(\d+)$/);
+  if(m){const sf="P"+m[2];return {base:m[1].trim(),suf:sf,g:PW[sf]||0,P:true}}
+  const p=packOf(c);
+  if(p)return {base:p.base,suf:p.suf,g:p.pack?p.pack.g:0,P:false};
+  return null;
+}
+function woMerged(wid){
+  const R={},extra=new Set();
+  orders.filter(o=>!["delivered","cancelled"].includes(o.stage)&&!((o.ship||{})[wid]||{}).done).forEach(o=>mineItems(o,wid).forEach(z=>{
+    const i=z.i,rem=Math.max(0,(+i.qty||0)-(+i.picked||0));if(!rem)return;
+    const k=woCode(i.code),base=k?k.base:((i.code||"").trim()||i.name),G=R[base]=R[base]||{base,name:i.name,cell:{},g:0,oth:{},unk:false};
+    if(!k){const u=i.unit||"";G.oth[u]=(G.oth[u]||0)+rem;return}
+    if(WCOLS.indexOf(k.suf)<0)extra.add(k.suf);
+    const gram=k.P&&i.unit==="جرام";
+    const packs=gram&&k.g?rem/k.g:rem;
+    G.cell[k.suf]=(G.cell[k.suf]||0)+packs;
+    if(k.g)G.g+=gram?rem:rem*k.g;else G.unk=true}));
+  const L=Object.values(R);if(!L.length)return "";
+  const cols=[...WCOLS,...[...extra].sort((a,b)=>a-b)],n3=v=>String(Math.round(v*1000)/1000),kg=g=>(Math.round(g)/1000).toFixed(3)+" كجم";
+  const tc={},tot=L.reduce((t,G)=>t+G.g,0);let ot={};
+  L.forEach(G=>{cols.forEach(c=>tc[c]=(tc[c]||0)+(G.cell[c]||0));Object.entries(G.oth).forEach(([u,q])=>ot[u]=(ot[u]||0)+q)});
+  const othTxt=o=>Object.entries(o).map(([u,q])=>n3(q)+(u?" "+esc(u):"")).join(" + ");
+  const hd=cols.map(c=>`<th class="craw">/${esc(c)}${WCOLS.indexOf(c)<0?" ⚠":""}</th>`).join("");
+  return `<details class="card" open><summary><b>إجمالي المتبقي للتجهيز في ${WHN[wid]} (طلبات عملاء + أوامر نقل، بيتحدّث لوحده)</b></summary><div class="tw"><table><tr><th>كود الصنف</th>${hd}<th>أخرى</th><th>إجمالي الزيوت بالكيلو</th></tr>${L.map(G=>`<tr><td><b class="craw">${esc(G.base)}</b><div class="mut">${esc(G.name)}</div></td>${cols.map(c=>`<td>${G.cell[c]?"<b>"+n3(G.cell[c])+"</b>":'<span class="mut">·</span>'}</td>`).join("")}<td>${othTxt(G.oth)||'<span class="mut">·</span>'}</td><td><b>${G.g?kg(G.g):"—"}</b>${G.unk?'<div class="hold">⚠ فيه عبوة وزنها غير معروف</div>':""}</td></tr>`).join("")}<tr style="font-weight:700;background:rgba(0,0,0,.05)"><td>الإجمالي</td>${cols.map(c=>`<td>${tc[c]?n3(tc[c]):"·"}</td>`).join("")}<td>${othTxt(ot)||"·"}</td><td>${kg(tot)}</td></tr></table></div><div class="mut">الأرقام = عدد العبوات المتبقية بعد التحضير. الطلبات اللي خرجت من عندك أو اتلغت مش محسوبة. الإجمالي بالكيلو بيتحسب من وزن كل عبوة (مش من عدد العبوات).</div></details>`;
+}
+const PACKLEGEND=`<details class="card"><summary>دليل أكواد العبوات (الكود الأساسي / رقم العبوة)</summary><div class="mut" style="margin-top:6px">/1 = عبوة كيلو · /2 = عبوة نص كيلو · /4 = عبوة ربع كيلو · /100 = عبوة 100 جرام · /50 = عبوة 50 جرام · /5 = عبوة 5 كيلو · /P1 = 1 كيلو · /P5 = 5 كيلو · /25 = برميل 25 كيلو. الكمية المكتوبة = عدد العبوات.</div></details>`;
 /* اكتمال مكونات طلب العميل عند مشعل (أكتوبر + أبو صير) */
 function feedSt(o){
   if(!noT(o))return null;
@@ -1309,7 +1342,7 @@ function whView(wid){
   const isArch=o=>!!((o.ship||{})[wid]||{}).done;
   const act=rel.filter(o=>o.stage!=="delivered"&&!isArch(o)).sort(byPrio),arch=rel.filter(isArch).sort((a,b)=>(b.ship[wid].t||0)-(a.ship[wid].t||0));
   const pendOut=act.filter(o=>readyNotOut(o,wid));
-  const head=`<div class="card"><b>${WHN[wid]}</b> <span class="mut">– طلبات فيها أصناف عليك: ${act.length}</span> <button class="b s x" onclick="foldAll([${act.map(o=>"'"+o.id+"'").join(",")}],true)">▾ طي الكل</button><button class="b s x" onclick="foldAll([${act.map(o=>"'"+o.id+"'").join(",")}],false)">◂ فتح الكل</button>${can("cprint",wid)?`<div class="row" style="margin-top:8px"><button class="b s x" onclick="printWh('${wid}','need')">🖨 طباعة المطلوب تجهيزه</button><button class="b s x" onclick="printWh('${wid}','done')">🖨 طباعة المجهّز</button></div>`:""}</div>`+(isPk(wid)?woSummary(wid)+PACKLEGEND:"")+whTotals(wid);
+  const head=`<div class="card"><b>${WHN[wid]}</b> <span class="mut">– طلبات فيها أصناف عليك: ${act.length}</span> <button class="b s x" onclick="foldAll([${act.map(o=>"'"+o.id+"'").join(",")}],true)">▾ طي الكل</button><button class="b s x" onclick="foldAll([${act.map(o=>"'"+o.id+"'").join(",")}],false)">◂ فتح الكل</button>${can("cprint",wid)?`<div class="row" style="margin-top:8px"><button class="b s x" onclick="printWh('${wid}','need')">🖨 طباعة المطلوب تجهيزه</button><button class="b s x" onclick="printWh('${wid}','done')">🖨 طباعة المجهّز</button></div>`:""}</div>`+(isPk(wid)?woMerged(wid)+PACKLEGEND:whTotals(wid));
   const toDo=act.filter(o=>mineItems(o,wid).length&&prepOf(o,wid)!=="full"),lateN=toDo.filter(o=>{const d=dueInfoWh(o,wid);return d&&d.late}).length;
   const statusCard=`<div class="card" style="border:2px solid ${lateN?"#d63b3b":"var(--bd)"}"><b>📊 موقف ${WHN[wid]} دلوقتي</b><div class="row" style="margin-top:6px"><span class="tag" style="background:#6f6459">غير محضّرة: ${toDo.length} طلب</span><span class="tag" style="background:${lateN?"#d63b3b":"#2f7d5b"}">متأخرة: ${lateN}</span><span class="tag" style="background:${pendOut.length?"#c97a1a":"#2f7d5b"}">محضّرة ولسه ما خرجتش: ${pendOut.length}</span></div></div>`;
   const top=statusCard+(pendOut.length?`<div class="card" style="border:2px solid #d63b3b;background:rgba(214,59,59,.10)"><b>⏰ محضّرة ولسه ما خرجتش (${pendOut.length}):</b> ${pendOut.map(o=>"<b>#"+esc(o.num)+"</b>").join("، ")}<div class="mut">دوس زرار الخروج على كل طلب منهم عشان يتسجّل.</div></div>`:"");
@@ -1364,13 +1397,15 @@ function whShip(oid,wid){
   else if(!mineItems(o0,wid).some(z=>+z.i.picked>0))return toast("سجّل الكمية المتحضّرة واحفظها الأول");
   if(o0.noShip)return toast(isFd(wid)?"⛔ الشحن متوقف حالياً. كلّم مروان.":"🚫 الحسابات منعت شحن الطلب ده لحين سداد كامل القيمة");
   if(wid==="wm"&&!(o0.prep&&o0.rev))return toast("اختار اسم المحضّر واسم المراجع على الطلب قبل الخروج");
+  if(isPk(wid)){const sh0=mineItems(o0,wid).filter(z=>(+z.i.picked||0)<(+z.i.qty||0)&&!OREASONS.includes(z.i.reason));if(sh0.length)return toast("اختار سبب النقص (الكمية غير متوفرة / العميل لغاه / بناءً على اللوجستك) للصنف: "+sh0[0].i.name+(sh0.length>1?" وغيره":""))}
+  const shT=isPk(wid)?mineItems(o0,wid).filter(z=>(+z.i.picked||0)<(+z.i.qty||0)).map(z=>z.i.name+" ("+(+z.i.picked||0)+"/"+z.i.qty+" – "+z.i.reason+")").join("، "):"";
   const r=($("#ws-"+oid)?.value||"").trim();let dr="",car="";
   if(isFd(wid)){
     if(!fleet.drivers.length||!fleet.cars.length)return toast("المدير لسه ما ضافش السائقين والسيارات. كلّمه يضيفهم من الإدارة");
     dr=$("#wd-"+oid)?.value||"";car=$("#wc-"+oid)?.value||"";
     if(!dr||!car)return toast("اختار اسم السائق واسم السيارة قبل تأكيد الخروج");
   }
-  upd(oid,o=>{o.ship={...(o.ship||{}),[wid]:{done:true,ref:r,t:Date.now(),by:actor(),...(isFd(wid)?{driver:dr,car}:{})}};recalc(o)},WHN[wid]+": تم الشحن"+(r?" – شحنة "+r:"")+(dr?" – السائق "+dr+" – السيارة "+car:"")+(isFd(wid)&&(fs=>fs&&fs.missing.every(w=>w===wid)&&noT(o0))(feedSt(o0))?" – ✅ اكتملت مكونات طلب العميل رقم "+o0.num+" بكمياتها وجاهزة لمشعل":""));
+  upd(oid,o=>{o.ship={...(o.ship||{}),[wid]:{done:true,ref:r,t:Date.now(),by:actor(),...(isFd(wid)?{driver:dr,car}:{})}};recalc(o)},WHN[wid]+": تم الشحن"+(shT?" – نقص: "+shT:"")+(r?" – شحنة "+r:"")+(dr?" – السائق "+dr+" – السيارة "+car:"")+(isFd(wid)&&(fs=>fs&&fs.missing.every(w=>w===wid)&&noT(o0))(feedSt(o0))?" – ✅ اكتملت مكونات طلب العميل رقم "+o0.num+" بكمياتها وجاهزة لمشعل":""));
 }
 const whUnship=(oid,wid)=>upd(oid,o=>{if(isFd(wid)&&o.wmRecv&&!o.wmRecv.t){o.wmRecv={...o.wmRecv};delete o.wmRecv[wid]}else if(isFd(wid))o.wmRecv=null;o.ship={...(o.ship||{}),[wid]:{...((o.ship||{})[wid]||{}),done:false}};recalc(o)},WHN[wid]+": إلغاء الشحن");
 
