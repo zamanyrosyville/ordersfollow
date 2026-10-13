@@ -509,13 +509,14 @@ async function ack(oid,mid){
 const mods=o=>(o.log||[]).filter(l=>l.kind==="mod");
 
 /* ---- الصلاحيات (المدير يتحكم فيها) ---- */
-const APP_VER="2026-10-13";
+const APP_VER="2026-10-13b";
 let secOpen={};
 let accounts=[],announce=null,newsAll=false,selAcct="";
 const seenGet=k=>{try{return localStorage.getItem(k)||""}catch(e){return ""}};
 const seenSet=(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}};
 const curAcct=()=>role==="tele"?(accounts.find(a=>a.name===seenGet("acctn"))||null):null;
-const CHANGES=[{v:APP_VER,ts:Date.parse("2026-10-13T03:00:00Z"),d:"١٣ أكتوبر",items:[
+const CHANGES=[{v:APP_VER,ts:Date.parse("2026-10-13T08:00:00Z"),d:"١٣ أكتوبر",items:[
+ [["owner","tele","log","acc","wm"],"صلاحية جديدة «تعديل أسماء العملاء على الطلبات»: مقفولة للكل افتراضيًا، والمدير بيمنحها لدور (لوجيستك / حسابات / مشعل) من «الصلاحيات»، أو لبنت بعينها من «الحسابات». التعديل بيتسجّل في سجل الطلب بالاسم القديم والجديد."],
  [["owner","tele","log","acc"],"زرار «🔔 برجاء الاعتماد على أونكس»: البنت تبعته للوجيستك والحسابات، واللوجيستك يبعته للحسابات. بيوصل في الإشعارات مع رقم الطلب وحالة التحضير والتحصيل الفعلية، وبيتسجّل مين بعت وإمتى وهل اتشاف. مفيش تكرار طول ما فيه تنبيه لسه محدش اطّلع عليه. وبيظهر في التقارير كعمود «تنبيه أونكس»."],
  [["owner","log","wm","wo","wa"],"أمر النقل الداخلي: خانة «رقم أونكس» بتتكتب يدويًا (لمن عنده الصلاحية) وبتظهر جنب رقم أمر النقل في الشاشات والتقارير والطباعة. رقم أمر النقل ما اتغيّرش، وآخر تعديل بيتسجّل. الصلاحية من «الصلاحيات»: «تعديل رقم أونكس»."],
  [["owner","log"],"صلاحية جديدة «إرسال تنبيه أونكس للحسابات (اللوجيستك)» في جدول الصلاحيات."],
@@ -592,6 +593,7 @@ const PERM_DEFS=[
  {k:"cprio",l:"أولوية تجهيز الطلب (عرضها)",roles:["log","acc","wm","wo","wa","rd"],def:{log:1,wm:1,wo:1,wa:1}},
  {k:"eprio",l:"تحديد وتعديل أولوية تجهيز الطلب",roles:["log","wm"],def:{log:1}},
  {k:"eonyx",l:"تعديل رقم أونكس لأمر النقل الداخلي",roles:["log","acc","wm","wo","wa"],def:{log:1}},
+ {k:"ename",l:"تعديل أسماء العملاء على الطلبات",roles:["log","acc","wm"],def:{}},
  {k:"sonyx",l:"إرسال تنبيه «برجاء الاعتماد على أونكس» للحسابات (اللوجيستك)",roles:["log"],def:{log:1}},
  {k:"cexcel",l:"تنزيل التقرير كملف Excel (الأعمدة بتتفلتر بنفس صلاحيات العرض)",roles:["log","acc","wm","wo","wa","rd"],def:{log:1,acc:1,wm:1,wo:1,wa:1,rd:1}}
 ];
@@ -602,13 +604,32 @@ const can=(k,scr)=>{
   if(owner)return true;
   const r=scr||role;
   if(isFd(r)&&FDHIDE.includes(k))return false;
-  if(r==="tele")return k==="srep"?!!(curAcct()&&curAcct().reports):!["cdue","cwaybill","cprint","cprio","eprio","eonyx"].includes(k);
+  if(r==="tele")return k==="srep"?!!(curAcct()&&curAcct().reports):k==="ename"?!!(curAcct()&&curAcct().ename):!["cdue","cwaybill","cprint","cprio","eprio","eonyx"].includes(k);
   return permVal(k,r);
 };
 const dnum=(o,scr)=>String(o.num)+((o.ccode&&can("cname",scr))?"/"+o.ccode:"");
 const codeId=c=>"c_"+String(c).trim().toLowerCase().replace(/[\/\s.#?\[\]*~]+/g,"_");
 const cT=(o,scr)=>"#<bdi dir=\"ltr\">"+esc(dnum(o,scr))+"</bdi>"+(can("cname",scr)?" – "+esc(o.customer):"")+(isTr(o)&&o.onyxNo?` <span class="tag" style="background:#6a4c93">أونكس: <bdi dir="ltr">${esc(o.onyxNo)}</bdi></span>`:"");
 
+/* تعديل اسم العميل على الطلب (بصلاحية «تعديل الأسماء» فقط، وبيتسجّل الاسم القديم والجديد) */
+const nameBox=(o,scr)=>{
+  if(isTr(o)||!can("ename",owner?"log":scr)||!can("cname",owner?"log":scr))return "";
+  if(scr==="tele"&&!owner&&o.createdBy!==who)return "";
+  return `<details style="margin-top:6px"><summary class="mut">✏ تعديل اسم العميل</summary><div class="row" style="margin-top:6px;gap:6px"><input class="wi" id="en-${o.id}" maxlength="80" style="max-width:240px" value="${esc(o.customer||"")}"><button class="b s" onclick="saveName('${o.id}','${scr}')">حفظ الاسم</button></div></details>`;
+};
+async function saveName(id,scr){
+  if(!needName())return;
+  const cur=orders.find(x=>x.id===id);if(!cur||isTr(cur))return;
+  const sc=owner?"log":scr;
+  if(!can("ename",sc))return toast("مفيش عندك صلاحية تعديل الأسماء");
+  if(role==="tele"&&!owner&&cur.createdBy!==who)return toast("الطلب ده مش بتاعك");
+  if(["cancelled","delivered"].includes(cur.stage))return toast("الطلب ده اتقفل أو اتلغى");
+  const v=($("#en-"+id)?.value||"").trim().replace(/\s+/g," ");
+  if(!v)return toast("اكتب اسم العميل");
+  if(v===(cur.customer||""))return toast("مفيش تغيير للحفظ");
+  const o=JSON.parse(JSON.stringify(cur));o.customer=v;
+  await save(o,"تعديل اسم العميل: «"+(cur.customer||"")+"» ← «"+v+"»","st");render();
+}
 /* ---- تنبيه «برجاء الاعتماد على أونكس»: بيستخدم نظام الإشارات الموجود (mentions) من غير نظام جديد ---- */
 const ONYX_TXT="برجاء الاعتماد على أونكس";
 const onyxAlerts=o=>(o.mentions||[]).filter(m=>m.kind==="onyx");
@@ -668,11 +689,16 @@ async function saveOnyx(id){
   await save(o,"رقم أونكس: "+(v||"تم المسح")+(cur.onyxNo?" (كان "+cur.onyxNo+")":""),"st");render();
 }
 const metaLine=(o,scr)=>[can("cphone",scr)?esc(o.phone):"",can("camt",scr)&&noT(o)?(o.amount||0)+" ج":"",can("cgirl",scr)?esc(o.createdBy):"",fmt(o.createdAt)].filter(Boolean).join(" · ");
+/* علم بيقرأه قواعد Firebase: هل أي حد اتمنح صلاحية «تعديل الأسماء»؟ (القواعد مش بتعرف مين الدور اللي بيكتب) */
+async function syncNameFlag(any){
+  if(!db||!owner)return;
+  try{await db.collection("settings").doc("flags").set({names:!!any},{merge:true})}catch(e){toast("تعذر تحديث علم الأسماء: "+(e.message||e.code))}
+}
 async function setPerm(k,r,v){
   if(!db)return toast("الحفظ غير متاح");
   const d=PERM_DEFS.find(x=>x.k===k),cur={};d.roles.forEach(x=>cur[x]=permVal(k,x));cur[r]=!!v;
   perms={...perms,[k]:cur};
-  try{await db.collection("settings").doc("perms").set(perms);toast("تم حفظ الصلاحية ✔",true)}catch(e){toast("تعذر الحفظ: "+(e.message||e.code))}
+  try{await db.collection("settings").doc("perms").set(perms);toast("تم حفظ الصلاحية ✔",true);if(k==="ename")syncNameFlag(["log","acc","wm"].some(x=>permVal("ename",x))||accounts.some(a=>a.ename))}catch(e){toast("تعذر الحفظ: "+(e.message||e.code))}
 }
 
 /* ---- عنوان الشحن المفصّل ---- */
@@ -731,7 +757,7 @@ const editUnit=i=>{const v=($("#un-"+i).value||"").trim(),m=chkUnit(v);if(m)retu
 const delUnit=i=>{if(UNITS.length<=1)return toast("لازم تفضل وحدة واحدة على الأقل");if(!confirm("حذف الوحدة «"+UNITS[i]+"» من القايمة؟ الأصناف القديمة اللي بيها هتفضل زي ما هي."))return;saveUnits(UNITS.filter((_,k)=>k!==i))};
 async function saveAccounts(l){
   if(!db)return toast("الحفظ غير متاح");
-  try{await db.collection("settings").doc("accounts").set({list:l});toast("تم حفظ الحسابات ✔",true)}catch(e){toast("تعذر الحفظ: "+(e.message||e.code))}
+  try{await db.collection("settings").doc("accounts").set({list:l});toast("تم حفظ الحسابات ✔",true);syncNameFlag(["log","acc","wm"].some(x=>permVal("ename",x))||l.some(a=>a.ename))}catch(e){toast("تعذر الحفظ: "+(e.message||e.code))}
 }
 function addAcct(){
   const n=($("#ac-n").value||"").trim(),pn=($("#ac-p").value||"").trim(),o=$("#ac-o").checked,r=$("#ac-r").checked;
@@ -744,7 +770,7 @@ const setAcct=(i,k,v)=>saveAccounts(accounts.map((a,j)=>j===i?{...a,[k]:v}:a));
 const setAcctPin=i=>{const v=($("#ap2-"+i).value||"").trim();if(!v)return toast("اكتب رقم سري");setAcct(i,"pin",v)};
 function accountsCard(){
   return `<div class="card"><b>الحسابات الشخصية (تقارير / إنشاء طلبات)</b><div class="mut">اعمل حساب لأي شخص باسمه ورقمه السري. «إنشاء طلبات» بيخليه يسجّل طلبات عملاء ويتابعها زي البنات. «عرض التقارير» بيفتح له شاشة التقارير، والبيانات اللي تظهر له بتتحدد من جدول الصلاحيات (عمود حسابات التقارير). اللي معاه تقارير بس بيشوف شاشة التقارير فقط.</div>
-  ${accounts.map((a,i)=>`<div class="row" style="margin-top:8px;border-top:1px solid var(--bd);padding-top:8px"><b style="min-width:90px">${esc(a.name)}</b><input id="ap2-${i}" value="${esc(a.pin)}" style="max-width:110px"><button class="b s x" onclick="setAcctPin(${i})">حفظ الرقم</button><label class="x" style="margin:0"><input type="checkbox" style="width:auto" ${a.orders?"checked":""} onchange="setAcct(${i},'orders',this.checked)"> إنشاء طلبات</label><label class="x" style="margin:0"><input type="checkbox" style="width:auto" ${a.reports?"checked":""} onchange="setAcct(${i},'reports',this.checked)"> عرض التقارير</label><button class="b s x" onclick="delAcct(${i})">حذف</button></div>`).join("")||'<div class="mut" style="margin-top:6px">لسه مفيش حسابات</div>'}
+  ${accounts.map((a,i)=>`<div class="row" style="margin-top:8px;border-top:1px solid var(--bd);padding-top:8px"><b style="min-width:90px">${esc(a.name)}</b><input id="ap2-${i}" value="${esc(a.pin)}" style="max-width:110px"><button class="b s x" onclick="setAcctPin(${i})">حفظ الرقم</button><label class="x" style="margin:0"><input type="checkbox" style="width:auto" ${a.orders?"checked":""} onchange="setAcct(${i},'orders',this.checked)"> إنشاء طلبات</label><label class="x" style="margin:0"><input type="checkbox" style="width:auto" ${a.reports?"checked":""} onchange="setAcct(${i},'reports',this.checked)"> عرض التقارير</label><label class="x" style="margin:0"><input type="checkbox" style="width:auto" ${a.ename?"checked":""} onchange="setAcct(${i},'ename',this.checked)"> تعديل أسماء العملاء</label><button class="b s x" onclick="delAcct(${i})">حذف</button></div>`).join("")||'<div class="mut" style="margin-top:6px">لسه مفيش حسابات</div>'}
   <div class="row" style="margin-top:10px"><input id="ac-n" placeholder="الاسم" style="max-width:150px"><input id="ac-p" placeholder="الرقم السري" style="max-width:120px"><label class="x" style="margin:0"><input type="checkbox" id="ac-o" style="width:auto"> إنشاء طلبات</label><label class="x" style="margin:0"><input type="checkbox" id="ac-r" style="width:auto" checked> عرض التقارير</label><button class="b x" onclick="addAcct()">إضافة حساب</button></div></div>`;
 }
 async function saveAnnounce(clear){
@@ -1281,7 +1307,7 @@ async function createTransfer(){
 const printBar=()=>can("cprint","log")?`<div class="card"><b>طباعة قوائم التجهيز</b><div class="row" style="margin-top:8px">${Object.entries(WHN).map(([w,n])=>`<button class="b s x" onclick="printWh('${w}','need')">🖨 المطلوب – ${n}</button><button class="b s x" onclick="printWh('${w}','done')">🖨 المجهّز – ${n}</button>`).join("")}</div></div>`:"";
 function logView(){
   const rel=orders.filter(match),act=rel.filter(o=>!isArchived(o,"log")).sort(byPrio),arch=rel.filter(o=>isArchived(o,"log"));
-  const logCard=o=>`<div class="card" style="${can("cdue","log")?lateStyle(o):""}"><div class="row"><div><b>${cT(o,"log")}</b>${isTr(o)?` <span class="tag" style="background:#3d6f8e">أمر نقل داخلي</span> <span class="mut">← ${esc(o.dest||"")}</span>`:""}<div class="mut">${metaLine(o,"log")}</div>${onyxBox(o,"log")}${onyxAlertBox(o,"log")}</div><div class="x">${prioTag(o,"log")}${tag(o.stage)} ${mods(o).length?`<span class="mod">${mods(o).length} تعديل</span>`:""} <button class="b s x" onclick="toggleFold('${o.id}')">${fold[o.id]?"◂ فتح":"▾ طي"}</button></div></div>
+  const logCard=o=>`<div class="card" style="${can("cdue","log")?lateStyle(o):""}"><div class="row"><div><b>${cT(o,"log")}</b>${isTr(o)?` <span class="tag" style="background:#3d6f8e">أمر نقل داخلي</span> <span class="mut">← ${esc(o.dest||"")}</span>`:""}<div class="mut">${metaLine(o,"log")}</div>${onyxBox(o,"log")}${onyxAlertBox(o,"log")}${nameBox(o,"log")}</div><div class="x">${prioTag(o,"log")}${tag(o.stage)} ${mods(o).length?`<span class="mod">${mods(o).length} تعديل</span>`:""} <button class="b s x" onclick="toggleFold('${o.id}')">${fold[o.id]?"◂ فتح":"▾ طي"}</button></div></div>
   <div class="mut">${whTxt(o)}</div>${can("cdue","log")?dueBadge(o)+logBadge(o)+whDueRows(o):""}${can("camt","log")?accBadge(o):""}${holdBanner(o)}${fold[o.id]?foldLine(o,"log"):""}<div ${fold[o.id]?'style="display:none"':""}>${prioBox(o)}<div style="margin-top:4px">${can("cship","log")&&noT(o)?shipBox(o):""}${compBanner(o)}${can("cwaybill","log")&&noT(o)?`<button class="b s x" onclick="printWaybill('${o.id}')">🖨 بوليصة شحن</button>`:""}</div>${!(o.items||[]).length?`<div class="hold">⚠ لسه ما اتسجلتش أصناف للطلب (الصق الأصناف من الإكسيل)</div>`:(o.items||[]).some(i=>!i.wh)?`<div class="hold">⚠ فيه أصناف لسه ما اتحدّدش لها مخزن</div>`:""}${o.stage==="modified"?`<div class="hold" style="color:#8a4fd6">⚠ آخر تعديل: ${esc(mods(o).slice(-1)[0]?.text)}</div>`:""}
   <div class="g2"><div><label>حالة الطلب</label><select onchange="setStage('${o.id}',this.value)">${Object.entries(STAGES).map(([v,s])=>`<option value="${v}" ${o.stage===v?"selected":""}>${s[0]}</option>`).join("")}</select></div>
   <div><label>سبب التوقف</label>${reasonSel("hr-"+o.id,o.holdReason,"setHold('"+o.id+"',this.value)")}</div>
@@ -1457,7 +1483,7 @@ function whView(wid){
       <div class="mut">التوزيع: ${esc(byPackTxt(by))}</div>
       <div class="tw"><table>${hdrPack}${G.rows.map(r=>whRow(o,r,done,r.p)).join("")}</table></div></div>`}).join("");
     const others=sp.other.length?`<div class="tw" style="margin-top:8px"><table>${hdrStd}${sp.other.map(z=>whRow(o,z,done,isPk(wid)?null:undefined)).join("")}</table></div>`:"";
-    return `<div class="card" style="${can("cdue",wid)?lateStyleWh(o,wid):""}"><div class="row"><div><b>${cT(o,wid)}</b>${isTr(o)?` <span class="tag" style="background:#3d6f8e">أمر نقل داخلي</span>`:""}<div class="mut">${metaLine(o,wid)}</div>${onyxBox(o,wid)}</div><div class="x">${prioTag(o,wid)}${tag(o.stage)} <button class="b s x" onclick="toggleFold('${o.id}')">${fold[o.id]?"◂ فتح":"▾ طي"}</button></div></div>${can("cdue",wid)?dueBadgeWh(o,wid):""}${fold[o.id]?foldLine(o,wid):""}${readyBox(o,wid)}<div ${fold[o.id]?'style="display:none"':""}>${isFd(wid)?(o.noShip?'<div class="hold" style="margin-top:6px">⛔ الشحن متوقف حالياً. كلّم مروان.</div>':""):holdBanner(o)}${wid==="wm"?payOkBanner(o)+relBanner(o)+compBanner(o):""}<div style="margin-top:4px">${can("cship",wid)?shipLine(o):""}${wid==="wm"&&can("cwaybill",wid)?`<button class="b s x" onclick="printWaybill('${o.id}')">🖨 بوليصة شحن</button>`:""}</div>
+    return `<div class="card" style="${can("cdue",wid)?lateStyleWh(o,wid):""}"><div class="row"><div><b>${cT(o,wid)}</b>${isTr(o)?` <span class="tag" style="background:#3d6f8e">أمر نقل داخلي</span>`:""}<div class="mut">${metaLine(o,wid)}</div>${onyxBox(o,wid)}${nameBox(o,wid)}</div><div class="x">${prioTag(o,wid)}${tag(o.stage)} <button class="b s x" onclick="toggleFold('${o.id}')">${fold[o.id]?"◂ فتح":"▾ طي"}</button></div></div>${can("cdue",wid)?dueBadgeWh(o,wid):""}${fold[o.id]?foldLine(o,wid):""}${readyBox(o,wid)}<div ${fold[o.id]?'style="display:none"':""}>${isFd(wid)?(o.noShip?'<div class="hold" style="margin-top:6px">⛔ الشحن متوقف حالياً. كلّم مروان.</div>':""):holdBanner(o)}${wid==="wm"?payOkBanner(o)+relBanner(o)+compBanner(o):""}<div style="margin-top:4px">${can("cship",wid)?shipLine(o):""}${wid==="wm"&&can("cwaybill",wid)?`<button class="b s x" onclick="printWaybill('${o.id}')">🖨 بوليصة شحن</button>`:""}</div>
     ${lm&&!(isFd(wid)&&/تحصيل|سداد|الحسابات|دفع/.test(lm.text))&&(can("cship",wid)||/الأصناف|الكميات|تحضير/.test(lm.text))&&!(isFd(wid)&&/بيانات الشحن/.test(lm.text))?`<div class="hold" style="color:#7b5aa6">آخر تعديل: ${esc(lm.text)}</div>`:""}
     <div class="mut" style="margin-top:6px">جاهز ${rd} من ${mi.length} صنف عندك${done?" · <b>تم الشحن</b>"+(sh.ref?" (شحنة "+esc(sh.ref)+")":"")+(sh.driver?" · السائق "+esc(sh.driver)+" · "+esc(sh.car):""):""}</div>
     ${wid==="wm"?prepBox(o)+cartonBox(o):""}
@@ -1514,7 +1540,7 @@ function girlAmount(id){
 function girlCollect(id){const c0=orders.find(x=>x.id===id);if(c0&&teleLocked(c0))return toast("الطلب اتشحن من مشعل، مفيش تعديل");const v=+($("#pc-"+id)?.value)||0;if(!v)return toast("اكتب المبلغ المحصّل");upd(id,o=>{o.collected=v;if(!o.collectedAt)o.collectedAt=Date.now()},"التحصيل: بلّغت "+actor()+" إن العميل دفع "+v)}
 function accView(){
   const all=orders.filter(o=>o.stage!=="cancelled"&&noT(o)&&match(o)),act=all.filter(o=>!(o.acct==="full"||o.release)),arch=all.filter(o=>o.acct==="full"||o.release);
-  const accCard=o=>`<div class="card" style="${can("cdue","acc")?lateStyle(o):""}"><div class="row"><div><b>${cT(o,"acc")}</b><div class="mut">${[can("camt","acc")?"قيمة الطلب "+(o.amount||0)+" · بلّغت البنت تحصيل: "+(o.collected||0)+(o.collected?" ("+diffTxt(o.amount,o.collected).t+")":""):"",can("cgirl","acc")?"البنت: "+esc(o.createdBy):"",can("cphone","acc")?esc(o.phone):""].filter(Boolean).join(" · ")}</div></div><div class="x">${can("camt","acc")?payTag(o):""}</div></div>${onyxAlertBox(o,"acc")}
+  const accCard=o=>`<div class="card" style="${can("cdue","acc")?lateStyle(o):""}"><div class="row"><div><b>${cT(o,"acc")}</b><div class="mut">${[can("camt","acc")?"قيمة الطلب "+(o.amount||0)+" · بلّغت البنت تحصيل: "+(o.collected||0)+(o.collected?" ("+diffTxt(o.amount,o.collected).t+")":""):"",can("cgirl","acc")?"البنت: "+esc(o.createdBy):"",can("cphone","acc")?esc(o.phone):""].filter(Boolean).join(" · ")}</div></div><div class="x">${can("camt","acc")?payTag(o):""}</div></div>${onyxAlertBox(o,"acc")}${nameBox(o,"acc")}
   ${can("cdue","acc")?dueBadge(o):""}${can("camt","acc")?accBadge(o):""}${can("cship","acc")?shipLine(o):""}
   ${holdBanner(o)}
   <div class="row" style="margin-top:8px">${o.acct?"":`<button class="b ok" onclick="accFull('${o.id}')">تأكيد تحصيل كامل</button>`}<input class="wi" id="ap-${o.id}" type="number" placeholder="${o.acct?"تصحيح إجمالي المبلغ المحصّل":"إجمالي المبلغ المحصّل"}" value="${o.acct?esc(o.accAmt):""}" oninput="accDiff('${o.id}')"><button class="b" onclick="accPart('${o.id}')">${o.acct?"حفظ التصحيح":"تأكيد المبلغ المحصّل"}</button>${o.acct?`<button class="b s x" onclick="accReset('${o.id}')">إلغاء تأكيد التحصيل</button>`:""}</div>
@@ -1767,7 +1793,7 @@ function list(rows,mode){
   <td>${m.length?`<span class="mod">${m.length}</span><div class="mut">آخر تعديل: ${esc(lm.text)}</div>`:`<span class="mut">—</span>`}</td>
   <td>${payTag(o)}</td>
   <td class="mut">${l?fmt(l.t)+"<br>"+esc(l.by)+(l.rl?" ("+esc(l.rl)+")":""):""}</td>
-  <td>${mode==="tele"&&CANCELABLE.includes(o.stage)?(cancelAsk===o.id?`<button class="b x" style="background:var(--bad)" onclick="girlCancel('${o.id}')">تأكيد الإلغاء بطلب العميل</button> <button class="b s x" onclick="cancelAsk=null;render()">رجوع</button> `:`<button class="b s x" onclick="cancelAsk='${o.id}';render()">إلغاء بطلب العميل</button> `):""}${mode==="tele"&&!teleLocked(o)?shipBox(o)+modBox(o,"tele")+onyxAlertBox(o,"tele")+`<div style="margin-top:6px"><input class="wi" id="am-${o.id}" type="number" placeholder="قيمة الطلب (${esc(o.amount||0)})" style="width:140px"><button class="b s" onclick="girlAmount('${o.id}')">تعديل قيمة الطلب</button></div><div style="margin-top:6px"><input class="wi" id="pc-${o.id}" type="number" placeholder="المبلغ المحصّل" style="width:120px"><button class="b s" onclick="girlCollect('${o.id}')">سجّل تحصيل</button></div> `:mode==="tele"&&!["delivered","cancelled"].includes(o.stage)?`<div class="mut">🔒 الطلب اتشحن من مشعل، مفيش تعديل في الشحن أو التحصيل.</div>`:""}${mode==="dash"?(delAsk===o.id?`<button class="b x" style="background:var(--bad)" onclick="deleteOrder('${o.id}')">تأكيد الحذف</button> <button class="b s x" onclick="delAsk=null;render()">إلغاء</button> `:`<button class="b s x" onclick="delAsk='${o.id}';render()">حذف</button> `):""}<button class="b s" onclick="openId=openId==='${o.id}'?null:'${o.id}';render()">السجل</button></td></tr>
+  <td>${mode==="tele"&&CANCELABLE.includes(o.stage)?(cancelAsk===o.id?`<button class="b x" style="background:var(--bad)" onclick="girlCancel('${o.id}')">تأكيد الإلغاء بطلب العميل</button> <button class="b s x" onclick="cancelAsk=null;render()">رجوع</button> `:`<button class="b s x" onclick="cancelAsk='${o.id}';render()">إلغاء بطلب العميل</button> `):""}${mode==="tele"&&!teleLocked(o)?shipBox(o)+modBox(o,"tele")+onyxAlertBox(o,"tele")+nameBox(o,"tele")+`<div style="margin-top:6px"><input class="wi" id="am-${o.id}" type="number" placeholder="قيمة الطلب (${esc(o.amount||0)})" style="width:140px"><button class="b s" onclick="girlAmount('${o.id}')">تعديل قيمة الطلب</button></div><div style="margin-top:6px"><input class="wi" id="pc-${o.id}" type="number" placeholder="المبلغ المحصّل" style="width:120px"><button class="b s" onclick="girlCollect('${o.id}')">سجّل تحصيل</button></div> `:mode==="tele"&&!["delivered","cancelled"].includes(o.stage)?`<div class="mut">🔒 الطلب اتشحن من مشعل، مفيش تعديل في الشحن أو التحصيل.</div>`:""}${mode==="dash"?(delAsk===o.id?`<button class="b x" style="background:var(--bad)" onclick="deleteOrder('${o.id}')">تأكيد الحذف</button> <button class="b s x" onclick="delAsk=null;render()">إلغاء</button> `:`<button class="b s x" onclick="delAsk='${o.id}';render()">حذف</button> `):""}<button class="b s" onclick="openId=openId==='${o.id}'?null:'${o.id}';render()">السجل</button></td></tr>
   ${openId===o.id?`<tr><td colspan="7">${mode==="dash"?shipLine(o):""}<b>الأصناف والكميات</b>${itemsTbl(o)}<div class="log" style="margin-top:8px">${(o.log||[]).map(x=>`${x.kind==="mod"?"🔧":"•"} ${fmt(x.t)} – ${esc(x.by)}${x.rl?" ("+esc(x.rl)+")":""}: ${esc(x.text)}`).join("<br>")}</div></td></tr>`:""}`}).join("")}</table></div>`;
 }
 
