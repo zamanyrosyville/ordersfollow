@@ -253,6 +253,21 @@ nav button{font-size:var(--fs);font-weight:500}
   th,td{padding:8px 7px}
 }
 @media print{#topbar,.dep{display:none!important}}
+
+/* التقارير على الشاشات العريضة: فلاتر في أعمدة وعرض كامل للجداول */
+@media(min-width:700px){.repf{grid-template-columns:repeat(3,1fr)}}
+@media(min-width:1100px){.repf{grid-template-columns:repeat(4,1fr)}}
+@media(min-width:900px){body[data-v=rep] main>*{max-width:none}}
+@media(min-width:900px) and (max-width:1199px){:root{--sb:196px}}
+/* الطباعة: حدود كاملة، تكرار رؤوس الأعمدة، منع قطع الصف */
+@media print{
+  #printArea table{border:1px solid #444;border-collapse:collapse}
+  #printArea thead{display:table-header-group}
+  #printArea tr{page-break-inside:avoid;break-inside:avoid}
+  #printArea th{background:#eee!important;font-weight:700}
+  #printArea th,#printArea td{border:1px solid #444!important;vertical-align:top}
+  #printArea.wide th,#printArea.wide td{font-size:10.5px;padding:3px 4px}
+}
 </style>
 </head>
 <body>
@@ -303,8 +318,17 @@ const pinOf=n=>String((contacts.find(c=>c.name===n)||{}).pin||"");
 const actor=()=>owner?"المدير":who.trim();
 const actorRole=()=>owner?"المدير":(RL[role]||"");
 let qNum="",qGirl="",wipeAsk=false,delAsk=null;
-const match=o=>(!qNum||String(o.num).includes(qNum)||String(o.ccode||"").toLowerCase().includes(qNum.toLowerCase()))&&(!qGirl||String(o.createdBy||"").includes(qGirl));
-const searchBar=()=>`<div class="card"><div class="g2"><input id="qn" placeholder="🔍 بحث برقم طلب العميل" value="${esc(qNum)}" oninput="qNum=this.value.trim();render()">${can("cgirl")?`<input id="qg" placeholder="🔍 بحث باسم البنت" value="${esc(qGirl)}" oninput="qGirl=this.value.trim();render()">`:""}</div><div class="mut" style="margin-top:6px">إجمالي الطلبات المسجّلة في السيستم: <b>${orders.length}</b>${(qNum||qGirl)?" · فيه بحث شغّال، امسح الخانتين لعرض الكل":""}</div></div>`;
+/* بحث موحّد: رقم الطلب / اسم العميل (لو مسموح) / كود أو اسم الصنف (أصناف المخزن بس للمخازن). كل كلمة لازم تتطابق، من غير حساسية لحالة الأحرف أو المسافات */
+const normQ=s=>ar2en(String(s==null?"":s)).toLowerCase().replace(/\s+/g," ").trim();
+function matchQ(o,q){
+  q=normQ(q);if(!q)return true;
+  const cn=can("cname"),own=!owner&&isFd(role)?(o.items||[]).filter(i=>i.wh===role):(o.items||[]);
+  const hay=normQ([o.num,cn&&o.ccode?o.num+"/"+o.ccode:"",cn?o.ccode:"",cn||isTr(o)?o.customer:"",isTr(o)?o.onyxNo:"",...own.map(i=>(i.code||"")+" "+i.name)].join(" "));
+  return q.split(" ").every(t=>hay.includes(t));
+}
+const dRender=()=>{clearTimeout(window._dq);window._dq=setTimeout(render,150)};
+const match=o=>matchQ(o,qNum)&&(!qGirl||String(o.createdBy||"").includes(qGirl.trim()));
+const searchBar=()=>`<div class="card"><div class="g2"><input id="qn" placeholder="${can("cname")?"🔍 رقم الطلب / اسم العميل / كود الصنف":"🔍 رقم الطلب / كود الصنف"}" value="${esc(qNum)}" oninput="qNum=this.value;dRender()">${can("cgirl")?`<input id="qg" placeholder="🔍 بحث باسم البنت" value="${esc(qGirl)}" oninput="qGirl=this.value;dRender()">`:""}</div><div class="mut" style="margin-top:6px">إجمالي الطلبات المسجّلة في السيستم: <b>${orders.length}</b>${(qNum||qGirl)?" · فيه بحث شغّال، امسح الخانتين لعرض الكل":""}</div></div>`;
 async function deleteOrder(id){
   if(!db)return toast("الحفظ غير متاح");
   try{const o0=orders.find(x=>x.id===id);await db.collection("orders").doc(id).delete();if(o0&&o0.ccode)await db.collection("codes").doc(codeId(o0.ccode)).delete();delAsk=null;toast("تم الحذف ✔",true)}catch(e){toast("تعذر الحذف: "+(e.message||e.code))}
@@ -485,13 +509,19 @@ async function ack(oid,mid){
 const mods=o=>(o.log||[]).filter(l=>l.kind==="mod");
 
 /* ---- الصلاحيات (المدير يتحكم فيها) ---- */
-const APP_VER="2026-10-12b";
+const APP_VER="2026-10-13";
 let secOpen={};
 let accounts=[],announce=null,newsAll=false,selAcct="";
 const seenGet=k=>{try{return localStorage.getItem(k)||""}catch(e){return ""}};
 const seenSet=(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}};
 const curAcct=()=>role==="tele"?(accounts.find(a=>a.name===seenGet("acctn"))||null):null;
-const CHANGES=[{v:APP_VER,ts:Date.parse("2026-10-12T11:00:00Z"),d:"١٢ أكتوبر",items:[
+const CHANGES=[{v:APP_VER,ts:Date.parse("2026-10-13T03:00:00Z"),d:"١٣ أكتوبر",items:[
+ [["owner","tele","log","acc"],"زرار «🔔 برجاء الاعتماد على أونكس»: البنت تبعته للوجيستك والحسابات، واللوجيستك يبعته للحسابات. بيوصل في الإشعارات مع رقم الطلب وحالة التحضير والتحصيل الفعلية، وبيتسجّل مين بعت وإمتى وهل اتشاف. مفيش تكرار طول ما فيه تنبيه لسه محدش اطّلع عليه. وبيظهر في التقارير كعمود «تنبيه أونكس»."],
+ [["owner","log","wm","wo","wa"],"أمر النقل الداخلي: خانة «رقم أونكس» بتتكتب يدويًا (لمن عنده الصلاحية) وبتظهر جنب رقم أمر النقل في الشاشات والتقارير والطباعة. رقم أمر النقل ما اتغيّرش، وآخر تعديل بيتسجّل. الصلاحية من «الصلاحيات»: «تعديل رقم أونكس»."],
+ [["owner","log"],"صلاحية جديدة «إرسال تنبيه أونكس للحسابات (اللوجيستك)» في جدول الصلاحيات."],
+ [["owner","tele","log","wm","wo","wa","acc","rd"],"بحث موحّد في كل الشاشات والتقارير: رقم الطلب (أو جزء منه) أو اسم العميل (لمن يحق له) أو كود/اسم الصنف، وبيشتغل أثناء الكتابة ومن غير حساسية لحالة الحروف أو المسافات. المخازن بتبحث في أصناف مخزنها بس."],
+ [["owner","log","wm","wo","wa","acc","rd"],"التقارير: عمود «تاريخ الشحن» بقى جنب «الحالة» (على الشاشة والطباعة والإكسل)، وفلاتر التقارير في أعمدة على اللاب توب، ومساحة الجداول أوسع."],
+ [["owner","log","wm","wo","wa","acc","rd"],"الطباعة: حدود الجداول كاملة، رؤوس الأعمدة بتتكرر في كل صفحة، والجداول العريضة بتتطبع أفقي من غير قصّ."],
  [["owner","wo"],"مخزن أكتوبر: جدول واحد للإجمالي بدل الجدولين (عمود لكل كود فيه سلاش + أخرى + إجمالي الزيوت بالكيلو بأوزان العبوات الفعلية). الأرقام هي المتبقي بعد التحضير، والطلب اللي يخرج بيتشال من الجدول."],
  [["owner","log","wo"],"عند «تم الخروج» من أكتوبر لو فيه صنف ناقص، لازم تختار سبب من 3 أسباب: الكمية غير متوفرة / العميل لغاه / بناءً على اللوجستك، وبيتسجّل في السجل."],
  [["owner","log","wm","wo","wa","acc","rd"],"تنزيل التقارير بقى ملف Excel حقيقي (.xlsx) بالأعمدة المسموحة لدورك بس، وورقة تانية فيها الفلاتر وتاريخ التصدير. المدير بيتحكم في مين يقدر ينزّل من «الصلاحيات»."],
@@ -561,6 +591,8 @@ const PERM_DEFS=[
  {k:"cprint",l:"طباعة قوائم التجهيز",roles:["log","wm","wo","wa"],def:{log:1,wm:1,wo:1,wa:1}},
  {k:"cprio",l:"أولوية تجهيز الطلب (عرضها)",roles:["log","acc","wm","wo","wa","rd"],def:{log:1,wm:1,wo:1,wa:1}},
  {k:"eprio",l:"تحديد وتعديل أولوية تجهيز الطلب",roles:["log","wm"],def:{log:1}},
+ {k:"eonyx",l:"تعديل رقم أونكس لأمر النقل الداخلي",roles:["log","acc","wm","wo","wa"],def:{log:1}},
+ {k:"sonyx",l:"إرسال تنبيه «برجاء الاعتماد على أونكس» للحسابات (اللوجيستك)",roles:["log"],def:{log:1}},
  {k:"cexcel",l:"تنزيل التقرير كملف Excel (الأعمدة بتتفلتر بنفس صلاحيات العرض)",roles:["log","acc","wm","wo","wa","rd"],def:{log:1,acc:1,wm:1,wo:1,wa:1,rd:1}}
 ];
 let perms={};
@@ -570,12 +602,71 @@ const can=(k,scr)=>{
   if(owner)return true;
   const r=scr||role;
   if(isFd(r)&&FDHIDE.includes(k))return false;
-  if(r==="tele")return k==="srep"?!!(curAcct()&&curAcct().reports):!["cdue","cwaybill","cprint","cprio","eprio"].includes(k);
+  if(r==="tele")return k==="srep"?!!(curAcct()&&curAcct().reports):!["cdue","cwaybill","cprint","cprio","eprio","eonyx"].includes(k);
   return permVal(k,r);
 };
 const dnum=(o,scr)=>String(o.num)+((o.ccode&&can("cname",scr))?"/"+o.ccode:"");
 const codeId=c=>"c_"+String(c).trim().toLowerCase().replace(/[\/\s.#?\[\]*~]+/g,"_");
-const cT=(o,scr)=>"#<bdi dir=\"ltr\">"+esc(dnum(o,scr))+"</bdi>"+(can("cname",scr)?" – "+esc(o.customer):"");
+const cT=(o,scr)=>"#<bdi dir=\"ltr\">"+esc(dnum(o,scr))+"</bdi>"+(can("cname",scr)?" – "+esc(o.customer):"")+(isTr(o)&&o.onyxNo?` <span class="tag" style="background:#6a4c93">أونكس: <bdi dir="ltr">${esc(o.onyxNo)}</bdi></span>`:"");
+
+/* ---- تنبيه «برجاء الاعتماد على أونكس»: بيستخدم نظام الإشارات الموجود (mentions) من غير نظام جديد ---- */
+const ONYX_TXT="برجاء الاعتماد على أونكس";
+const onyxAlerts=o=>(o.mentions||[]).filter(m=>m.kind==="onyx");
+function onyxState(o){ /* الحالة الفعلية من البيانات، مش من كلام المستخدم */
+  const it=o.items||[],un=it.filter(i=>!i.wh).length,pr=prepOf(o);
+  const prep=!it.length?"مفيش أصناف متسجّلة":un?un+" صنف لسه ما اتوزّعش على مخزن":pr==="full"?"التحضير مكتمل":pr==="part"?"التحضير جزئي":"التحضير لسه ما بدأش";
+  return {prep,pay:isTr(o)?"":payTxt(o),full:it.length>0&&!un&&pr==="full"&&(isTr(o)||o.acct==="full")};
+}
+const onyxStat=m=>m.to.map(k=>tlabel(k)+": "+((m.ack||{})[k]?"اطّلع "+fmt(m.ack[k]):"بانتظار الاطلاع")).join(" · ");
+const onyxBusy=(o,r)=>onyxAlerts(o).filter(m=>m.from===r&&m.to.some(k=>!(m.ack||{})[k]));
+function onyxAlertBox(o,scr){
+  const r=owner?"log":scr,closed=["cancelled","delivered"].includes(o.stage);
+  const sender=!closed&&((r==="tele"&&!isTr(o))||(r==="log"&&can("sonyx","log")));
+  const al=onyxAlerts(o),last=al[al.length-1],pend=onyxBusy(o,r).length>0;
+  const stat=last?`<div class="mut" style="margin-top:4px">🔔 آخر تنبيه أونكس: ${esc(last.by)} – ${fmt(last.t)} · ${esc(onyxStat(last))}</div>`:"";
+  const btn=sender?`<button class="b s" ${pend?'disabled title="اتبعت قبل كده وبانتظار الاطلاع"':""} onclick="sendOnyx('${o.id}')">🔔 ${ONYX_TXT}${r==="log"?" (للحسابات)":""}</button>`:"";
+  return btn||stat?`<div style="margin-top:6px">${btn}${stat}</div>`:"";
+}
+async function sendOnyx(id){
+  if(!needName()||window._ox)return;
+  const cur=orders.find(x=>x.id===id);if(!cur)return;
+  const r=owner?"log":role;
+  if(r!=="tele"&&r!=="log")return;
+  if(r==="tele"&&(isTr(cur)||cur.createdBy!==who))return toast("التنبيه ده للطلبات بتاعتك بس");
+  if(r==="log"&&!can("sonyx","log"))return toast("مفيش عندك صلاحية إرسال تنبيه أونكس");
+  if(["cancelled","delivered"].includes(cur.stage))return toast("الطلب ده اتقفل أو اتلغى");
+  const busy=onyxBusy(cur,r);
+  if(busy.length){const m=busy[busy.length-1];return toast("اتبعت تنبيه أونكس قبل كده ("+fmt(m.t)+") ولسه بانتظار الاطلاع. مش هيتكرر.")}
+  const to=r==="tele"?["log","acc"]:["acc"],st=onyxState(cur);
+  if(!st.full&&!confirm("الطلب لسه مش مكتمل ("+st.prep+(st.pay?" · "+st.pay:"")+").\nالتنبيه هيتبعت بالحالة الحقيقية دي. تكمل؟"))return;
+  window._ox=1;
+  try{
+    const o=JSON.parse(JSON.stringify(cur));
+    const txt="🔔 "+ONYX_TXT+" – "+(isTr(o)?"أمر نقل داخلي":"طلب")+" #"+o.num+(isTr(o)&&o.onyxNo?" (أونكس "+o.onyxNo+")":"")+" · "+st.prep+(st.pay?" · "+st.pay:"");
+    const mm={id:""+Date.now(),t:Date.now(),by:actor(),from:r,kind:"onyx",text:txt,to,ack:{}};
+    o.mentions=[...(o.mentions||[]),mm];
+    await save(o,"تنبيه أونكس: اتبعت إلى "+to.map(tlabel).join(" و")+" – "+st.prep+(st.pay?" · "+st.pay:""),"st");
+    pushMention(o,mm);
+  }finally{window._ox=0}
+  render();
+}
+/* رقم أونكس لأمر النقل الداخلي: حقل مستقل بيتكتب يدويًا، ورقم أمر النقل (num) ما بيتغيّرش */
+const onyxBox=(o,scr)=>{
+  if(!isTr(o))return "";
+  const ed=can("eonyx",scr),cur=o.onyxNo||"",info=cur&&o.onyxAt?`<span class="mut">آخر تعديل: ${esc(o.onyxBy||"")} – ${esc(fmt(o.onyxAt))}</span>`:"";
+  if(!ed)return cur?`<div class="mut">رقم أونكس: <b dir="ltr">${esc(cur)}</b> ${info}</div>`:"";
+  return `<div class="row" style="margin-top:6px;gap:6px"><label style="margin:0">رقم أونكس</label><input class="wi" id="ox-${o.id}" dir="ltr" maxlength="40" style="max-width:190px" value="${esc(cur)}" placeholder="اكتبه يدويًا"><button class="b s" onclick="saveOnyx('${o.id}')">حفظ</button>${info}</div>`;
+};
+async function saveOnyx(id){
+  if(!needName())return;
+  const cur=orders.find(x=>x.id===id);if(!cur||!isTr(cur))return;
+  if(!can("eonyx",owner?"log":role))return toast("مفيش عندك صلاحية تعديل رقم أونكس");
+  const v=ar2en(($("#ox-"+id)?.value||"")).trim().replace(/\s+/g," ");
+  if(v.length>40)return toast("رقم أونكس طويل أوي (أقصى 40 حرف)");
+  if(v===(cur.onyxNo||""))return toast("مفيش تغيير للحفظ");
+  const o=JSON.parse(JSON.stringify(cur));o.onyxNo=v;o.onyxBy=actor();o.onyxAt=Date.now();
+  await save(o,"رقم أونكس: "+(v||"تم المسح")+(cur.onyxNo?" (كان "+cur.onyxNo+")":""),"st");render();
+}
 const metaLine=(o,scr)=>[can("cphone",scr)?esc(o.phone):"",can("camt",scr)&&noT(o)?(o.amount||0)+" ج":"",can("cgirl",scr)?esc(o.createdBy):"",fmt(o.createdAt)].filter(Boolean).join(" · ");
 async function setPerm(k,r,v){
   if(!db)return toast("الحفظ غير متاح");
@@ -851,9 +942,14 @@ function doPrint(title,html,bare){
   const pa=$("#printArea");if(!pa)return;
   pa.innerHTML=bare?html:`<h2>${esc(title)}</h2><div style="margin-bottom:8px;font-size:11px">${esc(fmt(Date.now()))} · طُبع بواسطة: ${esc(actor()||"—")}</div>${html}`;
   window._oldTitle=window._oldTitle||document.title;document.title=bare?" ":(title||" ");
+  let wide=false;
+  if(!bare){pa.querySelectorAll("table").forEach(t=>{const f=t.rows[0];if(!f||t.tHead)return;if([...f.cells].every(c=>c.tagName==="TH")){const th=document.createElement("thead");th.appendChild(f);t.insertBefore(th,t.firstChild)}if(t.rows[0]&&t.rows[0].cells.length>7)wide=true})}
+  pa.classList.toggle("wide",wide);
+  const old=document.getElementById("pgStyle");if(old)old.remove();
+  if(wide){const st=document.createElement("style");st.id="pgStyle";st.textContent="@page{size:A4 landscape;margin:8mm}";document.head.appendChild(st)}
   setTimeout(()=>window.print(),80);
 }
-window.onafterprint=()=>{if(window._oldTitle){document.title=window._oldTitle;window._oldTitle=null}const pa=$("#printArea");if(pa)pa.innerHTML=""};
+window.onafterprint=()=>{const ps=document.getElementById("pgStyle");if(ps)ps.remove();if(window._oldTitle){document.title=window._oldTitle;window._oldTitle=null}const pa=$("#printArea");if(pa)pa.innerHTML=""};
 function printWh(wid,kind){
   const sc=(!owner&&role==="log")?"log":wid;
   if(!can("cprint",sc))return toast("طباعة القوائم غير متاحة لشاشتك");
@@ -871,7 +967,7 @@ function printWh(wid,kind){
       body+=`<div style="margin:6px 0"><b>${esc(G.base)} – ${esc(G.name)}</b> – ${lbl}: <b>${fmtW(w)}</b> (${esc(byPackTxt(by))})<table><tr><th>الكود</th><th>اسم الصنف</th><th>الوحدة</th><th>المطلوب (عبوات)</th><th>المتحضّر</th><th>المتبقي</th><th>الوزن</th><th>تم</th></tr>${trs}</table></div>`;
     });
     if(sp.other.length)body+=`<table><tr><th>الكود</th><th>اسم الصنف</th><th>الوحدة</th><th>المطلوب</th><th>المتحضّر</th><th>المتبقي</th><th>تم</th></tr>${sp.other.map(z=>`<tr><td>${esc(z.i.code||"")}</td><td>${esc(z.i.name)}</td><td>${esc(unitOf(z.i)||"—")}</td><td>${esc(z.i.qty)}</td><td>${esc(+z.i.picked||0)}</td><td>${rem(z.i)}</td><td>☐</td></tr>`).join("")}</table>`;
-    return `<div class="pb"><b>طلب #${esc(dnum(o,sc))}</b>${can("cname",sc)?" – "+esc(o.customer):""}${can("cgirl",sc)?" · البنت: "+esc(o.createdBy):""}${can("cdue",sc)?" · "+esc((dueInfoWh(o,wid)||{}).t||""):""}${sh.done?" · <b>تم الشحن</b>":""}${wid==="wm"?`<div>المحضّر: <b>${esc(o.prep||"—")}</b> · المراجع: <b>${esc(o.rev||"—")}</b></div>`:""}${can("cship",sc)?"<div>🚚 "+esc(shipTxtPlain(o))+"</div>":""}${body}</div>`;
+    return `<div class="pb"><b>طلب #${esc(dnum(o,sc))}</b>${isTr(o)&&o.onyxNo?" · رقم أونكس: <b dir=\"ltr\">"+esc(o.onyxNo)+"</b>":""}${can("cname",sc)?" – "+esc(o.customer):""}${can("cgirl",sc)?" · البنت: "+esc(o.createdBy):""}${can("cdue",sc)?" · "+esc((dueInfoWh(o,wid)||{}).t||""):""}${sh.done?" · <b>تم الشحن</b>":""}${wid==="wm"?`<div>المحضّر: <b>${esc(o.prep||"—")}</b> · المراجع: <b>${esc(o.rev||"—")}</b></div>`:""}${can("cship",sc)?"<div>🚚 "+esc(shipTxtPlain(o))+"</div>":""}${body}</div>`;
   }).join("");
   const sum=Object.keys(tot).length?`<div class="pb"><b>إجمالي ${lbl} من كل صنف</b><table><tr><th>الكود</th><th>اسم الصنف</th><th>الإجمالي</th><th>التوزيع</th></tr>${Object.entries(tot).map(([b,T])=>`<tr><td>${esc(b)}</td><td>${esc(T.name)}</td><td><b>${fmtW(T.g)}</b></td><td>${esc(byPackTxt(T.by))}</td></tr>`).join("")}</table></div>`:"";
   doPrint(WHN[wid]+" – "+(kind==="need"?"الأصناف المطلوب تجهيزها":"الأصناف المجهّزة"),sum+blocks);
@@ -1099,7 +1195,7 @@ async function doMod(id){
 
 /* ---- Telesales ---- */
 function teleView(){
-  const me=who.trim(),mine=me?orders.filter(o=>o.createdBy===me):[];
+  const me=who.trim(),mine=me?orders.filter(o=>o.createdBy===me&&matchQ(o,qNum)):[];
   const opn=mine.filter(o=>!isArchived(o,"tele")),arc=mine.filter(o=>isArchived(o,"tele"));
   return orderForm()+`<div class="card"><b>طلباتي المفتوحة</b>${list(opn,"tele")}</div>`+(arc.length?`<details class="card"><summary><b>📦 الأرشيف (${arc.length}) – طلبات اتشحنت أو اتقفلت</b></summary>${list(arc,"tele")}</details>`:"");
 }
@@ -1185,7 +1281,7 @@ async function createTransfer(){
 const printBar=()=>can("cprint","log")?`<div class="card"><b>طباعة قوائم التجهيز</b><div class="row" style="margin-top:8px">${Object.entries(WHN).map(([w,n])=>`<button class="b s x" onclick="printWh('${w}','need')">🖨 المطلوب – ${n}</button><button class="b s x" onclick="printWh('${w}','done')">🖨 المجهّز – ${n}</button>`).join("")}</div></div>`:"";
 function logView(){
   const rel=orders.filter(match),act=rel.filter(o=>!isArchived(o,"log")).sort(byPrio),arch=rel.filter(o=>isArchived(o,"log"));
-  const logCard=o=>`<div class="card" style="${can("cdue","log")?lateStyle(o):""}"><div class="row"><div><b>${cT(o,"log")}</b>${isTr(o)?` <span class="tag" style="background:#3d6f8e">أمر نقل داخلي</span> <span class="mut">← ${esc(o.dest||"")}</span>`:""}<div class="mut">${metaLine(o,"log")}</div></div><div class="x">${prioTag(o,"log")}${tag(o.stage)} ${mods(o).length?`<span class="mod">${mods(o).length} تعديل</span>`:""} <button class="b s x" onclick="toggleFold('${o.id}')">${fold[o.id]?"◂ فتح":"▾ طي"}</button></div></div>
+  const logCard=o=>`<div class="card" style="${can("cdue","log")?lateStyle(o):""}"><div class="row"><div><b>${cT(o,"log")}</b>${isTr(o)?` <span class="tag" style="background:#3d6f8e">أمر نقل داخلي</span> <span class="mut">← ${esc(o.dest||"")}</span>`:""}<div class="mut">${metaLine(o,"log")}</div>${onyxBox(o,"log")}${onyxAlertBox(o,"log")}</div><div class="x">${prioTag(o,"log")}${tag(o.stage)} ${mods(o).length?`<span class="mod">${mods(o).length} تعديل</span>`:""} <button class="b s x" onclick="toggleFold('${o.id}')">${fold[o.id]?"◂ فتح":"▾ طي"}</button></div></div>
   <div class="mut">${whTxt(o)}</div>${can("cdue","log")?dueBadge(o)+logBadge(o)+whDueRows(o):""}${can("camt","log")?accBadge(o):""}${holdBanner(o)}${fold[o.id]?foldLine(o,"log"):""}<div ${fold[o.id]?'style="display:none"':""}>${prioBox(o)}<div style="margin-top:4px">${can("cship","log")&&noT(o)?shipBox(o):""}${compBanner(o)}${can("cwaybill","log")&&noT(o)?`<button class="b s x" onclick="printWaybill('${o.id}')">🖨 بوليصة شحن</button>`:""}</div>${!(o.items||[]).length?`<div class="hold">⚠ لسه ما اتسجلتش أصناف للطلب (الصق الأصناف من الإكسيل)</div>`:(o.items||[]).some(i=>!i.wh)?`<div class="hold">⚠ فيه أصناف لسه ما اتحدّدش لها مخزن</div>`:""}${o.stage==="modified"?`<div class="hold" style="color:#8a4fd6">⚠ آخر تعديل: ${esc(mods(o).slice(-1)[0]?.text)}</div>`:""}
   <div class="g2"><div><label>حالة الطلب</label><select onchange="setStage('${o.id}',this.value)">${Object.entries(STAGES).map(([v,s])=>`<option value="${v}" ${o.stage===v?"selected":""}>${s[0]}</option>`).join("")}</select></div>
   <div><label>سبب التوقف</label>${reasonSel("hr-"+o.id,o.holdReason,"setHold('"+o.id+"',this.value)")}</div>
@@ -1361,7 +1457,7 @@ function whView(wid){
       <div class="mut">التوزيع: ${esc(byPackTxt(by))}</div>
       <div class="tw"><table>${hdrPack}${G.rows.map(r=>whRow(o,r,done,r.p)).join("")}</table></div></div>`}).join("");
     const others=sp.other.length?`<div class="tw" style="margin-top:8px"><table>${hdrStd}${sp.other.map(z=>whRow(o,z,done,isPk(wid)?null:undefined)).join("")}</table></div>`:"";
-    return `<div class="card" style="${can("cdue",wid)?lateStyleWh(o,wid):""}"><div class="row"><div><b>${cT(o,wid)}</b>${isTr(o)?` <span class="tag" style="background:#3d6f8e">أمر نقل داخلي</span>`:""}<div class="mut">${metaLine(o,wid)}</div></div><div class="x">${prioTag(o,wid)}${tag(o.stage)} <button class="b s x" onclick="toggleFold('${o.id}')">${fold[o.id]?"◂ فتح":"▾ طي"}</button></div></div>${can("cdue",wid)?dueBadgeWh(o,wid):""}${fold[o.id]?foldLine(o,wid):""}${readyBox(o,wid)}<div ${fold[o.id]?'style="display:none"':""}>${isFd(wid)?(o.noShip?'<div class="hold" style="margin-top:6px">⛔ الشحن متوقف حالياً. كلّم مروان.</div>':""):holdBanner(o)}${wid==="wm"?payOkBanner(o)+relBanner(o)+compBanner(o):""}<div style="margin-top:4px">${can("cship",wid)?shipLine(o):""}${wid==="wm"&&can("cwaybill",wid)?`<button class="b s x" onclick="printWaybill('${o.id}')">🖨 بوليصة شحن</button>`:""}</div>
+    return `<div class="card" style="${can("cdue",wid)?lateStyleWh(o,wid):""}"><div class="row"><div><b>${cT(o,wid)}</b>${isTr(o)?` <span class="tag" style="background:#3d6f8e">أمر نقل داخلي</span>`:""}<div class="mut">${metaLine(o,wid)}</div>${onyxBox(o,wid)}</div><div class="x">${prioTag(o,wid)}${tag(o.stage)} <button class="b s x" onclick="toggleFold('${o.id}')">${fold[o.id]?"◂ فتح":"▾ طي"}</button></div></div>${can("cdue",wid)?dueBadgeWh(o,wid):""}${fold[o.id]?foldLine(o,wid):""}${readyBox(o,wid)}<div ${fold[o.id]?'style="display:none"':""}>${isFd(wid)?(o.noShip?'<div class="hold" style="margin-top:6px">⛔ الشحن متوقف حالياً. كلّم مروان.</div>':""):holdBanner(o)}${wid==="wm"?payOkBanner(o)+relBanner(o)+compBanner(o):""}<div style="margin-top:4px">${can("cship",wid)?shipLine(o):""}${wid==="wm"&&can("cwaybill",wid)?`<button class="b s x" onclick="printWaybill('${o.id}')">🖨 بوليصة شحن</button>`:""}</div>
     ${lm&&!(isFd(wid)&&/تحصيل|سداد|الحسابات|دفع/.test(lm.text))&&(can("cship",wid)||/الأصناف|الكميات|تحضير/.test(lm.text))&&!(isFd(wid)&&/بيانات الشحن/.test(lm.text))?`<div class="hold" style="color:#7b5aa6">آخر تعديل: ${esc(lm.text)}</div>`:""}
     <div class="mut" style="margin-top:6px">جاهز ${rd} من ${mi.length} صنف عندك${done?" · <b>تم الشحن</b>"+(sh.ref?" (شحنة "+esc(sh.ref)+")":"")+(sh.driver?" · السائق "+esc(sh.driver)+" · "+esc(sh.car):""):""}</div>
     ${wid==="wm"?prepBox(o)+cartonBox(o):""}
@@ -1418,7 +1514,7 @@ function girlAmount(id){
 function girlCollect(id){const c0=orders.find(x=>x.id===id);if(c0&&teleLocked(c0))return toast("الطلب اتشحن من مشعل، مفيش تعديل");const v=+($("#pc-"+id)?.value)||0;if(!v)return toast("اكتب المبلغ المحصّل");upd(id,o=>{o.collected=v;if(!o.collectedAt)o.collectedAt=Date.now()},"التحصيل: بلّغت "+actor()+" إن العميل دفع "+v)}
 function accView(){
   const all=orders.filter(o=>o.stage!=="cancelled"&&noT(o)&&match(o)),act=all.filter(o=>!(o.acct==="full"||o.release)),arch=all.filter(o=>o.acct==="full"||o.release);
-  const accCard=o=>`<div class="card" style="${can("cdue","acc")?lateStyle(o):""}"><div class="row"><div><b>${cT(o,"acc")}</b><div class="mut">${[can("camt","acc")?"قيمة الطلب "+(o.amount||0)+" · بلّغت البنت تحصيل: "+(o.collected||0)+(o.collected?" ("+diffTxt(o.amount,o.collected).t+")":""):"",can("cgirl","acc")?"البنت: "+esc(o.createdBy):"",can("cphone","acc")?esc(o.phone):""].filter(Boolean).join(" · ")}</div></div><div class="x">${can("camt","acc")?payTag(o):""}</div></div>
+  const accCard=o=>`<div class="card" style="${can("cdue","acc")?lateStyle(o):""}"><div class="row"><div><b>${cT(o,"acc")}</b><div class="mut">${[can("camt","acc")?"قيمة الطلب "+(o.amount||0)+" · بلّغت البنت تحصيل: "+(o.collected||0)+(o.collected?" ("+diffTxt(o.amount,o.collected).t+")":""):"",can("cgirl","acc")?"البنت: "+esc(o.createdBy):"",can("cphone","acc")?esc(o.phone):""].filter(Boolean).join(" · ")}</div></div><div class="x">${can("camt","acc")?payTag(o):""}</div></div>${onyxAlertBox(o,"acc")}
   ${can("cdue","acc")?dueBadge(o):""}${can("camt","acc")?accBadge(o):""}${can("cship","acc")?shipLine(o):""}
   ${holdBanner(o)}
   <div class="row" style="margin-top:8px">${o.acct?"":`<button class="b ok" onclick="accFull('${o.id}')">تأكيد تحصيل كامل</button>`}<input class="wi" id="ap-${o.id}" type="number" placeholder="${o.acct?"تصحيح إجمالي المبلغ المحصّل":"إجمالي المبلغ المحصّل"}" value="${o.acct?esc(o.accAmt):""}" oninput="accDiff('${o.id}')"><button class="b" onclick="accPart('${o.id}')">${o.acct?"حفظ التصحيح":"تأكيد المبلغ المحصّل"}</button>${o.acct?`<button class="b s x" onclick="accReset('${o.id}')">إلغاء تأكيد التحصيل</button>`:""}</div>
@@ -1483,10 +1579,10 @@ function repRows(){
     if(rp.ar==="open"&&isArchived(o,R))return false;if(rp.ar==="arch"&&!isArchived(o,R))return false;
     if(rp.sf||rp.st){const sd=shipDate(o,repEW());if(!sd)return false;if(rp.sf&&sd<new Date(rp.sf+"T00:00:00").getTime())return false;if(rp.st&&sd>=new Date(rp.st+"T00:00:00").getTime()+864e5)return false}
     if(rp.from&&o.createdAt<new Date(rp.from).getTime())return false;if(rp.to&&o.createdAt>=new Date(rp.to).getTime()+864e5)return false;
-    if(q){const hay=[o.num,can("cname")?o.ccode:"",can("cname")||isTr(o)?o.customer:"",...(o.items||[]).map(i=>(i.code||"")+" "+i.name)].join(" ").toLowerCase();if(!hay.includes(q))return false}
+    if(!matchQ(o,rp.q))return false
     return true}).sort((a,b)=>b.createdAt-a.createdAt);
 }
-function repCols(){return [["رقم الطلب",o=>dnum(o)],["النوع",o=>isTr(o)?"أمر نقل":"طلب عميل"],[can("cname")?"العميل / الجهة":"الجهة",o=>isTr(o)?(o.dest||o.customer):(can("cname")?o.customer:"")],["البنت",o=>can("cgirl")?o.createdBy||"":""],["الحالة",o=>STAGES[o.stage][0]],["المخازن",o=>whInvolved(o).map(w=>WHN[w]).join(" + ")],["عدد الأصناف",o=>(o.items||[]).length],["قيمة الطلب",o=>can("camt")&&noT(o)?(o.amount||0):""],["المحصّل المؤكد",o=>can("camt")&&noT(o)?(o.acct?o.accAmt:0):""],["طريقة الشحن",o=>noT(o)&&can("cship")?(o.shipMethod||""):""],["الأولوية",o=>PRIO[o.prio]?PRIO[o.prio][1]:""],["تاريخ الإنشاء",o=>new Date(o.createdAt).toLocaleDateString("ar-EG"),o=>isoDT(o.createdAt),o=>o.createdAt],["تاريخ الشحن",o=>{const d=shipDate(o,repEW());return d?fmtY(d):"—"},o=>isoDT(shipDate(o,repEW())),o=>shipDate(o,repEW())],["متأخر",o=>isLate(o)?"نعم":""]].filter(c=>!(c[0]==="البنت"&&!can("cgirl"))&&!(["قيمة الطلب","المحصّل المؤكد"].includes(c[0])&&!can("camt"))&&!(c[0]==="طريقة الشحن"&&!can("cship"))&&!(c[0]==="الأولوية"&&!can("cprio")))}
+function repCols(){return [["رقم الطلب",o=>dnum(o)],["رقم أونكس",o=>isTr(o)?(o.onyxNo||""):""],["النوع",o=>isTr(o)?"أمر نقل":"طلب عميل"],[can("cname")?"العميل / الجهة":"الجهة",o=>isTr(o)?(o.dest||o.customer):(can("cname")?o.customer:"")],["البنت",o=>can("cgirl")?o.createdBy||"":""],["الحالة",o=>STAGES[o.stage][0]],["تاريخ الشحن",o=>{const d=shipDate(o,repEW());return d?fmtY(d):"—"},o=>isoDT(shipDate(o,repEW())),o=>shipDate(o,repEW())],["المخازن",o=>whInvolved(o).map(w=>WHN[w]).join(" + ")],["عدد الأصناف",o=>(o.items||[]).length],["قيمة الطلب",o=>can("camt")&&noT(o)?(o.amount||0):""],["المحصّل المؤكد",o=>can("camt")&&noT(o)?(o.acct?o.accAmt:0):""],["طريقة الشحن",o=>noT(o)&&can("cship")?(o.shipMethod||""):""],["الأولوية",o=>PRIO[o.prio]?PRIO[o.prio][1]:""],["تنبيه أونكس",o=>{const a=onyxAlerts(o),m=a[a.length-1];return m?m.by+" – "+fmt(m.t)+": "+(m.to.every(k=>(m.ack||{})[k])?"تم الاطلاع":"بانتظار الاطلاع"):""}],["تاريخ الإنشاء",o=>new Date(o.createdAt).toLocaleDateString("ar-EG"),o=>isoDT(o.createdAt),o=>o.createdAt],["متأخر",o=>isLate(o)?"نعم":""]].filter(c=>!(c[0]==="البنت"&&!can("cgirl"))&&!(["قيمة الطلب","المحصّل المؤكد"].includes(c[0])&&!can("camt"))&&!(c[0]==="طريقة الشحن"&&!can("cship"))&&!(c[0]==="الأولوية"&&!can("cprio"))&&!(c[0]==="تنبيه أونكس"&&!owner&&WHROLES.includes(role)))}
 /* ---- تصدير Excel حقيقي (.xlsx) بدون مكتبات خارجية ---- */
 const _crcT=(()=>{const t=[];for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=c&1?0xEDB88320^(c>>>1):c>>>1;t[n]=c>>>0}return t})();
 const crc32=u=>{let c=0xFFFFFFFF;for(let i=0;i<u.length;i++)c=_crcT[(c^u[i])&255]^(c>>>8);return (c^0xFFFFFFFF)>>>0};
@@ -1576,7 +1672,7 @@ function repView(){
   const C=repCols();
   return `<div class="card"><b>📊 التقارير والفلاتر</b><div class="mut">اختار أي فلاتر، والنتيجة بتتحدّث فوراً. تقدر تطبع أو تنزّل الجدول للإكسيل.</div>
   <div class="row" style="margin-top:8px">${chip("🟢 المفتوحة","{ar:'open'}")}${chip("🔴 المتأخرة","{flag:'late',ar:'open'}")}${chip("💰 غير المحصّلة","{pay:'unpaid',ar:'open'}")}${chip("🚚 اتشحنت","{out:'out'}")}${chip("🔁 أوامر النقل","{type:'t'}")}${chip("✏ اتعدّلت","{flag:'mod'}")}${chip("🚫 ممنوع الشحن","{pay:'noship'}")}</div>
-  <div class="g2" style="margin-top:10px">
+  <div class="g2 repf" style="margin-top:10px">
   ${sel("ar","المفتوح / الأرشيف",[["all","الكل"],["open","المفتوحة فقط"],["arch","الأرشيف فقط"]])}
   ${sel("type","النوع",[["","طلبات العملاء + أوامر النقل"],["c","طلبات العملاء فقط"],["t","أوامر النقل فقط"]])}
   ${sel("stage","الحالة",[["","كل الحالات"],...Object.entries(STAGES).map(([k,v])=>[k,v[0]])])}
@@ -1671,7 +1767,7 @@ function list(rows,mode){
   <td>${m.length?`<span class="mod">${m.length}</span><div class="mut">آخر تعديل: ${esc(lm.text)}</div>`:`<span class="mut">—</span>`}</td>
   <td>${payTag(o)}</td>
   <td class="mut">${l?fmt(l.t)+"<br>"+esc(l.by)+(l.rl?" ("+esc(l.rl)+")":""):""}</td>
-  <td>${mode==="tele"&&CANCELABLE.includes(o.stage)?(cancelAsk===o.id?`<button class="b x" style="background:var(--bad)" onclick="girlCancel('${o.id}')">تأكيد الإلغاء بطلب العميل</button> <button class="b s x" onclick="cancelAsk=null;render()">رجوع</button> `:`<button class="b s x" onclick="cancelAsk='${o.id}';render()">إلغاء بطلب العميل</button> `):""}${mode==="tele"&&!teleLocked(o)?shipBox(o)+modBox(o,"tele")+`<div style="margin-top:6px"><input class="wi" id="am-${o.id}" type="number" placeholder="قيمة الطلب (${esc(o.amount||0)})" style="width:140px"><button class="b s" onclick="girlAmount('${o.id}')">تعديل قيمة الطلب</button></div><div style="margin-top:6px"><input class="wi" id="pc-${o.id}" type="number" placeholder="المبلغ المحصّل" style="width:120px"><button class="b s" onclick="girlCollect('${o.id}')">سجّل تحصيل</button></div> `:mode==="tele"&&!["delivered","cancelled"].includes(o.stage)?`<div class="mut">🔒 الطلب اتشحن من مشعل، مفيش تعديل في الشحن أو التحصيل.</div>`:""}${mode==="dash"?(delAsk===o.id?`<button class="b x" style="background:var(--bad)" onclick="deleteOrder('${o.id}')">تأكيد الحذف</button> <button class="b s x" onclick="delAsk=null;render()">إلغاء</button> `:`<button class="b s x" onclick="delAsk='${o.id}';render()">حذف</button> `):""}<button class="b s" onclick="openId=openId==='${o.id}'?null:'${o.id}';render()">السجل</button></td></tr>
+  <td>${mode==="tele"&&CANCELABLE.includes(o.stage)?(cancelAsk===o.id?`<button class="b x" style="background:var(--bad)" onclick="girlCancel('${o.id}')">تأكيد الإلغاء بطلب العميل</button> <button class="b s x" onclick="cancelAsk=null;render()">رجوع</button> `:`<button class="b s x" onclick="cancelAsk='${o.id}';render()">إلغاء بطلب العميل</button> `):""}${mode==="tele"&&!teleLocked(o)?shipBox(o)+modBox(o,"tele")+onyxAlertBox(o,"tele")+`<div style="margin-top:6px"><input class="wi" id="am-${o.id}" type="number" placeholder="قيمة الطلب (${esc(o.amount||0)})" style="width:140px"><button class="b s" onclick="girlAmount('${o.id}')">تعديل قيمة الطلب</button></div><div style="margin-top:6px"><input class="wi" id="pc-${o.id}" type="number" placeholder="المبلغ المحصّل" style="width:120px"><button class="b s" onclick="girlCollect('${o.id}')">سجّل تحصيل</button></div> `:mode==="tele"&&!["delivered","cancelled"].includes(o.stage)?`<div class="mut">🔒 الطلب اتشحن من مشعل، مفيش تعديل في الشحن أو التحصيل.</div>`:""}${mode==="dash"?(delAsk===o.id?`<button class="b x" style="background:var(--bad)" onclick="deleteOrder('${o.id}')">تأكيد الحذف</button> <button class="b s x" onclick="delAsk=null;render()">إلغاء</button> `:`<button class="b s x" onclick="delAsk='${o.id}';render()">حذف</button> `):""}<button class="b s" onclick="openId=openId==='${o.id}'?null:'${o.id}';render()">السجل</button></td></tr>
   ${openId===o.id?`<tr><td colspan="7">${mode==="dash"?shipLine(o):""}<b>الأصناف والكميات</b>${itemsTbl(o)}<div class="log" style="margin-top:8px">${(o.log||[]).map(x=>`${x.kind==="mod"?"🔧":"•"} ${fmt(x.t)} – ${esc(x.by)}${x.rl?" ("+esc(x.rl)+")":""}: ${esc(x.text)}`).join("<br>")}</div></td></tr>`:""}`}).join("")}</table></div>`;
 }
 
@@ -1745,13 +1841,13 @@ function render(){
   try{render0()}catch(e){const m=$("#msg");if(m){m.style.display="block";m.textContent="حصل خطأ في عرض الشاشة: "+(e.message||e)}}
 }
 function shipUi(){const v=$("#sm")?.value||"",h=v==="تسليم الشركة";const a=$("#scBox"),b=$("#addrBox");if(a)a.style.display=h?"none":"";if(b)b.style.display=h?"none":""}
-function tbSearch(v){v=(v||"").trim();if(view==="rep")rp.q=v;else qNum=v;render()}
+function tbSearch(v){v=v||"";if(view==="rep")rp.q=v;else qNum=v;dRender()}
 function tbRefresh(){try{render();toast("اتحدّثت البيانات ✔")}catch(e){}}
 function tbBell(){const e=document.querySelector("#app .card[style*='8a4fd6']")||document.querySelector("#app details.card");if(e){e.scrollIntoView({behavior:"smooth",block:"start"});if(e.tagName==="DETAILS")e.open=true}else{window.scrollTo({top:0,behavior:"smooth"});toast("مفيش إشارات جديدة ليك")}}
 function chromeSync(al){
   document.body.classList.toggle("nol",!al.length);document.body.dataset.v=al.length?view:"";
   const b=document.querySelector("nav button.on"),t=$("#tbTitle");if(t)t.textContent=b?b.textContent.trim():"";
-  const q=$("#tbq");if(q&&document.activeElement!==q)q.value=view==="rep"?(rp.q||""):(qNum||"");
+  const q=$("#tbq");if(q){q.placeholder=can("cname")?"🔍 رقم الطلب / اسم العميل / كود الصنف…":"🔍 رقم الطلب / كود الصنف…";if(document.activeElement!==q)q.value=view==="rep"?(rp.q||""):(qNum||"")}
   let n=0;try{if(!owner&&role){const k=myKey();orders.forEach(o=>(o.mentions||[]).forEach(m=>{if((m.to||[]).includes(k)&&!(m.ack||{})[k])n++}))}}catch(e){}
   const nb=$("#tbN");if(nb){nb.textContent=n;nb.style.display=n?"":"none"}
 }
