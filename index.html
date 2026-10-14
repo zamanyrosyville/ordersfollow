@@ -323,7 +323,7 @@ const normQ=s=>ar2en(String(s==null?"":s)).toLowerCase().replace(/\s+/g," ").tri
 function matchQ(o,q){
   q=normQ(q);if(!q)return true;
   const cn=can("cname"),own=!owner&&isFd(role)?(o.items||[]).filter(i=>i.wh===role):(o.items||[]);
-  const hay=normQ([o.num,cn&&o.ccode?o.num+"/"+o.ccode:"",cn?o.ccode:"",cn||isTr(o)?o.customer:"",isTr(o)?o.onyxNo:"",...own.map(i=>(i.code||"")+" "+i.name)].join(" "));
+  const hay=normQ([o.num,cn&&o.ccode?o.num+"/"+o.ccode:"",cn?o.ccode:"",cn?o.customer:"",isTr(o)?o.onyxNo:"",o.grp?grpCode(o.grp)+" مرتبط":"",...own.map(i=>(i.code||"")+" "+i.name)].join(" "));
   return q.split(" ").every(t=>hay.includes(t));
 }
 const dRender=()=>{clearTimeout(window._dq);window._dq=setTimeout(render,150)};
@@ -509,13 +509,18 @@ async function ack(oid,mid){
 const mods=o=>(o.log||[]).filter(l=>l.kind==="mod");
 
 /* ---- الصلاحيات (المدير يتحكم فيها) ---- */
-const APP_VER="2026-10-13b";
+const APP_VER="2026-10-15b";
 let secOpen={};
 let accounts=[],announce=null,newsAll=false,selAcct="";
 const seenGet=k=>{try{return localStorage.getItem(k)||""}catch(e){return ""}};
 const seenSet=(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}};
 const curAcct=()=>role==="tele"?(accounts.find(a=>a.name===seenGet("acctn"))||null):null;
-const CHANGES=[{v:APP_VER,ts:Date.parse("2026-10-13T08:00:00Z"),d:"١٣ أكتوبر",items:[
+const CHANGES=[{v:APP_VER,ts:Date.parse("2026-10-15T12:00:00Z"),d:"١٥ أكتوبر",items:[
+ [["owner","log","wm","wo","wa"],"أرصدة المخازن: كل مخزن (أو مروان) يرفع ملف Excel/CSV فيه كود الصنف والرصيد. الكود اللي فيه سلاش (222333/1) بيتعرض له رصيد السلاش ورصيد الكود الأساسي (222333) جنب بعض، وفي شاشة توزيع مروان بيظهر رصيد المخازن التلاتة جنب كل صنف مع وقت آخر تحديث."]],
+},{v:"2026-10-15a",ts:Date.parse("2026-10-14T23:00:00Z"),d:"١٥ أكتوبر",items:[
+ [["wo","wa"],"مخزن أكتوبر وأبو صير: أي طلب عميل أو أمر نقل بيظهر بالرقم بس مع علامة «يخص عميل»، من غير اسم العميل أو الجهة، لا في الشاشة ولا في البحث ولا في التقارير."]],
+},{v:"2026-10-13c",ts:Date.parse("2026-10-13T20:00:00Z"),d:"١٣ أكتوبر",items:[
+ [["owner","tele","log","acc","wm","wo","wa"],"ربط طلبات نفس العميل: من أي طلب زرار «🔗 ربط بطلب تاني لنفس العميل». كل طلب بيفضل مستقل بحالته وأصنافه، والربط للعرض بس: بيظهر شريط «طلبات مرتبطة» بأرقامها وحالتها (من غير بيانات العميل للمخازن). الصلاحية للمدير واللوجيستك والبنات (في طلباتهم)، وبتتفتح لغيرهم من «الصلاحيات»."],
  [["owner","tele","log","acc","wm"],"صلاحية جديدة «تعديل أسماء العملاء على الطلبات»: مقفولة للكل افتراضيًا، والمدير بيمنحها لدور (لوجيستك / حسابات / مشعل) من «الصلاحيات»، أو لبنت بعينها من «الحسابات». التعديل بيتسجّل في سجل الطلب بالاسم القديم والجديد."],
  [["owner","tele","log","acc"],"زرار «🔔 برجاء الاعتماد على أونكس»: البنت تبعته للوجيستك والحسابات، واللوجيستك يبعته للحسابات. بيوصل في الإشعارات مع رقم الطلب وحالة التحضير والتحصيل الفعلية، وبيتسجّل مين بعت وإمتى وهل اتشاف. مفيش تكرار طول ما فيه تنبيه لسه محدش اطّلع عليه. وبيظهر في التقارير كعمود «تنبيه أونكس»."],
  [["owner","log","wm","wo","wa"],"أمر النقل الداخلي: خانة «رقم أونكس» بتتكتب يدويًا (لمن عنده الصلاحية) وبتظهر جنب رقم أمر النقل في الشاشات والتقارير والطباعة. رقم أمر النقل ما اتغيّرش، وآخر تعديل بيتسجّل. الصلاحية من «الصلاحيات»: «تعديل رقم أونكس»."],
@@ -594,6 +599,9 @@ const PERM_DEFS=[
  {k:"eprio",l:"تحديد وتعديل أولوية تجهيز الطلب",roles:["log","wm"],def:{log:1}},
  {k:"eonyx",l:"تعديل رقم أونكس لأمر النقل الداخلي",roles:["log","acc","wm","wo","wa"],def:{log:1}},
  {k:"ename",l:"تعديل أسماء العملاء على الطلبات",roles:["log","acc","wm"],def:{}},
+ {k:"elink",l:"ربط طلبات نفس العميل ببعض (وفكّ الربط)",roles:["log","acc","wm"],def:{log:1}},
+ {k:"estock",l:"رفع أرصدة المخازن (ملف Excel)",roles:["log","wm","wo","wa"],def:{log:1,wm:1,wo:1,wa:1}},
+ {k:"sstock",l:"عرض أرصدة المخازن",roles:["log","acc","wm","wo","wa"],def:{log:1,wm:1,wo:1,wa:1}},
  {k:"sonyx",l:"إرسال تنبيه «برجاء الاعتماد على أونكس» للحسابات (اللوجيستك)",roles:["log"],def:{log:1}},
  {k:"cexcel",l:"تنزيل التقرير كملف Excel (الأعمدة بتتفلتر بنفس صلاحيات العرض)",roles:["log","acc","wm","wo","wa","rd"],def:{log:1,acc:1,wm:1,wo:1,wa:1,rd:1}}
 ];
@@ -604,12 +612,12 @@ const can=(k,scr)=>{
   if(owner)return true;
   const r=scr||role;
   if(isFd(r)&&FDHIDE.includes(k))return false;
-  if(r==="tele")return k==="srep"?!!(curAcct()&&curAcct().reports):k==="ename"?!!(curAcct()&&curAcct().ename):!["cdue","cwaybill","cprint","cprio","eprio","eonyx"].includes(k);
+  if(r==="tele")return k==="srep"?!!(curAcct()&&curAcct().reports):k==="ename"?!!(curAcct()&&curAcct().ename):!["cdue","cwaybill","cprint","cprio","eprio","eonyx","estock","sstock"].includes(k);
   return permVal(k,r);
 };
 const dnum=(o,scr)=>String(o.num)+((o.ccode&&can("cname",scr))?"/"+o.ccode:"");
 const codeId=c=>"c_"+String(c).trim().toLowerCase().replace(/[\/\s.#?\[\]*~]+/g,"_");
-const cT=(o,scr)=>"#<bdi dir=\"ltr\">"+esc(dnum(o,scr))+"</bdi>"+(can("cname",scr)?" – "+esc(o.customer):"")+(isTr(o)&&o.onyxNo?` <span class="tag" style="background:#6a4c93">أونكس: <bdi dir="ltr">${esc(o.onyxNo)}</bdi></span>`:"");
+const cT=(o,scr)=>"#<bdi dir=\"ltr\">"+esc(dnum(o,scr))+"</bdi>"+(can("cname",scr)?" – "+esc(o.customer):' <span class="tag" style="background:#6f6459">يخص عميل</span>')+(isTr(o)&&o.onyxNo?` <span class="tag" style="background:#6a4c93">أونكس: <bdi dir="ltr">${esc(o.onyxNo)}</bdi></span>`:"");
 
 /* تعديل اسم العميل على الطلب (بصلاحية «تعديل الأسماء» فقط، وبيتسجّل الاسم القديم والجديد) */
 const nameBox=(o,scr)=>{
@@ -629,6 +637,179 @@ async function saveName(id,scr){
   if(v===(cur.customer||""))return toast("مفيش تغيير للحفظ");
   const o=JSON.parse(JSON.stringify(cur));o.customer=v;
   await save(o,"تعديل اسم العميل: «"+(cur.customer||"")+"» ← «"+v+"»","st");render();
+}
+
+
+/* ---- أرصدة المخازن (ملف Excel/CSV): بتتخزّن في collection "stock" منفصلة، مش بتلمس الطلبات ---- */
+let stockDocs={},stockMap={},stockErr="",stk=null,stockOpen=false;
+const sKey=c=>ar2en(String(c==null?"":c)).replace(/\s+/g,"").replace(/\\/g,"/").replace(/\.0+$/,"").toUpperCase();
+const sBase=k=>k.split("/")[0];
+const sNum=v=>+(+v).toFixed(3);
+const stockVis=()=>(owner||role==="log"||role==="acc")?["wm","wo","wa"]:(WHN[role]?[role]:[]);
+const stockUp=w=>!!(can("estock")&&(owner||role==="log"||role===w));
+function colIdx(n){let r=0;for(const ch of n)r=r*26+ch.charCodeAt(0)-64;return r-1}
+async function readXlsx(buf){
+  const u8=new Uint8Array(buf),dv=new DataView(buf),td=new TextDecoder();
+  let e=-1;for(let i=u8.length-22;i>=Math.max(0,u8.length-66000);i--){if(dv.getUint32(i,true)===0x06054b50){e=i;break}}
+  if(e<0)throw new Error("الملف مش xlsx سليم");
+  const n=dv.getUint16(e+10,true);let q=dv.getUint32(e+16,true);const ents={};
+  for(let k=0;k<n;k++){if(dv.getUint32(q,true)!==0x02014b50)break;const meth=dv.getUint16(q+10,true),csz=dv.getUint32(q+20,true),nl=dv.getUint16(q+28,true),xl=dv.getUint16(q+30,true),cl=dv.getUint16(q+32,true),lo=dv.getUint32(q+42,true);ents[td.decode(u8.subarray(q+46,q+46+nl))]={meth,csz,lo};q+=46+nl+xl+cl}
+  const get=async nm=>{const z=ents[nm];if(!z)return null;const ln=dv.getUint16(z.lo+26,true),lx=dv.getUint16(z.lo+28,true),st=z.lo+30+ln+lx,data=u8.subarray(st,st+z.csz);
+    if(z.meth===0)return td.decode(data);
+    const ds=new Blob([data]).stream().pipeThrough(new DecompressionStream("deflate-raw"));return td.decode(await new Response(ds).arrayBuffer())};
+  const X=t=>new DOMParser().parseFromString(t,"application/xml");
+  let path=null;const wb=await get("xl/workbook.xml"),rl=await get("xl/_rels/workbook.xml.rels");
+  if(wb&&rl){const sh=X(wb).getElementsByTagName("sheet")[0];const rid=sh&&(sh.getAttribute("r:id")||sh.getAttributeNS("http://schemas.openxmlformats.org/officeDocument/2006/relationships","id"));
+    [...X(rl).getElementsByTagName("Relationship")].forEach(r=>{if(r.getAttribute("Id")===rid){let t=r.getAttribute("Target");path=t.startsWith("/")?t.slice(1):"xl/"+t}})}
+  if(!path||!ents[path])path=Object.keys(ents).filter(k=>/^xl\/worksheets\/sheet\d+\.xml$/.test(k)).sort()[0];
+  if(!path)throw new Error("مفيش شيت في الملف");
+  const ss=[];const sst=await get("xl/sharedStrings.xml");
+  if(sst)[...X(sst).getElementsByTagName("si")].forEach(si=>{ss.push([...si.getElementsByTagName("t")].filter(t=>t.parentNode.nodeName!=="rPh").map(t=>t.textContent).join(""))});
+  const doc=X(await get(path)),rows=[];
+  [...doc.getElementsByTagName("row")].forEach(r=>{const arr=[];[...r.getElementsByTagName("c")].forEach(c=>{const ref=c.getAttribute("r")||"",m=/^([A-Z]+)/.exec(ref),ix=m?colIdx(m[1]):arr.length,t=c.getAttribute("t"),v=c.getElementsByTagName("v")[0];let val="";
+    if(t==="s")val=v?ss[+v.textContent]||"":"";else if(t==="inlineStr")val=[...c.getElementsByTagName("t")].map(x=>x.textContent).join("");else val=v?v.textContent:"";
+    arr[ix]=val});rows.push(Array.from(arr,x=>x==null?"":String(x)))});
+  return rows;
+}
+function readCsv(t){
+  t=t.replace(/^﻿/,"");const first=t.split(/\r?\n/)[0]||"";const d=[",",";","\t"].map(c=>[c,first.split(c).length]).sort((a,b)=>b[1]-a[1])[0][0];
+  const rows=[];let row=[],f="",q=false;
+  for(let i=0;i<t.length;i++){const ch=t[i];
+    if(q){if(ch==='"'){if(t[i+1]==='"'){f+='"';i++}else q=false}else f+=ch}
+    else if(ch==='"')q=true;else if(ch===d){row.push(f);f=""}else if(ch==="\n"||ch==="\r"){if(ch==="\r"&&t[i+1]==="\n")i++;row.push(f);rows.push(row);row=[];f=""}else f+=ch}
+  if(f!==""||row.length){row.push(f);rows.push(row)}
+  return rows;
+}
+async function readSheetFile(file){
+  const buf=await file.arrayBuffer(),u=new Uint8Array(buf.slice(0,4));
+  if(u[0]===0x50&&u[1]===0x4B)return readXlsx(buf);
+  if(u[0]===0xD0&&u[1]===0xCF)throw new Error("ده ملف Excel قديم (.xls). افتحه واحفظه كـ xlsx أو CSV وارفعه تاني");
+  let t=new TextDecoder("utf-8").decode(buf);if(t.includes("�"))try{t=new TextDecoder("windows-1256").decode(buf)}catch(e){}
+  return readCsv(t);
+}
+function stkDetect(rows){
+  const codeRe=/كود|code|sku|item|رقم الصنف|باركود|barcode/i,q1=/رصيد|balance|stock|متاح|available/i,q2=/كمية|الكمية|qty|quantity/i;
+  for(let r=0;r<Math.min(rows.length,10);r++){const row=rows[r]||[];const ci=row.findIndex(c=>codeRe.test(c||""));let qi=row.findIndex(c=>q1.test(c||""));if(qi<0)qi=row.findIndex(c=>q2.test(c||""));if(ci>=0&&qi>=0&&ci!==qi)return {code:ci,qty:qi}}
+  return {code:0,qty:1};
+}
+function stkParse(){
+  const map=new Map();let skipped=0,dup=0,slash=0;
+  (stk.rows||[]).forEach(r=>{const k=sKey(r[stk.code]);if(!k){return}const raw=ar2en(String(r[stk.qty]==null?"":r[stk.qty])).replace(/[,\s]/g,"");if(!/^-?\d+(\.\d+)?$/.test(raw)){skipped++;return}
+    const v=parseFloat(raw);if(map.has(k)){dup++;map.set(k,map.get(k)+v)}else map.set(k,v)});
+  map.forEach((v,k)=>{if(k.includes("/"))slash++});
+  return {map,skipped,dup,slash};
+}
+async function stkPick(w,inp){
+  const f=inp.files&&inp.files[0];if(!f)return;
+  try{const rows=await readSheetFile(f);if(!rows.length)throw new Error("الملف فاضي");
+    const d=stkDetect(rows);stk={wid:w,fname:f.name,rows,code:d.code,qty:d.qty};stockOpen=true;render()}
+  catch(e){stk=null;toast("تعذّرت قراءة الملف: "+(e.message||e));render()}
+}
+async function stkSave(){
+  if(!stk||!stockUp(stk.wid))return toast("مفيش عندك صلاحية رفع الأرصدة");
+  if(!db)return toast("الحفظ غير متاح");
+  const r=stkParse();if(!r.map.size)return toast("مفيش أصناف بأرصدة صالحة. تأكد من عمودي الكود والرصيد");
+  const old=stockDocs[stk.wid],rows=[...r.map].map(([c,q])=>({c,q:sNum(q)}));
+  if(JSON.stringify(rows).length>900000)return toast("الملف كبير أوي. قسّمه أو ارفع الأصناف المهمة بس");
+  if(old&&old.n&&rows.length<old.n*0.5&&!confirm("الملف الجديد فيه "+rows.length+" صنف، والرصيد الحالي فيه "+old.n+". متأكد إنه الملف الصح؟ هيستبدل الرصيد القديم كله."))return;
+  try{await db.collection("stock").doc(stk.wid).set({wh:stk.wid,at:Date.now(),by:actor(),file:String(stk.fname||"").slice(0,80),n:rows.length,rows});toast("اتحدّثت أرصدة "+WHN[stk.wid]+" ✔ ("+rows.length+" صنف)",true);stk=null;render()}
+  catch(e){alert("تعذر حفظ الأرصدة: "+(e.message||e.code))}
+}
+const stkAge=x=>x&&x.at?fmt(x.at)+(Date.now()-x.at>48*3600e3?" ⚠ قديم":""):"";
+function stkPrev(){
+  const r=stkParse(),hd=stk.rows[0]||[],ncol=Math.max(...stk.rows.slice(0,10).map(x=>x.length),2);
+  const opts=sel=>Array.from({length:ncol},(_,i)=>`<option value="${i}" ${i===sel?"selected":""}>${String.fromCharCode(65+i%26)}${i>25?"+":""} – ${esc(String(hd[i]||"").slice(0,24))}</option>`).join("");
+  return `<div class="card" style="margin-top:6px;border:2px solid var(--acc)"><b>معاينة ملف ${esc(stk.fname)} ← ${WHN[stk.wid]}</b>
+  <div class="row" style="margin-top:6px;gap:8px"><label>عمود الكود <select onchange="stk.code=+this.value;render()">${opts(stk.code)}</select></label><label>عمود الرصيد <select onchange="stk.qty=+this.value;render()">${opts(stk.qty)}</select></label></div>
+  <div class="tw" style="margin-top:6px"><table><tr><th>الكود (كما هو)</th><th>بعد التوحيد</th><th>الرصيد</th></tr>${stk.rows.slice(0,6).map(x=>`<tr><td>${esc(String(x[stk.code]||""))}</td><td dir="ltr">${esc(sKey(x[stk.code]))}</td><td>${esc(String(x[stk.qty]||""))}</td></tr>`).join("")}</table></div>
+  <div class="mut" style="margin-top:6px">هيتحفظ <b>${r.map.size}</b> كود (منهم <b>${r.slash}</b> كود بسلاش)${r.skipped?" · اتتخطّى "+r.skipped+" صف الرصيد فيه مش رقم (غالبًا العناوين)":""}${r.dup?" · "+r.dup+" كود متكرر اتجمعت أرصدته":""}. الحفظ بيستبدل رصيد ${WHN[stk.wid]} القديم كله.</div>
+  <div class="row" style="margin-top:8px"><button class="b ok" onclick="stkSave()">اعتماد ورفع الأرصدة</button><button class="b s" onclick="stk=null;render()">إلغاء</button></div></div>`;
+}
+function stkLine(w,code,qty){ /* سطر رصيد مخزن واحد لكود واحد: رصيد السلاش + رصيد الكود الأساسي */
+  const k=sKey(code),m=stockMap[w],nm=WHN[w].replace("مخزن ","");
+  if(!k)return "";if(!m)return `<div class="x mut">${nm}: لم يُرفع</div>`;
+  const hs=k.includes("/"),b=sBase(k),sl=hs?m.get(k):undefined,bs=m.get(b),q=+qty||0,ok="color:#2f7d5b",bad="color:#b8412f";
+  const f=v=>v===undefined?"—":"<b>"+esc(String(sNum(v)))+"</b>";
+  let st="",txt;
+  if(hs){txt="سلاش: "+f(sl)+" · بدون سلاش ("+esc(b)+"): "+f(bs);st=sl!==undefined&&q?(sl>=q?ok:bad):(sl===undefined&&bs===undefined?bad:"")}
+  else{txt="رصيد: "+f(bs);st=bs===undefined?bad:(q?(bs>=q?ok:bad):"")}
+  return `<div class="x" style="${st}"><b>${nm}</b> ${txt}</div>`;
+}
+function stockCell(i){return stockVis().map(w=>stkLine(w,i.code,i.qty)).join("")||"—"}
+function stockLook(v){
+  const el=document.getElementById("stkRes");if(!el)return;v=(v||"").trim();
+  if(!v){el.innerHTML="";return}
+  el.innerHTML=stockVis().map(w=>stkLine(w,v,0)).join("")||'<span class="mut">مفيش</span>';
+}
+function stockCard(scope){
+  if(!can("sstock"))return "";
+  const ws=scope==="log"?stockVis():[scope].filter(w=>stockVis().includes(w));if(!ws.length)return "";
+  const sum=ws.map(w=>stockDocs[w]?WHN[w].replace("مخزن ","")+" "+fmt(stockDocs[w].at):WHN[w].replace("مخزن ","")+" — لم يُرفع").join(" · ");
+  return `<details class="card" ${stockOpen||(stk&&ws.includes(stk.wid))?"open":""} ontoggle="stockOpen=this.open"><summary><b>📦 أرصدة المخازن</b> <span class="mut">${esc(sum)}</span></summary>
+  ${stockErr?`<div class="mut" style="color:var(--bad)">تعذّر تحميل الأرصدة (${esc(stockErr)}). لو نشرت قواعد Firebase الجديدة لازم تنشر النسخة المحدّثة منها.</div>`:""}
+  ${ws.map(w=>{const d=stockDocs[w];return `<div class="row" style="margin-top:8px;gap:8px"><b>${WHN[w]}</b><span class="mut">${d?"آخر تحديث: "+esc(stkAge(d))+" · "+esc(d.by||"")+" · "+d.n+" كود":"لم يُرفع رصيد بعد"}</span>${stockUp(w)?`<label class="b s" style="cursor:pointer">📤 رفع ملف الرصيد<input type="file" accept=".xlsx,.csv,.txt" style="display:none" onchange="stkPick('${w}',this);this.value=''"></label>`:""}</div>${stk&&stk.wid===w?stkPrev():""}`}).join("")}
+  <div class="row" style="margin-top:10px;gap:6px"><input class="wi" style="max-width:260px" dir="ltr" placeholder="🔍 اعرف رصيد كود (مثلًا 222333/1)" oninput="stockLook(this.value)"></div><div id="stkRes" style="margin-top:6px"></div>
+  <div class="mut" style="margin-top:6px">الكود اللي فيه سلاش (222333/1) بيظهر له رصيد السلاش ورصيد الكود الأساسي (222333) جنب بعض. الأرصدة من آخر ملف اترفع، مش لحظية.</div></details>`;
+}
+/* ---- ربط طلبات نفس العميل (يدوي): حقل grp على الطلب، للعرض بس — مفيش حالة أو كمية بتتغيّر ---- */
+const grpCode=g=>"م-"+String(g).slice(-4).toUpperCase();
+const grpOthers=o=>o.grp?orders.filter(x=>x.grp===o.grp&&x.id!==o.id).sort((a,b)=>(a.createdAt||0)-(b.createdAt||0)):[];
+const linkDone=x=>x.stage==="shipped"||x.stage==="delivered";
+function linkBox(o,scr){
+  if(isTr(o))return "";
+  const sc=owner?"log":scr,oth=grpOthers(o),canL=can("elink",sc)&&!(scr==="tele"&&!owner&&o.createdBy!==who);
+  if(!oth.length&&!canL)return "";
+  let h="";
+  if(oth.length){
+    const all=[o,...oth],act=all.filter(x=>x.stage!=="cancelled"),dn=act.filter(linkDone).length,cn=all.length-act.length;
+    const sum=all.length+" طلبات: "+(act.length&&dn===act.length?"كلها اتشحنت/اتسلّمت ✔":dn+" اتشحن أو اتسلّم، "+(act.length-dn)+" لسه")+(cn?"، "+cn+" ملغي":"");
+    h+=`<div class="card" style="margin:6px 0;background:#f6f1ea"><b>🔗 طلبات مرتبطة <span class="mut">(${grpCode(o.grp)})</span></b><div class="mut">${esc(sum)}</div>`+
+      oth.map(x=>{const pr=prepOf(x),pt=!(x.items||[]).length?"":pr==="full"?"تحضير مكتمل":pr==="part"?"تحضير جزئي":"لسه ما اتحضرش";
+        const pay=(!isTr(x)&&can("camt",sc))?payTxt(x):"";
+        return `<div class="row" style="margin-top:4px;gap:6px"><a href="#" onclick="openLinked('${x.id}');return false" style="font-weight:700">#<bdi dir="ltr">${esc(dnum(x,sc))}</bdi></a><span class="tag" style="background:${STAGES[x.stage][1]}">${STAGES[x.stage][0]}</span><span class="mut">${esc([pt,pay].filter(Boolean).join(" · "))}</span>`+
+          (canL?`<button class="b s" style="margin-inline-start:auto" onclick="unlinkOrd('${o.id}','${x.id}','${scr}')">فك الربط</button>`:"")+`</div>`}).join("")+`</div>`;
+  }
+  if(canL)h+=`<details style="margin-top:6px"><summary class="mut">🔗 ربط بطلب تاني لنفس العميل</summary><div class="row" style="margin-top:6px;gap:6px"><input class="wi" id="lk-${o.id}" style="max-width:200px" placeholder="رقم الطلب التاني (أو رقم/كود)"><button class="b s" onclick="linkOrd('${o.id}','${scr}')">ربط</button></div></details>`;
+  return h;
+}
+function openLinked(id){const x=orders.find(z=>z.id===id);if(!x)return;qNum=String(x.num);qGirl="";render();window.scrollTo(0,0)}
+const grpPatch=async(id,g,text)=>{const c=orders.find(x=>x.id===id);if(!c)return;const o=JSON.parse(JSON.stringify(c));if(g)o.grp=g;else delete o.grp;await save(o,text,"st")};
+async function linkOrd(id,scr){
+  if(!needName())return;
+  const a=orders.find(x=>x.id===id);if(!a||isTr(a))return;
+  const sc=owner?"log":scr;
+  if(!can("elink",sc))return toast("مفيش عندك صلاحية ربط الطلبات");
+  const v=($("#lk-"+id)?.value||"").trim();if(!v)return toast("اكتب رقم الطلب التاني");
+  const nv=ar2en(v).toLowerCase();
+  const hit=orders.filter(x=>!isTr(x)&&x.id!==id&&(String(x.num)===nv||(x.ccode&&(x.num+"/"+x.ccode).toLowerCase()===nv)));
+  if(!hit.length)return toast("مفيش طلب عميل بالرقم ده");
+  if(hit.length>1)return toast("في أكتر من طلب بنفس الرقم، اكتب رقم/كود");
+  const b=hit[0],mine=role==="tele"&&!owner;
+  if(mine&&(a.createdBy!==who||b.createdBy!==who))return toast("تقدر تربط طلباتك إنت بس");
+  if(a.grp&&a.grp===b.grp)return toast("الطلبين مربوطين أصلًا");
+  const A=a.grp?orders.filter(x=>x.grp===a.grp):[a],B=b.grp?orders.filter(x=>x.grp===b.grp):[b];
+  if(a.grp&&b.grp&&!confirm("الطلبين في مجموعتين مختلفتين. تدمج المجموعتين في واحدة؟"))return;
+  if(mine&&[...A,...B].some(x=>x.createdBy!==who))return toast("المجموعة فيها طلبات مش بتاعتك");
+  const g=a.grp||b.grp||"g"+Date.now().toString(36);
+  const all=[...A,...B.filter(x=>!A.some(y=>y.id===x.id))];
+  for(const x of all){const others=all.filter(y=>y.id!==x.id).map(y=>"#"+y.num).join("، ");
+    if(x.grp===g)continue;await grpPatch(x.id,g,"ربط بطلبات نفس العميل ("+grpCode(g)+"): "+others)}
+  // سجّل على الطلب اللي كان مجموعته الأصلية لو اتضاف له أعضاء جداد
+  for(const x of all){if(x.grp===g&&all.some(y=>y.grp!==g))await grpPatch(x.id,g,"اتضافت طلبات للمجموعة "+grpCode(g)+": "+all.filter(y=>y.grp!==g).map(y=>"#"+y.num).join("، "))}
+  render();
+}
+async function unlinkOrd(id,otherId,scr){
+  if(!needName())return;
+  const a=orders.find(x=>x.id===id),b=orders.find(x=>x.id===otherId);if(!a||!b||!a.grp||a.grp!==b.grp)return;
+  const sc=owner?"log":scr;
+  if(!can("elink",sc))return toast("مفيش عندك صلاحية");
+  if(role==="tele"&&!owner&&(a.createdBy!==who||b.createdBy!==who))return toast("تقدر تفك ربط طلباتك إنت بس");
+  if(!confirm("تفك ربط الطلب #"+b.num+" من المجموعة؟"))return;
+  const g=a.grp,rest=orders.filter(x=>x.grp===g&&x.id!==b.id);
+  await grpPatch(b.id,null,"فك الربط من المجموعة "+grpCode(g));
+  if(rest.length===1)await grpPatch(rest[0].id,null,"المجموعة "+grpCode(g)+" بقت طلب واحد فاتفكّت");
+  else for(const x of rest)await grpPatch(x.id,g,"فك ربط #"+b.num+" من المجموعة "+grpCode(g));
+  render();
 }
 /* ---- تنبيه «برجاء الاعتماد على أونكس»: بيستخدم نظام الإشارات الموجود (mentions) من غير نظام جديد ---- */
 const ONYX_TXT="برجاء الاعتماد على أونكس";
@@ -1095,8 +1276,8 @@ function itemsTbl(o,mode){
   const it=o.items||[];
   if(!it.length)return `<div class="mut" style="margin-top:6px">مفيش أصناف مسجّلة للطلب ده</div>`;
   const rd=it.filter(i=>itemSt(i).c==="ok").length;
-  return `<div class="tw" style="margin-top:6px"><div class="mut">جاهز ${rd} من ${it.length} صنف</div><table><tr><th>الكود</th><th>اسم الصنف</th><th>الوحدة</th><th>المطلوب</th><th>المخزن</th><th>المتحضّر</th><th>الحالة</th></tr>${it.map((i,x)=>{const s=itemSt(i),k=o.id+"-"+x;return `<tr style="background:${ROWBG[s.c]}"><td>${esc(i.code||"")}${(()=>{const pk=isPk(i.wh)?packOf(i.code):null;return pk?`<div class="mut">${pk.pack?esc(pk.pack.n):"⚠ عبوة غير معروفة /"+esc(pk.suf)}</div>`:""})()}</td><td>${esc(i.name)}</td><td>${mode==="log"&&(pendWh[k]!==undefined?pendWh[k]:i.wh)&&!isDec({...i,wh:(pendWh[k]!==undefined?pendWh[k]:i.wh)})?`<select style="min-width:90px" onchange="pendUnit['${k}']=this.value">${unitsFor(i).map(u=>`<option ${(pendUnit[k]!==undefined?pendUnit[k]:(i.unit||defU(i)))===u?"selected":""}>${u}</option>`).join("")}</select>`:esc(unitOf(i)||"—")}</td><td><b>${esc(i.qty)}</b></td>
-  <td>${mode==="log"?`<select style="min-width:120px" onchange="pendWh['${k}']=this.value"><option value="">— حدّد —</option>${Object.entries(WHN).map(([v,n])=>`<option value="${v}" ${(pendWh[k]!==undefined?pendWh[k]:i.wh)===v?"selected":""}>${n}</option>`).join("")}</select>`:esc(WHN[i.wh]||"—")}</td>
+  return `<div class="tw" style="margin-top:6px"><div class="mut">جاهز ${rd} من ${it.length} صنف${mode==="log"&&can("sstock")?" · أرصدة: "+stockVis().map(w=>WHN[w].replace("مخزن ","")+" "+(stockDocs[w]?esc(stkAge(stockDocs[w])):"لم يُرفع")).join(" · "):""}</div><table><tr><th>الكود</th><th>اسم الصنف</th><th>الوحدة</th><th>المطلوب</th>${mode==="log"&&can("sstock")?"<th>الأرصدة (سلاش / بدون)</th>":""}<th>المخزن</th><th>المتحضّر</th><th>الحالة</th></tr>${it.map((i,x)=>{const s=itemSt(i),k=o.id+"-"+x;return `<tr style="background:${ROWBG[s.c]}"><td>${esc(i.code||"")}${(()=>{const pk=isPk(i.wh)?packOf(i.code):null;return pk?`<div class="mut">${pk.pack?esc(pk.pack.n):"⚠ عبوة غير معروفة /"+esc(pk.suf)}</div>`:""})()}</td><td>${esc(i.name)}</td><td>${mode==="log"&&(pendWh[k]!==undefined?pendWh[k]:i.wh)&&!isDec({...i,wh:(pendWh[k]!==undefined?pendWh[k]:i.wh)})?`<select style="min-width:90px" onchange="pendUnit['${k}']=this.value">${unitsFor(i).map(u=>`<option ${(pendUnit[k]!==undefined?pendUnit[k]:(i.unit||defU(i)))===u?"selected":""}>${u}</option>`).join("")}</select>`:esc(unitOf(i)||"—")}</td><td><b>${esc(i.qty)}</b></td>
+  ${mode==="log"&&can("sstock")?`<td style="min-width:190px">${stockCell(i)}</td>`:""}<td>${mode==="log"?`<select style="min-width:120px" onchange="pendWh['${k}']=this.value"><option value="">— حدّد —</option>${Object.entries(WHN).map(([v,n])=>`<option value="${v}" ${(pendWh[k]!==undefined?pendWh[k]:i.wh)===v?"selected":""}>${n}</option>`).join("")}</select>`:esc(WHN[i.wh]||"—")}</td>
   <td><b>${esc(+i.picked||0)}</b></td><td>${esc(s.t)}</td></tr>`}).join("")}</table></div>`;
 }
 function itemsBox(o){
@@ -1307,7 +1488,7 @@ async function createTransfer(){
 const printBar=()=>can("cprint","log")?`<div class="card"><b>طباعة قوائم التجهيز</b><div class="row" style="margin-top:8px">${Object.entries(WHN).map(([w,n])=>`<button class="b s x" onclick="printWh('${w}','need')">🖨 المطلوب – ${n}</button><button class="b s x" onclick="printWh('${w}','done')">🖨 المجهّز – ${n}</button>`).join("")}</div></div>`:"";
 function logView(){
   const rel=orders.filter(match),act=rel.filter(o=>!isArchived(o,"log")).sort(byPrio),arch=rel.filter(o=>isArchived(o,"log"));
-  const logCard=o=>`<div class="card" style="${can("cdue","log")?lateStyle(o):""}"><div class="row"><div><b>${cT(o,"log")}</b>${isTr(o)?` <span class="tag" style="background:#3d6f8e">أمر نقل داخلي</span> <span class="mut">← ${esc(o.dest||"")}</span>`:""}<div class="mut">${metaLine(o,"log")}</div>${onyxBox(o,"log")}${onyxAlertBox(o,"log")}${nameBox(o,"log")}</div><div class="x">${prioTag(o,"log")}${tag(o.stage)} ${mods(o).length?`<span class="mod">${mods(o).length} تعديل</span>`:""} <button class="b s x" onclick="toggleFold('${o.id}')">${fold[o.id]?"◂ فتح":"▾ طي"}</button></div></div>
+  const logCard=o=>`<div class="card" style="${can("cdue","log")?lateStyle(o):""}"><div class="row"><div><b>${cT(o,"log")}</b>${isTr(o)?` <span class="tag" style="background:#3d6f8e">أمر نقل داخلي</span> <span class="mut">← ${esc(o.dest||"")}</span>`:""}<div class="mut">${metaLine(o,"log")}</div>${onyxBox(o,"log")}${onyxAlertBox(o,"log")}${nameBox(o,"log")+linkBox(o,"log")}</div><div class="x">${prioTag(o,"log")}${tag(o.stage)} ${mods(o).length?`<span class="mod">${mods(o).length} تعديل</span>`:""} <button class="b s x" onclick="toggleFold('${o.id}')">${fold[o.id]?"◂ فتح":"▾ طي"}</button></div></div>
   <div class="mut">${whTxt(o)}</div>${can("cdue","log")?dueBadge(o)+logBadge(o)+whDueRows(o):""}${can("camt","log")?accBadge(o):""}${holdBanner(o)}${fold[o.id]?foldLine(o,"log"):""}<div ${fold[o.id]?'style="display:none"':""}>${prioBox(o)}<div style="margin-top:4px">${can("cship","log")&&noT(o)?shipBox(o):""}${compBanner(o)}${can("cwaybill","log")&&noT(o)?`<button class="b s x" onclick="printWaybill('${o.id}')">🖨 بوليصة شحن</button>`:""}</div>${!(o.items||[]).length?`<div class="hold">⚠ لسه ما اتسجلتش أصناف للطلب (الصق الأصناف من الإكسيل)</div>`:(o.items||[]).some(i=>!i.wh)?`<div class="hold">⚠ فيه أصناف لسه ما اتحدّدش لها مخزن</div>`:""}${o.stage==="modified"?`<div class="hold" style="color:#8a4fd6">⚠ آخر تعديل: ${esc(mods(o).slice(-1)[0]?.text)}</div>`:""}
   <div class="g2"><div><label>حالة الطلب</label><select onchange="setStage('${o.id}',this.value)">${Object.entries(STAGES).map(([v,s])=>`<option value="${v}" ${o.stage===v?"selected":""}>${s[0]}</option>`).join("")}</select></div>
   <div><label>سبب التوقف</label>${reasonSel("hr-"+o.id,o.holdReason,"setHold('"+o.id+"',this.value)")}</div>
@@ -1316,7 +1497,7 @@ function logView(){
   <div style="margin-top:8px">${itemsBox(o)}</div>
   <div style="margin-top:8px">${modBox(o,"log")}</div></div></div>`;
   const foldBar=act.length?`<div class="row" style="margin:6px 0"><button class="b s x" onclick="foldAll([${act.map(o=>"'"+o.id+"'").join(",")}],true)">▾ طي كل الطلبات</button><button class="b s x" onclick="foldAll([${act.map(o=>"'"+o.id+"'").join(",")}],false)">◂ فتح الكل</button></div>`:"";
-  return printBar()+orderForm(true)+transferCard()+searchBar()+pasteCard()+foldBar+(act.length?act.map(logCard).join(""):`<div class="card empty">مفيش طلبات مفتوحة مطابقة</div>`)+archBlock(arch,logCard,"أرشيف الطلبات وأوامر النقل (اتشحنت)");
+  return printBar()+orderForm(true)+transferCard()+stockCard("log")+searchBar()+pasteCard()+foldBar+(act.length?act.map(logCard).join(""):`<div class="card empty">مفيش طلبات مفتوحة مطابقة</div>`)+archBlock(arch,logCard,"أرشيف الطلبات وأوامر النقل (اتشحنت)");
 }
 const setStage=(id,v)=>{const cur=orders.find(x=>x.id===id);if(cur&&cur.noShip&&["shipped","partial","delivered"].includes(v)){toast("🚫 الحسابات منعت شحن الطلب ده لحين سداد كامل القيمة");render();return}if(v==="hold"&&!(cur&&cur.holdReason)){toast("اختار سبب التوقف من القايمة الأول");render();return}return upd(id,o=>{o.stage=v;if(v==="shipped"){o.shippedAt=o.shippedAt||Date.now()}else if(v!=="delivered")o.shippedAt=0},"تغيير الحالة إلى: "+STAGES[v][0])};
 const setHold=(id,v)=>{if(!v){render();return}return upd(id,o=>{o.holdReason=v;o.stage="hold"},"سبب التوقف: "+v)};
@@ -1469,10 +1650,10 @@ function whView(wid){
   const statusCard=`<div class="card" style="border:2px solid ${lateN?"#d63b3b":"var(--bd)"}"><b>📊 موقف ${WHN[wid]} دلوقتي</b><div class="row" style="margin-top:6px"><span class="tag" style="background:#6f6459">غير محضّرة: ${toDo.length} طلب</span><span class="tag" style="background:${lateN?"#d63b3b":"#2f7d5b"}">متأخرة: ${lateN}</span><span class="tag" style="background:${pendOut.length?"#c97a1a":"#2f7d5b"}">محضّرة ولسه ما خرجتش: ${pendOut.length}</span></div></div>`;
   const top=statusCard+(pendOut.length?`<div class="card" style="border:2px solid #d63b3b;background:rgba(214,59,59,.10)"><b>⏰ محضّرة ولسه ما خرجتش (${pendOut.length}):</b> ${pendOut.map(o=>"<b>#"+esc(o.num)+"</b>").join("، ")}<div class="mut">دوس زرار الخروج على كل طلب منهم عشان يتسجّل.</div></div>`:"");
   const archHtml=arch.length?`<details class="card"><summary><b>📦 أرشيف – طلبات اتشحنت من عندك (${arch.length})</b></summary><div class="mut" style="margin-top:6px">الطلبات دي خرجت للشحن واتشالت من الشاشة الرئيسية. «استدعاء الطلب» بيرجّعه للقايمة.</div>${arch.slice(0,80).map(o=>{const sh=o.ship[wid];return `<div class="row" style="margin-top:6px;border-top:1px solid var(--bd);padding-top:6px"><div><b>${cT(o,wid)}</b><div class="mut">${metaLine(o,wid)} · خرج ${esc(fmt(sh.t))}${sh.ref?" · شحنة "+esc(sh.ref):""}${wid==="wm"&&o.cartons?" · كراتين "+esc(o.cartons):""}${sh.driver?" · "+esc(sh.driver)+" / "+esc(sh.car||""):""}</div></div><div class="x">${wid==="wm"&&can("cwaybill",wid)?`<button class="b s x" onclick="printWaybill('${o.id}')">🖨 بوليصة</button>`:""}<button class="b s x" onclick="whUnship('${o.id}','${wid}')">↩ استدعاء الطلب</button></div></div>`}).join("")}</details>`:"";
-  if(!act.length)return head+top+searchBar()+`<div class="card empty">مفيش أصناف محوّلة لـ${WHN[wid]} دلوقتي</div>`+archHtml;
+  if(!act.length)return head+top+stockCard(wid)+searchBar()+`<div class="card empty">مفيش أصناف محوّلة لـ${WHN[wid]} دلوقتي</div>`+archHtml;
   const hdrStd=`<tr><th>الكود</th><th>اسم الصنف</th><th>الوحدة</th><th>المطلوب</th><th>المتحضّر (علّم ✓ لو كامل، أو اكتب الكمية)</th><th>سبب النقص</th></tr>`;
   const hdrPack=`<tr><th>الكود</th><th>اسم الصنف</th><th>الوحدة</th><th>الكمية المطلوبة (عبوات)</th><th>وزن المطلوب</th><th>المتحضّر (علّم ✓ لو كامل، أو اكتب عدد العبوات)</th><th>سبب النقص</th></tr>`;
-  return head+top+searchBar()+act.map(o=>{
+  return head+top+stockCard(wid)+searchBar()+act.map(o=>{
     const mi=mineItems(o,wid),lm=mods(o).slice(-1)[0],sh=(o.ship||{})[wid]||{},done=!!sh.done,rd=mi.filter(z=>itemSt(z.i).c==="ok").length;
     const sp=isPk(wid)?woSplit(mi):{groups:[],other:mi};
     const groups=sp.groups.map(G=>{
@@ -1483,7 +1664,7 @@ function whView(wid){
       <div class="mut">التوزيع: ${esc(byPackTxt(by))}</div>
       <div class="tw"><table>${hdrPack}${G.rows.map(r=>whRow(o,r,done,r.p)).join("")}</table></div></div>`}).join("");
     const others=sp.other.length?`<div class="tw" style="margin-top:8px"><table>${hdrStd}${sp.other.map(z=>whRow(o,z,done,isPk(wid)?null:undefined)).join("")}</table></div>`:"";
-    return `<div class="card" style="${can("cdue",wid)?lateStyleWh(o,wid):""}"><div class="row"><div><b>${cT(o,wid)}</b>${isTr(o)?` <span class="tag" style="background:#3d6f8e">أمر نقل داخلي</span>`:""}<div class="mut">${metaLine(o,wid)}</div>${onyxBox(o,wid)}${nameBox(o,wid)}</div><div class="x">${prioTag(o,wid)}${tag(o.stage)} <button class="b s x" onclick="toggleFold('${o.id}')">${fold[o.id]?"◂ فتح":"▾ طي"}</button></div></div>${can("cdue",wid)?dueBadgeWh(o,wid):""}${fold[o.id]?foldLine(o,wid):""}${readyBox(o,wid)}<div ${fold[o.id]?'style="display:none"':""}>${isFd(wid)?(o.noShip?'<div class="hold" style="margin-top:6px">⛔ الشحن متوقف حالياً. كلّم مروان.</div>':""):holdBanner(o)}${wid==="wm"?payOkBanner(o)+relBanner(o)+compBanner(o):""}<div style="margin-top:4px">${can("cship",wid)?shipLine(o):""}${wid==="wm"&&can("cwaybill",wid)?`<button class="b s x" onclick="printWaybill('${o.id}')">🖨 بوليصة شحن</button>`:""}</div>
+    return `<div class="card" style="${can("cdue",wid)?lateStyleWh(o,wid):""}"><div class="row"><div><b>${cT(o,wid)}</b>${isTr(o)?` <span class="tag" style="background:#3d6f8e">أمر نقل داخلي</span>`:""}<div class="mut">${metaLine(o,wid)}</div>${onyxBox(o,wid)}${nameBox(o,wid)+linkBox(o,wid)}</div><div class="x">${prioTag(o,wid)}${tag(o.stage)} <button class="b s x" onclick="toggleFold('${o.id}')">${fold[o.id]?"◂ فتح":"▾ طي"}</button></div></div>${can("cdue",wid)?dueBadgeWh(o,wid):""}${fold[o.id]?foldLine(o,wid):""}${readyBox(o,wid)}<div ${fold[o.id]?'style="display:none"':""}>${isFd(wid)?(o.noShip?'<div class="hold" style="margin-top:6px">⛔ الشحن متوقف حالياً. كلّم مروان.</div>':""):holdBanner(o)}${wid==="wm"?payOkBanner(o)+relBanner(o)+compBanner(o):""}<div style="margin-top:4px">${can("cship",wid)?shipLine(o):""}${wid==="wm"&&can("cwaybill",wid)?`<button class="b s x" onclick="printWaybill('${o.id}')">🖨 بوليصة شحن</button>`:""}</div>
     ${lm&&!(isFd(wid)&&/تحصيل|سداد|الحسابات|دفع/.test(lm.text))&&(can("cship",wid)||/الأصناف|الكميات|تحضير/.test(lm.text))&&!(isFd(wid)&&/بيانات الشحن/.test(lm.text))?`<div class="hold" style="color:#7b5aa6">آخر تعديل: ${esc(lm.text)}</div>`:""}
     <div class="mut" style="margin-top:6px">جاهز ${rd} من ${mi.length} صنف عندك${done?" · <b>تم الشحن</b>"+(sh.ref?" (شحنة "+esc(sh.ref)+")":"")+(sh.driver?" · السائق "+esc(sh.driver)+" · "+esc(sh.car):""):""}</div>
     ${wid==="wm"?prepBox(o)+cartonBox(o):""}
@@ -1540,7 +1721,7 @@ function girlAmount(id){
 function girlCollect(id){const c0=orders.find(x=>x.id===id);if(c0&&teleLocked(c0))return toast("الطلب اتشحن من مشعل، مفيش تعديل");const v=+($("#pc-"+id)?.value)||0;if(!v)return toast("اكتب المبلغ المحصّل");upd(id,o=>{o.collected=v;if(!o.collectedAt)o.collectedAt=Date.now()},"التحصيل: بلّغت "+actor()+" إن العميل دفع "+v)}
 function accView(){
   const all=orders.filter(o=>o.stage!=="cancelled"&&noT(o)&&match(o)),act=all.filter(o=>!(o.acct==="full"||o.release)),arch=all.filter(o=>o.acct==="full"||o.release);
-  const accCard=o=>`<div class="card" style="${can("cdue","acc")?lateStyle(o):""}"><div class="row"><div><b>${cT(o,"acc")}</b><div class="mut">${[can("camt","acc")?"قيمة الطلب "+(o.amount||0)+" · بلّغت البنت تحصيل: "+(o.collected||0)+(o.collected?" ("+diffTxt(o.amount,o.collected).t+")":""):"",can("cgirl","acc")?"البنت: "+esc(o.createdBy):"",can("cphone","acc")?esc(o.phone):""].filter(Boolean).join(" · ")}</div></div><div class="x">${can("camt","acc")?payTag(o):""}</div></div>${onyxAlertBox(o,"acc")}${nameBox(o,"acc")}
+  const accCard=o=>`<div class="card" style="${can("cdue","acc")?lateStyle(o):""}"><div class="row"><div><b>${cT(o,"acc")}</b><div class="mut">${[can("camt","acc")?"قيمة الطلب "+(o.amount||0)+" · بلّغت البنت تحصيل: "+(o.collected||0)+(o.collected?" ("+diffTxt(o.amount,o.collected).t+")":""):"",can("cgirl","acc")?"البنت: "+esc(o.createdBy):"",can("cphone","acc")?esc(o.phone):""].filter(Boolean).join(" · ")}</div></div><div class="x">${can("camt","acc")?payTag(o):""}</div></div>${onyxAlertBox(o,"acc")}${nameBox(o,"acc")+linkBox(o,"acc")}
   ${can("cdue","acc")?dueBadge(o):""}${can("camt","acc")?accBadge(o):""}${can("cship","acc")?shipLine(o):""}
   ${holdBanner(o)}
   <div class="row" style="margin-top:8px">${o.acct?"":`<button class="b ok" onclick="accFull('${o.id}')">تأكيد تحصيل كامل</button>`}<input class="wi" id="ap-${o.id}" type="number" placeholder="${o.acct?"تصحيح إجمالي المبلغ المحصّل":"إجمالي المبلغ المحصّل"}" value="${o.acct?esc(o.accAmt):""}" oninput="accDiff('${o.id}')"><button class="b" onclick="accPart('${o.id}')">${o.acct?"حفظ التصحيح":"تأكيد المبلغ المحصّل"}</button>${o.acct?`<button class="b s x" onclick="accReset('${o.id}')">إلغاء تأكيد التحصيل</button>`:""}</div>
@@ -1608,7 +1789,7 @@ function repRows(){
     if(!matchQ(o,rp.q))return false
     return true}).sort((a,b)=>b.createdAt-a.createdAt);
 }
-function repCols(){return [["رقم الطلب",o=>dnum(o)],["رقم أونكس",o=>isTr(o)?(o.onyxNo||""):""],["النوع",o=>isTr(o)?"أمر نقل":"طلب عميل"],[can("cname")?"العميل / الجهة":"الجهة",o=>isTr(o)?(o.dest||o.customer):(can("cname")?o.customer:"")],["البنت",o=>can("cgirl")?o.createdBy||"":""],["الحالة",o=>STAGES[o.stage][0]],["تاريخ الشحن",o=>{const d=shipDate(o,repEW());return d?fmtY(d):"—"},o=>isoDT(shipDate(o,repEW())),o=>shipDate(o,repEW())],["المخازن",o=>whInvolved(o).map(w=>WHN[w]).join(" + ")],["عدد الأصناف",o=>(o.items||[]).length],["قيمة الطلب",o=>can("camt")&&noT(o)?(o.amount||0):""],["المحصّل المؤكد",o=>can("camt")&&noT(o)?(o.acct?o.accAmt:0):""],["طريقة الشحن",o=>noT(o)&&can("cship")?(o.shipMethod||""):""],["الأولوية",o=>PRIO[o.prio]?PRIO[o.prio][1]:""],["تنبيه أونكس",o=>{const a=onyxAlerts(o),m=a[a.length-1];return m?m.by+" – "+fmt(m.t)+": "+(m.to.every(k=>(m.ack||{})[k])?"تم الاطلاع":"بانتظار الاطلاع"):""}],["تاريخ الإنشاء",o=>new Date(o.createdAt).toLocaleDateString("ar-EG"),o=>isoDT(o.createdAt),o=>o.createdAt],["متأخر",o=>isLate(o)?"نعم":""]].filter(c=>!(c[0]==="البنت"&&!can("cgirl"))&&!(["قيمة الطلب","المحصّل المؤكد"].includes(c[0])&&!can("camt"))&&!(c[0]==="طريقة الشحن"&&!can("cship"))&&!(c[0]==="الأولوية"&&!can("cprio"))&&!(c[0]==="تنبيه أونكس"&&!owner&&WHROLES.includes(role)))}
+function repCols(){return [["رقم الطلب",o=>dnum(o)],["رقم أونكس",o=>isTr(o)?(o.onyxNo||""):""],["مجموعة الربط",o=>o.grp?grpCode(o.grp):""],["النوع",o=>isTr(o)?"أمر نقل":"طلب عميل"],[can("cname")?"العميل / الجهة":"الجهة",o=>(!owner&&isFd(role))?"":isTr(o)?(o.dest||o.customer):(can("cname")?o.customer:"")],["البنت",o=>can("cgirl")?o.createdBy||"":""],["الحالة",o=>STAGES[o.stage][0]],["تاريخ الشحن",o=>{const d=shipDate(o,repEW());return d?fmtY(d):"—"},o=>isoDT(shipDate(o,repEW())),o=>shipDate(o,repEW())],["المخازن",o=>whInvolved(o).map(w=>WHN[w]).join(" + ")],["عدد الأصناف",o=>(o.items||[]).length],["قيمة الطلب",o=>can("camt")&&noT(o)?(o.amount||0):""],["المحصّل المؤكد",o=>can("camt")&&noT(o)?(o.acct?o.accAmt:0):""],["طريقة الشحن",o=>noT(o)&&can("cship")?(o.shipMethod||""):""],["الأولوية",o=>PRIO[o.prio]?PRIO[o.prio][1]:""],["تنبيه أونكس",o=>{const a=onyxAlerts(o),m=a[a.length-1];return m?m.by+" – "+fmt(m.t)+": "+(m.to.every(k=>(m.ack||{})[k])?"تم الاطلاع":"بانتظار الاطلاع"):""}],["تاريخ الإنشاء",o=>new Date(o.createdAt).toLocaleDateString("ar-EG"),o=>isoDT(o.createdAt),o=>o.createdAt],["متأخر",o=>isLate(o)?"نعم":""]].filter(c=>!(c[0]==="الجهة"&&!owner&&isFd(role))&&!(c[0]==="البنت"&&!can("cgirl"))&&!(["قيمة الطلب","المحصّل المؤكد"].includes(c[0])&&!can("camt"))&&!(c[0]==="طريقة الشحن"&&!can("cship"))&&!(c[0]==="الأولوية"&&!can("cprio"))&&!(c[0]==="تنبيه أونكس"&&!owner&&WHROLES.includes(role)))}
 /* ---- تصدير Excel حقيقي (.xlsx) بدون مكتبات خارجية ---- */
 const _crcT=(()=>{const t=[];for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=c&1?0xEDB88320^(c>>>1):c>>>1;t[n]=c>>>0}return t})();
 const crc32=u=>{let c=0xFFFFFFFF;for(let i=0;i<u.length;i++)c=_crcT[(c^u[i])&255]^(c>>>8);return (c^0xFFFFFFFF)>>>0};
@@ -1793,7 +1974,7 @@ function list(rows,mode){
   <td>${m.length?`<span class="mod">${m.length}</span><div class="mut">آخر تعديل: ${esc(lm.text)}</div>`:`<span class="mut">—</span>`}</td>
   <td>${payTag(o)}</td>
   <td class="mut">${l?fmt(l.t)+"<br>"+esc(l.by)+(l.rl?" ("+esc(l.rl)+")":""):""}</td>
-  <td>${mode==="tele"&&CANCELABLE.includes(o.stage)?(cancelAsk===o.id?`<button class="b x" style="background:var(--bad)" onclick="girlCancel('${o.id}')">تأكيد الإلغاء بطلب العميل</button> <button class="b s x" onclick="cancelAsk=null;render()">رجوع</button> `:`<button class="b s x" onclick="cancelAsk='${o.id}';render()">إلغاء بطلب العميل</button> `):""}${mode==="tele"&&!teleLocked(o)?shipBox(o)+modBox(o,"tele")+onyxAlertBox(o,"tele")+nameBox(o,"tele")+`<div style="margin-top:6px"><input class="wi" id="am-${o.id}" type="number" placeholder="قيمة الطلب (${esc(o.amount||0)})" style="width:140px"><button class="b s" onclick="girlAmount('${o.id}')">تعديل قيمة الطلب</button></div><div style="margin-top:6px"><input class="wi" id="pc-${o.id}" type="number" placeholder="المبلغ المحصّل" style="width:120px"><button class="b s" onclick="girlCollect('${o.id}')">سجّل تحصيل</button></div> `:mode==="tele"&&!["delivered","cancelled"].includes(o.stage)?`<div class="mut">🔒 الطلب اتشحن من مشعل، مفيش تعديل في الشحن أو التحصيل.</div>`:""}${mode==="dash"?(delAsk===o.id?`<button class="b x" style="background:var(--bad)" onclick="deleteOrder('${o.id}')">تأكيد الحذف</button> <button class="b s x" onclick="delAsk=null;render()">إلغاء</button> `:`<button class="b s x" onclick="delAsk='${o.id}';render()">حذف</button> `):""}<button class="b s" onclick="openId=openId==='${o.id}'?null:'${o.id}';render()">السجل</button></td></tr>
+  <td>${mode==="tele"&&CANCELABLE.includes(o.stage)?(cancelAsk===o.id?`<button class="b x" style="background:var(--bad)" onclick="girlCancel('${o.id}')">تأكيد الإلغاء بطلب العميل</button> <button class="b s x" onclick="cancelAsk=null;render()">رجوع</button> `:`<button class="b s x" onclick="cancelAsk='${o.id}';render()">إلغاء بطلب العميل</button> `):""}${mode==="tele"&&!teleLocked(o)?shipBox(o)+modBox(o,"tele")+onyxAlertBox(o,"tele")+nameBox(o,"tele")+linkBox(o,"tele")+`<div style="margin-top:6px"><input class="wi" id="am-${o.id}" type="number" placeholder="قيمة الطلب (${esc(o.amount||0)})" style="width:140px"><button class="b s" onclick="girlAmount('${o.id}')">تعديل قيمة الطلب</button></div><div style="margin-top:6px"><input class="wi" id="pc-${o.id}" type="number" placeholder="المبلغ المحصّل" style="width:120px"><button class="b s" onclick="girlCollect('${o.id}')">سجّل تحصيل</button></div> `:mode==="tele"&&!["delivered","cancelled"].includes(o.stage)?`<div class="mut">🔒 الطلب اتشحن من مشعل، مفيش تعديل في الشحن أو التحصيل.</div>`:""}${mode==="dash"?(delAsk===o.id?`<button class="b x" style="background:var(--bad)" onclick="deleteOrder('${o.id}')">تأكيد الحذف</button> <button class="b s x" onclick="delAsk=null;render()">إلغاء</button> `:`<button class="b s x" onclick="delAsk='${o.id}';render()">حذف</button> `):""}<button class="b s" onclick="openId=openId==='${o.id}'?null:'${o.id}';render()">السجل</button></td></tr>
   ${openId===o.id?`<tr><td colspan="7">${mode==="dash"?shipLine(o):""}<b>الأصناف والكميات</b>${itemsTbl(o)}<div class="log" style="margin-top:8px">${(o.log||[]).map(x=>`${x.kind==="mod"?"🔧":"•"} ${fmt(x.t)} – ${esc(x.by)}${x.rl?" ("+esc(x.rl)+")":""}: ${esc(x.text)}`).join("<br>")}</div></td></tr>`:""}`}).join("")}</table></div>`;
 }
 
@@ -1924,6 +2105,7 @@ function startListeners(){
   db=firebase.firestore();
   const err=e=>{const m=$("#msg");m.style.display="block";m.textContent="خطأ في الاتصال بقاعدة البيانات: "+(e.message||e.code)};
   db.collection("settings").onSnapshot(x=>{pins={};shipHours=72;logHours=72;accHours=24;shipHoursBy={};whHours={};perms={};nperms={};fleet={drivers:[],cars:[],dests:[SOHAG],staff:[],preps:[],revs:[]};wbill={...WB_DEF};reasons=DEFAULT_REASONS.slice();UNITS=DEF_UNITS.slice();accounts=[];announce=null;x.docs.forEach(d=>{const v=d.data()||{};if(d.id==="reasons"){const l=toArr(v.list).filter(Boolean);reasons=l}else if(d.id==="rules"){whHours=v.byWh||{};{const lh=+v.logHours,ah=+v.accHours;if(lh>0)logHours=lh;if(ah>0)accHours=ah}const h=+v.shipHours;if(h>0)shipHours=h;shipHoursBy=v.byMethod||{}}else if(d.id==="perms"){perms=v}else if(d.id==="notif"){nperms=v}else if(d.id==="fleet"){fleet={drivers:toArr(v.drivers).filter(Boolean),cars:toArr(v.cars).filter(Boolean),dests:v.dests?toArr(v.dests).filter(Boolean):[SOHAG],staff:toArr(v.staff).filter(Boolean),preps:toArr(v.preps).filter(Boolean),revs:toArr(v.revs).filter(Boolean)}}else if(d.id==="accounts"){accounts=toArr(v.list).filter(a=>a&&a.name)}else if(d.id==="announce"){announce=v&&v.id?v:null}else if(d.id==="units"){const l=toArr(v.list).map(z=>String(z).trim()).filter(Boolean);if(l.length)UNITS=l}else if(d.id==="waybill"){wbill={...WB_DEF,...v}}else if(v.phones)contacts=mergeC(toArr(v.phones).filter(x=>x&&x.name));else pins=v});refresh()},err);
+  db.collection("stock").onSnapshot(x=>{stockDocs={};stockMap={};stockErr="";x.docs.forEach(d=>{const v=d.data();stockDocs[d.id]=v;stockMap[d.id]=new Map((v.rows||[]).map(r=>[r.c,r.q]))});refresh()},e=>{stockErr=e.code||e.message||"خطأ"});
   db.collection("orders").orderBy("createdAt","desc").onSnapshot(s=>{orders=s.docs.map(d=>d.data());checkNew();refresh()},err);
 }
 (function(){
