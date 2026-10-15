@@ -472,9 +472,35 @@ function evTargets(ev,o,whOk){
 const NTFY_PREFIX="zamany-oud-k7q3x9";
 const keySlug=k=>{if(k.indexOf("tele:")!==0)return k;let h=0;for(const ch of k)h=(h*31+ch.charCodeAt(0))>>>0;return "g"+h.toString(36)};
 const topicOf=k=>NTFY_PREFIX+"-"+keySlug(k);
+/* ملخّص نص الإشعار: بيشيل أسماء الأصناف ويقصّر الكلام. السجل بيحتفظ بالنص الكامل. */
+function mSum(t){
+  t=String(t==null?"":t);
+  let m;
+  if(/^تحويل أصناف للمخازن:/.test(t)){
+    const c={};(t.match(/\s←\s(مخزن [^،(]+|بدون مخزن)/g)||[]).forEach(x=>{const k=x.replace(/^\s←\s/,"").replace(/^مخزن\s+/,"").trim();c[k]=(c[k]||0)+1});
+    const parts=Object.entries(c).map(([k,n])=>k+" "+n+(n===1?" صنف":" أصناف"));
+    return "تحويل أصناف للمخازن"+(parts.length?": "+parts.join(" · "):"");
+  }
+  if((m=/^(.*?: تحضير) – /.exec(t))&&/\(\s*[\d.]+\s*\/\s*[\d.]+/.test(t)){
+    const n=(t.match(/\(\s*[\d.]+\s*\/\s*[\d.]+/g)||[]).length,sh=/\(\s*[\d.]+\s*\/\s*[\d.]+\s*–/.test(t);
+    return m[1]+" – "+n+(n===1?" صنف":" أصناف")+(sh?" (فيه نقص)":"");
+  }
+  t=t.replace(/\(فيه زيادة في: [^)]*\)/,"(فيه زيادة في بعض الأصناف)");
+  t=t.replace(/ – نقص: .*?(?= – شحنة| – السائق| – ✅|$)/," – فيه نقص في بعض الأصناف");
+  return t.length>110?t.slice(0,107)+"… (التفاصيل في سجل الطلب)":t;
+}
+/* ملخّص إضافي لإشعارات المخازن (مشعل / أكتوبر / أبو صير): جملة قصيرة من غير أسماء أصناف ولا بيانات شحن */
+function mSumWh(t){
+  t=mSum(t);
+  if(/^تحويل أصناف للمخازن/.test(t))return t.length>60?"تحويل أصناف للمخازن – راجع الطلب":t;
+  if(/بيانات الشحن/.test(t))return "تعديل بيانات الشحن";
+  if(/^تعديل \([^)]*\):/.test(t))return /تحديث الأصناف والكميات \(\d+ صنف\)/.test(t)?t.replace(/^تعديل \([^)]*\):\s*/,""):"تعديل على الطلب – راجع التفاصيل";
+  return t.length>60?t.slice(0,57)+"…":t;
+}
+const mSumFor=(t,k)=>WHROLES.includes(k)?mSumWh(t):mSum(t);
 function pushMention(o,m){
-  const title=(m.by||"")+" – طلب #"+o.num,msg=String(m.text||"").replace(/^تعديل \([^)]*\):\s*/,"");
-  (m.to||[]).forEach(k=>{try{fetch("https://ntfy.sh/",{method:"POST",body:JSON.stringify({topic:topicOf(k),title,message:msg,tags:["bell"]})}).catch(()=>{})}catch(e){}});
+  const title=(m.by||"")+" – طلب #"+o.num,msg0=m.text;
+  (m.to||[]).forEach(k=>{const msg=mSumFor(msg0,k).replace(/^تعديل \([^)]*\):\s*/,"");try{fetch("https://ntfy.sh/",{method:"POST",body:JSON.stringify({topic:topicOf(k),title,message:msg,tags:["bell"]})}).catch(()=>{})}catch(e){}});
 }
 function beep(){try{const A=window.AudioContext||window.webkitAudioContext,c=new A(),o=c.createOscillator(),g=c.createGain();o.connect(g);g.connect(c.destination);o.frequency.value=880;g.gain.value=.15;o.start();setTimeout(()=>{o.stop();c.close()},350)}catch(e){}}
 let seenM=null,baselined=false;
@@ -484,8 +510,8 @@ function checkNew(){
   orders.forEach(o=>(o.mentions||[]).forEach(m=>{const id=o.id+"/"+m.id;if(seenM.has(id))return;seenM.add(id);if(baselined&&k&&m.to.includes(k)&&m.by!==actor())fresh.push([o,m])}));
   baselined=true;try{localStorage.setItem("seenM",JSON.stringify([...seenM].slice(-500)))}catch(e){}
   if(!fresh.length)return;beep();
-  fresh.forEach(([o,m])=>{try{if(window.Notification&&Notification.permission==="granted")new Notification(m.by+" – طلب #"+o.num,{body:String(m.text||"")})}catch(e){}});
-  toast("🔔 إشعار جديد: طلب #"+fresh[0][0].num+" – "+fresh[0][1].text,true);
+  fresh.forEach(([o,m])=>{try{if(window.Notification&&Notification.permission==="granted")new Notification(m.by+" – طلب #"+o.num,{body:mSumFor(m.text,role)})}catch(e){}});
+  toast("🔔 إشعار جديد: طلب #"+fresh[0][0].num+" – "+mSumFor(fresh[0][1].text,role),true);
 }
 function enableNotif(){
   try{if(!window.Notification)return toast("المتصفح ده مش بيدعم الإشعارات (على الآيفون أضف الصفحة للشاشة الرئيسية الأول)");Notification.requestPermission().then(p=>{toast(p==="granted"?"تم تفعيل إشعارات المتصفح ✔":"الإشعارات مرفوضة من إعدادات المتصفح",p==="granted");beep();render()})}catch(e){toast("تعذر التفعيل")}
@@ -499,7 +525,7 @@ function inbox(){
   const k=myKey(),it=[];
   orders.forEach(o=>(o.mentions||[]).forEach(m=>{if(m.to.includes(k)&&!(m.ack||{})[k])it.push([o,m])}));
   if(!it.length)return "";
-  return `<div class="card" style="border:2px solid #8a4fd6"><b>🔔 إشارات ليك (${it.length}) – لازم تأكد الاطلاع</b>${it.map(([o,m])=>`<div class="row" style="margin-top:8px"><div>${cT(o,role)} – <b>${esc(m.by)}</b>: ${esc(m.text)} <span class="mut">${fmt(m.t)}</span></div><button class="b ok x" onclick="ack('${o.id}','${m.id}')">تم الاطلاع</button></div>`).join("")}</div>`;
+  return `<div class="card" style="border:2px solid #8a4fd6"><b>🔔 إشارات ليك (${it.length}) – لازم تأكد الاطلاع</b>${it.map(([o,m])=>`<div class="row" style="margin-top:8px"><div>${cT(o,role)} – <b>${esc(m.by)}</b>: ${esc(mSumFor(m.text,role))} <span class="mut">${fmt(m.t)}</span></div><button class="b ok x" onclick="ack('${o.id}','${m.id}')">تم الاطلاع</button></div>`).join("")}</div>`;
 }
 async function ack(oid,mid){
   const k=myKey(),o=JSON.parse(JSON.stringify(orders.find(x=>x.id===oid))),m=o.mentions.find(x=>x.id===mid);
@@ -509,13 +535,15 @@ async function ack(oid,mid){
 const mods=o=>(o.log||[]).filter(l=>l.kind==="mod");
 
 /* ---- الصلاحيات (المدير يتحكم فيها) ---- */
-const APP_VER="2026-10-15b";
+const APP_VER="2026-10-15c";
 let secOpen={};
 let accounts=[],announce=null,newsAll=false,selAcct="";
 const seenGet=k=>{try{return localStorage.getItem(k)||""}catch(e){return ""}};
 const seenSet=(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}};
 const curAcct=()=>role==="tele"?(accounts.find(a=>a.name===seenGet("acctn"))||null):null;
-const CHANGES=[{v:APP_VER,ts:Date.parse("2026-10-15T12:00:00Z"),d:"١٥ أكتوبر",items:[
+const CHANGES=[{v:APP_VER,ts:Date.parse("2026-10-15T00:30:00Z"),d:"١٥ أكتوبر",items:[
+ [["owner","tele","log","acc","wm","wo","wa"],"الإشعارات بقت ملخّص قصير من غير أسماء أصناف (مثلًا «تحويل أصناف للمخازن: أكتوبر ٣ أصناف» و«تحضير – ٢ صنف»). التفاصيل الكاملة لسه موجودة في سجل الطلب. وإشعارات المخازن (مشعل وأكتوبر وأبو صير) أقصر: «تعديل على الطلب – راجع التفاصيل» و«تعديل بيانات الشحن» من غير عنوان ولا أسماء."]],
+},{v:"2026-10-15b",ts:Date.parse("2026-10-15T12:00:00Z"),d:"١٥ أكتوبر",items:[
  [["owner","log","wm","wo","wa"],"أرصدة المخازن: كل مخزن (أو مروان) يرفع ملف Excel/CSV فيه كود الصنف والرصيد. الكود اللي فيه سلاش (222333/1) بيتعرض له رصيد السلاش ورصيد الكود الأساسي (222333) جنب بعض، وفي شاشة توزيع مروان بيظهر رصيد المخازن التلاتة جنب كل صنف مع وقت آخر تحديث."]],
 },{v:"2026-10-15a",ts:Date.parse("2026-10-14T23:00:00Z"),d:"١٥ أكتوبر",items:[
  [["wo","wa"],"مخزن أكتوبر وأبو صير: أي طلب عميل أو أمر نقل بيظهر بالرقم بس مع علامة «يخص عميل»، من غير اسم العميل أو الجهة، لا في الشاشة ولا في البحث ولا في التقارير."]],
@@ -1382,7 +1410,7 @@ async function upd(id,fn,text,kind,extra,quiet){
   if(WHROLES.includes(r)&&!(o.items||[]).some(i=>i.wh===r)&&!(r==="wm"&&woShipped(o)&&(noT(o)||o.destType==="wm")))return toast("مفيش أصناف محوّلة لمخزنك في الطلب ده");
   fn(o);
   const to=targets(r,o,text);let t2=text;
-  if(to.length){const mm={id:""+Date.now(),t:Date.now(),by:actor(),from:r,text,to,ack:{}};o.mentions=[...(o.mentions||[]),mm];pushMention(o,mm);t2+=" [إشارة إلى: "+to.map(tlabel).join("، ")+"]"}
+  if(to.length){const mm={id:""+Date.now(),t:Date.now(),by:actor(),from:r,text:mSum(text),to,ack:{}};o.mentions=[...(o.mentions||[]),mm];pushMention(o,mm);t2+=" [إشارة إلى: "+to.map(tlabel).join("، ")+"]"}
   await save(o,t2,kind,extra);typing=false;render();
   if(!quiet&&(kind==="mod"||/^(المخزن|مخزن|تحويل|تحديث الأصناف|تغيير الحالة|سبب التوقف|التحصيل|الحسابات)/.test(text)))notice(o,text);
 }
