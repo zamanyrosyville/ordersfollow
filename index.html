@@ -535,13 +535,15 @@ async function ack(oid,mid){
 const mods=o=>(o.log||[]).filter(l=>l.kind==="mod");
 
 /* ---- الصلاحيات (المدير يتحكم فيها) ---- */
-const APP_VER="2026-10-15d";
+const APP_VER="2026-10-16a";
 let secOpen={};
 let accounts=[],announce=null,newsAll=false,selAcct="";
 const seenGet=k=>{try{return localStorage.getItem(k)||""}catch(e){return ""}};
 const seenSet=(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}};
 const curAcct=()=>role==="tele"?(accounts.find(a=>a.name===seenGet("acctn"))||null):null;
-const CHANGES=[{v:APP_VER,ts:Date.parse("2026-10-15T06:00:00Z"),d:"١٥ أكتوبر",items:[
+const CHANGES=[{v:APP_VER,ts:Date.parse("2026-10-16T00:10:00Z"),d:"١٦ أكتوبر",items:[
+ [["owner","wo"],"مخزن أكتوبر: في جدول «إجمالي المتبقي للتجهيز» فيه خانة ✓ قدام كل كود. تعليمها بيحضّر كل المتبقي من الكود ده في كل الطلبات المقبولة (بالترتيب) وبيتسجّل في سجل كل طلب. قسم «اتحضّر» تحت الجدول فيه زرار «تراجع». كروت الطلبات بقت مخفية افتراضيًا ويظهر بس الطلبات الجاهزة للخروج مع زرار «تم الخروج»، وزرار «عرض كروت الطلبات» بيرجّعها (للتحضير الجزئي وبيانات الطلب)."]
+]},{v:"2026-10-15d",ts:Date.parse("2026-10-15T06:00:00Z"),d:"١٥ أكتوبر",items:[
  [["owner","log","wo"],"مخزن أكتوبر: الأوردرات الجديدة اللي مروان بيحوّل فيها أصناف لأكتوبر مبتظهرش في شاشة أكتوبر لحد ما مسؤول أكتوبر يدوس «قبول أوردرات جديدة». قبل القبول بيشوف أرقامها بس. مروان بيشوف جنب كل طلب «بانتظار قبول المخزن» وبعد القبول بيتسجّل في السجل مين قبل وإمتى. الأوردرات القديمة (قبل التحديث) متقبولة تلقائيًا."]],
 },{v:"2026-10-15c",ts:Date.parse("2026-10-15T00:30:00Z"),d:"١٥ أكتوبر",items:[
  [["owner","tele","log","acc","wm","wo","wa"],"الإشعارات بقت ملخّص قصير من غير أسماء أصناف (مثلًا «تحويل أصناف للمخازن: أكتوبر ٣ أصناف» و«تحضير – ٢ صنف»). التفاصيل الكاملة لسه موجودة في سجل الطلب. وإشعارات المخازن (مشعل وأكتوبر وأبو صير) أقصر: «تعديل على الطلب – راجع التفاصيل» و«تعديل بيانات الشحن» من غير عنوان ولا أسماء."]],
@@ -1599,6 +1601,38 @@ function woCode(code){
   if(p)return {base:p.base,suf:p.suf,g:p.pack?p.pack.g:0,P:false};
   return null;
 }
+/* تحضير من الجدول المدموج (أكتوبر): خانة ✓ لكل كود، بتحضّر كل المتبقي منه في كل الطلبات المقبولة وغير المشحونة. */
+const woBase=i=>{const k=woCode(i.code);return k?k.base:((i.code||"").trim()||i.name)};
+const woTk=wid=>wid==="wo"&&(role==="wo"||owner);
+let woCards=false;try{woCards=localStorage.getItem("woCards")==="1"}catch(e){}
+function woCardsToggle(){woCards=!woCards;try{localStorage.setItem("woCards",woCards?"1":"0")}catch(e){}render()}
+const woBar=()=>woTk("wo")?`<div class="card"><div class="row"><div class="mut">${woCards?"كروت الطلبات ظاهرة.":"كروت الطلبات مخفية: التحضير من الجدول، والطلبات الجاهزة للخروج بتظهر تحت."}</div><button class="b s x" onclick="woCardsToggle()">${woCards?"إخفاء الكروت":"📋 عرض كروت الطلبات"}</button></div></div>`:"";
+const woEnc=b=>encodeURIComponent(b).replace(/'/g,"%27");
+function woTargets(base){
+  const L=[];
+  orders.filter(o=>!["delivered","cancelled"].includes(o.stage)&&!((o.ship||{}).wo||{}).done&&!woPend(o)).sort(byPrio).forEach(o=>mineItems(o,"wo").forEach(z=>{if(woBase(z.i)===base)L.push({o,x:z.x,i:z.i})}));
+  return L;
+}
+async function woTick(enc,on){
+  if(!needName()||!woTk("wo"))return;
+  const base=decodeURIComponent(enc),qn=t=>+t.i.qty||0,pk=t=>+t.i.picked||0;
+  const T=woTargets(base).filter(t=>on?pk(t)<qn(t):(qn(t)>0&&pk(t)>=qn(t)));
+  if(!T.length)return render();
+  const by={};T.forEach(t=>(by[t.o.id]=by[t.o.id]||{o:t.o,L:[]}).L.push(t));
+  let ready=false;
+  for(const g of Object.values(by)){
+    const L=g.L;L.forEach(t=>{delete pendPick[g.o.id+"-"+t.x];delete pendReason[g.o.id+"-"+t.x]});
+    if(on&&mineItems(g.o,"wo").every(z=>L.some(t=>t.x===z.x)||(+z.i.qty>0&&+z.i.picked>=+z.i.qty)))ready=true;
+    await upd(g.o.id,o=>{L.forEach(t=>{const it=o.items[t.x];it.picked=on?(+it.qty||0):0;if(on)it.reason=""});recalc(o)},"مخزن أكتوبر: "+(on?"تحضير كامل":"إلغاء التحضير")+" (من جدول الإجمالي) – "+L.map(t=>t.i.name+" ("+(on?t.i.qty:0)+"/"+t.i.qty+")").join("، "));
+  }
+  if(ready)readyAlert("wo");
+}
+function woMini(o,wid){
+  const mi=mineItems(o,wid);
+  if(!mi.length||!mi.every(z=>+z.i.qty>0&&+z.i.picked>=+z.i.qty))return "";
+  return `<div class="card" style="${can("cdue",wid)?lateStyleWh(o,wid):""}"><div class="row"><div><b>${cT(o,wid)}</b>${isTr(o)?` <span class="tag" style="background:#3d6f8e">أمر نقل داخلي</span>`:""}</div><div class="x">${prioTag(o,wid)}${tag(o.stage)}</div></div>${can("cdue",wid)?dueBadgeWh(o,wid):""}${readyBox(o,wid)}${o.noShip?'<div class="hold" style="margin-top:6px">⛔ الشحن متوقف حالياً. كلّم مروان.</div>':""}
+  <div class="row" style="margin-top:8px"><input class="wi" id="ws-${o.id}" placeholder="رقم الشحنة (اختياري)"><select class="wi" id="wd-${o.id}"><option value="">— اسم السائق —</option>${fleet.drivers.map(d=>`<option>${esc(d)}</option>`).join("")}</select><select class="wi" id="wc-${o.id}"><option value="">— اسم السيارة —</option>${fleet.cars.map(d=>`<option>${esc(d)}</option>`).join("")}</select><button class="b x" onclick="whShip('${o.id}','${wid}')">تم الخروج</button></div></div>`;
+}
 function woMerged(wid){
   const R={},extra=new Set();
   orders.filter(o=>!["delivered","cancelled"].includes(o.stage)&&!((o.ship||{})[wid]||{}).done).forEach(o=>mineItems(o,wid).forEach(z=>{
@@ -1610,13 +1644,16 @@ function woMerged(wid){
     const packs=gram&&k.g?rem/k.g:rem;
     G.cell[k.suf]=(G.cell[k.suf]||0)+packs;
     if(k.g)G.g+=gram?rem:rem*k.g;else G.unk=true}));
-  const L=Object.values(R);if(!L.length)return "";
+  const L=Object.values(R),tk=woTk(wid),D={};
+  if(tk)orders.filter(o=>!["delivered","cancelled"].includes(o.stage)&&!((o.ship||{})[wid]||{}).done&&!woPend(o)).forEach(o=>mineItems(o,wid).forEach(z=>{if(+z.i.qty>0&&+z.i.picked>=+z.i.qty){const b=woBase(z.i);(D[b]=D[b]||{base:b,name:z.i.name,n:0}).n++}}));
+  const DL=Object.values(D),doneBox=DL.length?`<details style="margin-top:8px"><summary><b>✅ اتحضّر (${DL.length} كود)</b> <span class="mut">– دوس «تراجع» لو علّمت بالغلط</span></summary>${DL.map(d=>`<div class="row" style="margin-top:4px"><span><b class="craw">${esc(d.base)}</b> <span class="mut">${esc(d.name)} · ${d.n} بند</span></span><button class="b s x" onclick="woTick('${woEnc(d.base)}',false)">↩ تراجع</button></div>`).join("")}</details>`:"";
+  if(!L.length)return tk&&DL.length?`<div class="card"><b>إجمالي المتبقي للتجهيز في ${WHN[wid]}</b><div class="mut">كل المطلوب اتحضّر ✅</div>${doneBox}</div>`:"";
   const cols=[...WCOLS,...[...extra].sort((a,b)=>a-b)],n3=v=>String(Math.round(v*1000)/1000),kg=g=>(Math.round(g)/1000).toFixed(3)+" كجم";
   const tc={},tot=L.reduce((t,G)=>t+G.g,0);let ot={};
   L.forEach(G=>{cols.forEach(c=>tc[c]=(tc[c]||0)+(G.cell[c]||0));Object.entries(G.oth).forEach(([u,q])=>ot[u]=(ot[u]||0)+q)});
   const othTxt=o=>Object.entries(o).map(([u,q])=>n3(q)+(u?" "+esc(u):"")).join(" + ");
   const hd=cols.map(c=>`<th class="craw">/${esc(c)}${WCOLS.indexOf(c)<0?" ⚠":""}</th>`).join("");
-  return `<details class="card" open><summary><b>إجمالي المتبقي للتجهيز في ${WHN[wid]} (طلبات عملاء + أوامر نقل، بيتحدّث لوحده)</b></summary><div class="tw"><table><tr><th>كود الصنف</th>${hd}<th>أخرى</th><th>إجمالي الزيوت بالكيلو</th></tr>${L.map(G=>`<tr><td><b class="craw">${esc(G.base)}</b><div class="mut">${esc(G.name)}</div></td>${cols.map(c=>`<td>${G.cell[c]?"<b>"+n3(G.cell[c])+"</b>":'<span class="mut">·</span>'}</td>`).join("")}<td>${othTxt(G.oth)||'<span class="mut">·</span>'}</td><td><b>${G.g?kg(G.g):"—"}</b>${G.unk?'<div class="hold">⚠ فيه عبوة وزنها غير معروف</div>':""}</td></tr>`).join("")}<tr style="font-weight:700;background:rgba(0,0,0,.05)"><td>الإجمالي</td>${cols.map(c=>`<td>${tc[c]?n3(tc[c]):"·"}</td>`).join("")}<td>${othTxt(ot)||"·"}</td><td>${kg(tot)}</td></tr></table></div><div class="mut">الأرقام = عدد العبوات المتبقية بعد التحضير. الطلبات اللي خرجت من عندك أو اتلغت مش محسوبة. الإجمالي بالكيلو بيتحسب من وزن كل عبوة (مش من عدد العبوات).</div></details>`;
+  return `<details class="card" open><summary><b>إجمالي المتبقي للتجهيز في ${WHN[wid]} (طلبات عملاء + أوامر نقل، بيتحدّث لوحده)</b></summary><div class="tw"><table><tr>${tk?"<th>✓ حضّرت</th>":""}<th>كود الصنف</th>${hd}<th>أخرى</th><th>إجمالي الزيوت بالكيلو</th></tr>${L.map(G=>`<tr>${tk?`<td><input type="checkbox" title="حضّرت كل المتبقي من الكود ده" aria-label="حضّرت" onchange="woTick('${woEnc(G.base)}',this.checked)" style="width:26px;height:26px;padding:0"></td>`:""}<td><b class="craw">${esc(G.base)}</b><div class="mut">${esc(G.name)}</div></td>${cols.map(c=>`<td>${G.cell[c]?"<b>"+n3(G.cell[c])+"</b>":'<span class="mut">·</span>'}</td>`).join("")}<td>${othTxt(G.oth)||'<span class="mut">·</span>'}</td><td><b>${G.g?kg(G.g):"—"}</b>${G.unk?'<div class="hold">⚠ فيه عبوة وزنها غير معروف</div>':""}</td></tr>`).join("")}<tr style="font-weight:700;background:rgba(0,0,0,.05)">${tk?"<td></td>":""}<td>الإجمالي</td>${cols.map(c=>`<td>${tc[c]?n3(tc[c]):"·"}</td>`).join("")}<td>${othTxt(ot)||"·"}</td><td>${kg(tot)}</td></tr></table></div><div class="mut">الأرقام = عدد العبوات المتبقية بعد التحضير.${tk?" علامة ✓ = حضّرت كل المتبقي من الكود في كل الطلبات (للتحضير الجزئي: «عرض كروت الطلبات»).":""} الطلبات اللي خرجت من عندك أو اتلغت مش محسوبة. الإجمالي بالكيلو بيتحسب من وزن كل عبوة (مش من عدد العبوات).</div>${doneBox}</details>`;
 }
 const PACKLEGEND=`<details class="card"><summary>دليل أكواد العبوات (الكود الأساسي / رقم العبوة)</summary><div class="mut" style="margin-top:6px">/1 = عبوة كيلو · /2 = عبوة نص كيلو · /4 = عبوة ربع كيلو · /100 = عبوة 100 جرام · /50 = عبوة 50 جرام · /5 = عبوة 5 كيلو · /P1 = 1 كيلو · /P5 = 5 كيلو · /25 = برميل 25 كيلو. الكمية المكتوبة = عدد العبوات.</div></details>`;
 /* اكتمال مكونات طلب العميل عند مشعل (أكتوبر + أبو صير) */
@@ -1676,7 +1713,7 @@ function feedTbl(o){
 function woAckCard(wid){
   if(wid!=="wo"||(role!=="wo"&&!owner))return "";
   const ps=orders.filter(o=>woPend(o)&&(o.items||[]).some(i=>i.wh==="wo")).sort((a,b)=>((a.sentAt||{}).wo||0)-((b.sentAt||{}).wo||0));
-  return `<div class="card" style="border:2px solid ${ps.length?"#8a4fd6":"var(--bd)"}"><div class="row"><div><b>📥 أوردرات جديدة</b> <span class="mut">${ps.length?"مستنية قبولك: "+ps.length+" ("+ps.slice(0,12).map(o=>"#"+esc(dnum(o,"wo"))).join("، ")+(ps.length>12?" …":"")+")":"مفيش أوردرات جديدة مستنية"}</span></div>
+  return woBar()+`<div class="card" style="border:2px solid ${ps.length?"#8a4fd6":"var(--bd)"}"><div class="row"><div><b>📥 أوردرات جديدة</b> <span class="mut">${ps.length?"مستنية قبولك: "+ps.length+" ("+ps.slice(0,12).map(o=>"#"+esc(dnum(o,"wo"))).join("، ")+(ps.length>12?" …":"")+")":"مفيش أوردرات جديدة مستنية"}</span></div>
   <button class="b ${ps.length?"ok":"s"}" ${ps.length?"":"disabled"} onclick="woAccept()">قبول أوردرات جديدة${ps.length?" ("+ps.length+")":""}</button></div></div>`;
 }
 async function woAccept(){
@@ -1700,6 +1737,7 @@ function whView(wid){
   const hdrStd=`<tr><th>الكود</th><th>اسم الصنف</th><th>الوحدة</th><th>المطلوب</th><th>المتحضّر (علّم ✓ لو كامل، أو اكتب الكمية)</th><th>سبب النقص</th></tr>`;
   const hdrPack=`<tr><th>الكود</th><th>اسم الصنف</th><th>الوحدة</th><th>الكمية المطلوبة (عبوات)</th><th>وزن المطلوب</th><th>المتحضّر (علّم ✓ لو كامل، أو اكتب عدد العبوات)</th><th>سبب النقص</th></tr>`;
   return head+woAckCard(wid)+top+stockCard(wid)+searchBar()+act.map(o=>{
+    if(woTk(wid)&&!woCards)return woMini(o,wid);
     const mi=mineItems(o,wid),lm=mods(o).slice(-1)[0],sh=(o.ship||{})[wid]||{},done=!!sh.done,rd=mi.filter(z=>itemSt(z.i).c==="ok").length;
     const sp=isPk(wid)?woSplit(mi):{groups:[],other:mi};
     const groups=sp.groups.map(G=>{
