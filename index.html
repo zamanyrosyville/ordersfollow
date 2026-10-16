@@ -535,14 +535,14 @@ async function ack(oid,mid){
 const mods=o=>(o.log||[]).filter(l=>l.kind==="mod");
 
 /* ---- الصلاحيات (المدير يتحكم فيها) ---- */
-const APP_VER="2026-10-16c";
+const APP_VER="2026-10-16d";
 let secOpen={};
 let accounts=[],announce=null,newsAll=false,selAcct="";
 const seenGet=k=>{try{return localStorage.getItem(k)||""}catch(e){return ""}};
 const seenSet=(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}};
 const curAcct=()=>role==="tele"?(accounts.find(a=>a.name===seenGet("acctn"))||null):null;
 const CHANGES=[{v:APP_VER,ts:Date.parse("2026-10-16T00:10:00Z"),d:"١٦ أكتوبر",items:[
- [["owner","wo"],"مخزن أكتوبر: في جدول «إجمالي المتبقي للتجهيز» فيه خانة ✓ قدام كل كود. تعليمها بيحضّر كل المتبقي من الكود ده في كل الطلبات المقبولة (بالترتيب) وبيتسجّل في سجل كل طلب. قسم «اتحضّر» تحت الجدول فيه زرار «تراجع». كروت الطلبات بقت مخفية افتراضيًا، وتحت الجدول مباشرة قسم «🚚 جاهزة للخروج» فيه لكل طلب رقم الشحنة والسائق والسيارة وزرار «تم الخروج» (وتقدر تعلّم أكتر من طلب وتختار السائق والسيارة مرة واحدة وتدوس «خروج المحدد»)، وزرار «عرض كروت الطلبات» بيرجّعها (للتحضير الجزئي وبيانات الطلب)."]
+ [["owner","wo"],"مخزن أكتوبر: في جدول «إجمالي المتبقي للتجهيز» فيه خانة ✓ قدام كل كود. تعليمها بيحضّر كل المتبقي من الكود ده في كل الطلبات المقبولة (بالترتيب) وبيتسجّل في سجل كل طلب. قسم «اتحضّر» تحت الجدول فيه زرار «تراجع». كروت الطلبات بقت مخفية افتراضيًا، وتحت الجدول مباشرة قسم «🚚 جاهزة للخروج» فيه لكل طلب رقم الشحنة والسائق والسيارة وزرار «تم الخروج» (وتقدر تعلّم أكتر من طلب وتختار السائق والسيارة مرة واحدة وتدوس «خروج المحدد»)، وزرار «عرض كروت الطلبات» بيرجّعها. كروت أكتوبر بقت ملخّص بس (رقم الطلب والتأخير والأولوية وحالة التحضير: كامل/جزئي/لسه) من غير فتح ولا طي ولا تفاصيل الأصناف أو بيانات الشحن."]
 ]},{v:"2026-10-15d",ts:Date.parse("2026-10-15T06:00:00Z"),d:"١٥ أكتوبر",items:[
  [["owner","log","wo"],"مخزن أكتوبر: الأوردرات الجديدة اللي مروان بيحوّل فيها أصناف لأكتوبر مبتظهرش في شاشة أكتوبر لحد ما مسؤول أكتوبر يدوس «قبول أوردرات جديدة». قبل القبول بيشوف أرقامها بس. مروان بيشوف جنب كل طلب «بانتظار قبول المخزن» وبعد القبول بيتسجّل في السجل مين قبل وإمتى. الأوردرات القديمة (قبل التحديث) متقبولة تلقائيًا."]],
 },{v:"2026-10-15c",ts:Date.parse("2026-10-15T00:30:00Z"),d:"١٥ أكتوبر",items:[
@@ -1627,6 +1627,14 @@ async function woTick(enc,on){
   }
   if(ready)readyAlert("wo");
 }
+/* مسؤول أكتوبر (مش المدير): كارت الطلب ملخّص بس، من غير فتح/طي ومن غير تفاصيل الأصناف أو بيانات الشحن أو التعديلات */
+const woSum=wid=>wid==="wo"&&role==="wo"&&!owner;
+function woSumCard(o,wid){
+  const mi=mineItems(o,wid),rd=mi.filter(z=>+z.i.qty>0&&+z.i.picked>=+z.i.qty).length,pr=prepOf(o,wid),ready=mi.length>0&&rd===mi.length;
+  const pt=pr==="full"?"✅ متحضّر بالكامل":pr==="part"?"🟡 متحضّر جزئيًا ("+rd+" من "+mi.length+" بند جاهز)":"⚪ لسه ما اتحضّرش ("+mi.length+" بند)";
+  return `<div class="card" style="${can("cdue",wid)?lateStyleWh(o,wid):""}"><div class="row"><div>${woChk(o,wid)}<b>${cT(o,wid)}</b>${isTr(o)?` <span class="tag" style="background:#3d6f8e">أمر نقل داخلي</span>`:""}<div class="mut">${metaLine(o,wid)}</div>${onyxBox(o,wid)}${linkBox(o,wid)}</div><div class="x">${prioTag(o,wid)}${tag(o.stage)}</div></div>${can("cdue",wid)?dueBadgeWh(o,wid):""}<div style="margin-top:6px"><b>${pt}</b></div>${readyBox(o,wid)}${o.noShip?'<div class="hold" style="margin-top:6px">⛔ الشحن متوقف حالياً. كلّم مروان.</div>':""}
+  ${ready&&!o.noShip?`<div class="row" style="margin-top:8px"><input class="wi" id="ws-${o.id}" placeholder="رقم الشحنة (اختياري)">${woFleetSel(o.id)}<button class="b x" onclick="whShip('${o.id}','${wid}')">تم الخروج</button></div>`:""}</div>`;
+}
 function woReadyList(wid){
   return orders.filter(o=>!["delivered","cancelled"].includes(o.stage)&&!((o.ship||{})[wid]||{}).done&&match(o)).sort(byPrio).filter(o=>{const mi=mineItems(o,wid);return mi.length&&mi.every(z=>+z.i.qty>0&&+z.i.picked>=+z.i.qty)});
 }
@@ -1751,7 +1759,7 @@ function whView(wid){
   const isArch=o=>!!((o.ship||{})[wid]||{}).done;
   const act=rel.filter(o=>o.stage!=="delivered"&&!isArch(o)).sort(byPrio),arch=rel.filter(isArch).sort((a,b)=>(b.ship[wid].t||0)-(a.ship[wid].t||0));
   const pendOut=act.filter(o=>readyNotOut(o,wid));
-  const head=`<div class="card"><b>${WHN[wid]}</b> <span class="mut">– طلبات فيها أصناف عليك: ${act.length}</span> <button class="b s x" onclick="foldAll([${act.map(o=>"'"+o.id+"'").join(",")}],true)">▾ طي الكل</button><button class="b s x" onclick="foldAll([${act.map(o=>"'"+o.id+"'").join(",")}],false)">◂ فتح الكل</button>${can("cprint",wid)?`<div class="row" style="margin-top:8px"><button class="b s x" onclick="printWh('${wid}','need')">🖨 طباعة المطلوب تجهيزه</button><button class="b s x" onclick="printWh('${wid}','done')">🖨 طباعة المجهّز</button></div>`:""}</div>`+(isPk(wid)?woMerged(wid)+woReady(wid)+PACKLEGEND:whTotals(wid));
+  const head=`<div class="card"><b>${WHN[wid]}</b> <span class="mut">– طلبات فيها أصناف عليك: ${act.length}</span> ${woSum(wid)?"":`<button class="b s x" onclick="foldAll([${act.map(o=>"'"+o.id+"'").join(",")}],true)">▾ طي الكل</button><button class="b s x" onclick="foldAll([${act.map(o=>"'"+o.id+"'").join(",")}],false)">◂ فتح الكل</button>`}${can("cprint",wid)?`<div class="row" style="margin-top:8px"><button class="b s x" onclick="printWh('${wid}','need')">🖨 طباعة المطلوب تجهيزه</button><button class="b s x" onclick="printWh('${wid}','done')">🖨 طباعة المجهّز</button></div>`:""}</div>`+(isPk(wid)?woMerged(wid)+woReady(wid)+PACKLEGEND:whTotals(wid));
   const toDo=act.filter(o=>mineItems(o,wid).length&&prepOf(o,wid)!=="full"),lateN=toDo.filter(o=>{const d=dueInfoWh(o,wid);return d&&d.late}).length;
   const statusCard=`<div class="card" style="border:2px solid ${lateN?"#d63b3b":"var(--bd)"}"><b>📊 موقف ${WHN[wid]} دلوقتي</b><div class="row" style="margin-top:6px"><span class="tag" style="background:#6f6459">غير محضّرة: ${toDo.length} طلب</span><span class="tag" style="background:${lateN?"#d63b3b":"#2f7d5b"}">متأخرة: ${lateN}</span><span class="tag" style="background:${pendOut.length?"#c97a1a":"#2f7d5b"}">محضّرة ولسه ما خرجتش: ${pendOut.length}</span></div></div>`;
   const top=statusCard+(pendOut.length?`<div class="card" style="border:2px solid #d63b3b;background:rgba(214,59,59,.10)"><b>⏰ محضّرة ولسه ما خرجتش (${pendOut.length}):</b> ${pendOut.map(o=>"<b>#"+esc(o.num)+"</b>").join("، ")}<div class="mut">دوس زرار الخروج على كل طلب منهم عشان يتسجّل.</div></div>`:"");
@@ -1761,6 +1769,7 @@ function whView(wid){
   const hdrPack=`<tr><th>الكود</th><th>اسم الصنف</th><th>الوحدة</th><th>الكمية المطلوبة (عبوات)</th><th>وزن المطلوب</th><th>المتحضّر (علّم ✓ لو كامل، أو اكتب عدد العبوات)</th><th>سبب النقص</th></tr>`;
   return head+woAckCard(wid)+top+stockCard(wid)+searchBar()+act.map(o=>{
     if(woTk(wid)&&!woCards)return "";
+    if(woSum(wid))return woSumCard(o,wid);
     const mi=mineItems(o,wid),lm=mods(o).slice(-1)[0],sh=(o.ship||{})[wid]||{},done=!!sh.done,rd=mi.filter(z=>itemSt(z.i).c==="ok").length;
     const sp=isPk(wid)?woSplit(mi):{groups:[],other:mi};
     const groups=sp.groups.map(G=>{
