@@ -644,6 +644,7 @@ initWeeklyReport();
 (function(){const errs=[];window.addEventListener('error',e=>{errs.push((e.message||'')+(e.filename?' @'+e.filename.split('/').pop():'')+':'+e.lineno);upd()});window.addEventListener('unhandledrejection',e=>{errs.push('promise: '+(e.reason&&e.reason.message||e.reason));upd()});
 function upd(){const d=document.getElementById('diagLine');if(!d)return;d.textContent='v1017b | firebase:'+(window.firebase?'ok':'NO')+' | auth:'+(auth?'ok':'NO')+(window._fbErr?' | '+window._fbErr:'')+(errs.length?' | ERR '+errs.slice(0,2).join(' ; '):'')}
 setInterval(upd,1000);upd()})();
+(function(){try{if('serviceWorker' in navigator){navigator.serviceWorker.getRegistrations().then(rs=>{if(rs.length){Promise.all(rs.map(r=>r.unregister())).then(()=>{if(window.caches)caches.keys().then(k=>Promise.all(k.map(x=>caches.delete(x)))).then(()=>{if(!sessionStorage.getItem('sw-cleared')){sessionStorage.setItem('sw-cleared','1');location.reload()}})})}})}}catch(e){}})();
 </script>
 <script>/* طبقة واجهة ERP: لوحة التحكم، الطلبيات كجدول، البحث، التنبيهات، التحديث */
 (function(){
