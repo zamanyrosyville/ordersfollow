@@ -256,6 +256,10 @@ nav button{font-size:var(--fs);font-weight:500}
 
 /* التقارير على الشاشات العريضة: فلاتر في أعمدة وعرض كامل للجداول */
 @media(min-width:700px){.repf{grid-template-columns:repeat(3,1fr)}}
+.drbox{padding:10px}.drg{display:flex;flex-wrap:wrap;align-items:center;gap:4px;margin-top:6px}.drl{font-weight:700;font-size:13px;min-width:64px}
+.drcb{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--bd);border-radius:14px;padding:3px 10px;font-size:13px;cursor:pointer;white-space:nowrap}
+.drcb.on{background:rgba(47,125,91,.16);border-color:#2f7d5b;font-weight:700}
+.drcb input{width:16px;height:16px;margin:0;padding:0;accent-color:#2f7d5b}.drsep{width:1px;height:18px;background:var(--bd);margin:0 4px}.drsum{margin-top:8px;font-size:13px}
 @media(min-width:1100px){.repf{grid-template-columns:repeat(4,1fr)}}
 @media(min-width:900px){body[data-v=rep] main>*{max-width:none}}
 @media(min-width:900px) and (max-width:1199px){:root{--sb:196px}}
@@ -535,14 +539,14 @@ async function ack(oid,mid){
 const mods=o=>(o.log||[]).filter(l=>l.kind==="mod");
 
 /* ---- الصلاحيات (المدير يتحكم فيها) ---- */
-const APP_VER="2026-10-18a";
+const APP_VER="2026-10-18b";
 let secOpen={};
 let accounts=[],announce=null,newsAll=false,selAcct="";
 const seenGet=k=>{try{return localStorage.getItem(k)||""}catch(e){return ""}};
 const seenSet=(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}};
 const curAcct=()=>role==="tele"?(accounts.find(a=>a.name===seenGet("acctn"))||null):null;
 const CHANGES=[{v:APP_VER,ts:Date.parse("2026-10-18T14:00:00Z"),d:"١٨ أكتوبر",items:[
- [["owner","log","wm","wo","wa","acc","rd"],"شاشة التقارير: قسم جديد «📈 تقارير الأصناف ومدد التأخير» بمربعات اختيار (من غير قوايم): عدد الطلبات والأصناف، المتأخر منها ونسبته، ومتوسط وأقصى وإجمالي مدة التأخير، حسب المخزن أو البنت أو الصنف أو الشهر أو الأسبوع أو شريحة مدة التأخير. التأخير بيتحسب من موعد التحضير لحد ما التحضير يخلص."],
+ [["owner"],"شاشة الإدارة: قسم جديد «📈 تقارير الأصناف ومدد التأخير» بمربعات اختيار صغيرة (من غير قوايم): عدد الطلبات والأصناف، المتأخر منها ونسبته، ومتوسط وأقصى وإجمالي مدة التأخير، حسب المخزن أو البنت أو الصنف أو الشهر أو الأسبوع أو شريحة مدة التأخير. التأخير بيتحسب من موعد التحضير لحد ما التحضير يخلص."],
 ]},{v:"2026-10-17b",ts:Date.parse("2026-10-17T15:00:00Z"),d:"١٧ أكتوبر",items:[
  [["owner","log"],"أول ما تكتب أو تلصق كود في خانة الأصناف (طلب جديد أو تعديل الأصناف) بيظهر تحتها رصيد الكود: لو بسلاش يظهر رصيد السلاش ورصيد الكود الأصلي بدون سلاش، لكل مخزن."],
  [["owner","log"],"أرصدة المخازن: زرار جديد «رفع شيت الأرصدة المجمّع» — شيت واحد فيه عمود للكود وعمود لكل مخزن (مشعل / أكتوبر / أبو صير). التطبيق بيتعرّف على الأعمدة من العناوين، بيعرض معاينة، وبعد الاعتماد بيحدّث أرصدة المخازن كلها مرة واحدة. الخانة الفاضية = الصنف مش موجود في المخزن ده، والصفر = موجود ورصيده صفر. الرفع لكل مخزن لوحده لسه شغال."]
@@ -2112,20 +2116,20 @@ function drTables(U){
   return R.join("");
 }
 function drView(){
-  const U=drUnits(),lim=!owner&&WHROLES.includes(role)?role:"",cb=(on,fn,t)=>`<label class="drcb"><input type="checkbox" ${on?"checked":""} onchange="${fn}" style="width:22px;height:22px;padding:0;margin-left:6px;vertical-align:middle">${t}</label>`;
+  const U=drUnits(),lim=!owner&&WHROLES.includes(role)?role:"";
+  const cb=(on,fn,t)=>`<label class="drcb ${on?"on":""}"><input type="checkbox" ${on?"checked":""} onchange="${fn}">${t}</label>`;
+  const grp=(t,h)=>`<div class="drg"><span class="drl">${t}</span>${h}</div>`;
   const late=U.filter(u=>u.late),est=U.filter(u=>u.est).length;
-  const sum=`<div style="margin-top:8px">تحضيرات محسوبة: <b>${U.length}</b> · متأخر: <b style="color:#b8412f">${late.length}</b> (${drPct(late.length,U.length)}) · أصناف في التحضيرات دي: <b>${U.reduce((t,u)=>t+u.items.length,0)}</b>, المتأخر منها <b>${late.reduce((t,u)=>t+u.items.length,0)}</b>${late.length?` · متوسط التأخير <b>${esc(fmtDur(late.reduce((t,u)=>t+u.delay,0)/late.length))}</b>`:""}</div>${est?`<div class="mut">${est} تحضير قديم وقت انتهائه تقديري من سجل الطلب. التحضيرات الجديدة وقتها بيتسجّل بدقة.</div>`:""}${U.unk?`<div class="mut">${U.unk} تحضير خلص قبل التحديث ومفيش له وقت مسجّل، فاتشال من الحساب.</div>`:""}`;
-  return `<div class="card"><b>📈 تقارير الأصناف ومدد التأخير</b><div class="mut">علّم اللي عايزه والجداول بتتحدّث فوراً. التأخير بيتحسب من موعد التحضير المحدد للمخزن (مهلته من الإعدادات) لحد ما تحضير المخزن يخلص، ولو لسه ما خلصش بيتحسب لحد دلوقتي.</div>
-  <div style="margin-top:8px"><b>اعرض حسب:</b> ${DRDIM.filter(([k])=>k!=="girl"||can("cgirl")).map(([k,t])=>cb(dr.dims[k],`drTog('dims','${k}',this.checked)`,t)).join("")}</div>
-  <div style="margin-top:6px"><b>المخازن:</b> ${Object.entries(WHN).filter(([w])=>!lim||w===lim).map(([w,n])=>cb(dr.whs[w],`drTog('whs','${w}',this.checked)`,n)).join("")}</div>
-  <div style="margin-top:6px"><b>النوع:</b> ${cb(dr.ty.c,"drTog('ty','c',this.checked)","طلبات العملاء")}${cb(dr.ty.t,"drTog('ty','t',this.checked)","أوامر النقل")} <b style="margin-right:10px">الحالة:</b> ${cb(dr.st.done,"drTog('st','done',this.checked)","اتحضّر")}${cb(dr.st.open,"drTog('st','open',this.checked)","لسه ما اتحضّرش")}</div>
-  <div style="margin-top:6px"><b>الفترة:</b> ${DRPER.map(([k,t])=>cb(dr.per===k,`drPer('${k}',this.checked)`,t)).join("")}</div>
-  ${sum}<div class="row" style="margin-top:8px"><button class="b x" onclick="drPrint()">🖨 طباعة</button></div></div>${U.length?drTables(U):'<div class="card"><div class="empty">مفيش بيانات بالاختيارات دي</div></div>'}`;
+  const sum=`<div class="drsum">تحضيرات: <b>${U.length}</b> · متأخر: <b style="color:#b8412f">${late.length}</b> (${drPct(late.length,U.length)}) · أصناف: <b>${U.reduce((t,u)=>t+u.items.length,0)}</b>، المتأخر منها <b>${late.reduce((t,u)=>t+u.items.length,0)}</b>${late.length?` · متوسط التأخير <b>${esc(fmtDur(late.reduce((t,u)=>t+u.delay,0)/late.length))}</b>`:""}</div>${est?`<div class="mut">${est} تحضير قديم وقته تقديري من السجل.</div>`:""}${U.unk?`<div class="mut">${U.unk} تحضير قديم مفيش له وقت مسجّل فاتشال من الحساب.</div>`:""}`;
+  return `<div class="card drbox"><div class="mut">التأخير = من موعد التحضير المحدد للمخزن لحد ما تحضيره يخلص (أو لحد دلوقتي لو لسه).</div>
+  ${grp("اعرض حسب",DRDIM.filter(([k])=>k!=="girl"||can("cgirl")).map(([k,t])=>cb(dr.dims[k],`drTog('dims','${k}',this.checked)`,t)).join(""))}
+  ${grp("الفلتر",Object.entries(WHN).filter(([w])=>!lim||w===lim).map(([w,n])=>cb(dr.whs[w],`drTog('whs','${w}',this.checked)`,n.replace("مخزن ",""))).join("")+'<span class="drsep"></span>'+cb(dr.ty.c,"drTog('ty','c',this.checked)","طلبات عملاء")+cb(dr.ty.t,"drTog('ty','t',this.checked)","أوامر نقل")+'<span class="drsep"></span>'+cb(dr.st.done,"drTog('st','done',this.checked)","اتحضّر")+cb(dr.st.open,"drTog('st','open',this.checked)","لسه"))}
+  ${grp("الفترة",DRPER.map(([k,t])=>cb(dr.per===k,`drPer('${k}',this.checked)`,t)).join("")+'<button class="b x s" style="margin-right:auto" onclick="drPrint()">🖨 طباعة</button>')}
+  ${sum}</div>${U.length?drTables(U):'<div class="card"><div class="empty">مفيش بيانات بالاختيارات دي</div></div>'}`;
 }
 function drPrint(){doPrint("تقرير الأصناف ومدد التأخير",drTables(drUnits()))}
 
-function repView(){return drView()+repView0()}
-function repView0(){
+function repView(){
   const rows=repRows(),sel=(k,l,opts)=>`<div><label>${l}</label><select onchange="rp.${k}=this.value;render()">${opts.map(([v,t])=>`<option value="${esc(v)}" ${rp[k]===v?"selected":""}>${esc(t)}</option>`).join("")}</select></div>`;
   const girls=[...new Set(orders.map(o=>o.createdBy).filter(Boolean))];
   const ca=can("camt"),tot=rows.filter(noT).reduce((t,o)=>t+(+o.amount||0),0),col=rows.filter(o=>noT(o)&&o.acct).reduce((t,o)=>t+(+o.accAmt||0),0);
@@ -2157,7 +2161,7 @@ function repView0(){
 /* ---- Dashboard ---- */
 const sO=(id,t)=>`<details class="card sec" id="sec-${id}" ${secOpen[id]===false?"":"open"} ontoggle="secOpen['${id}']=this.open"><summary><b>${t}</b></summary><div class="secbody">`;
 const sC="</div></details>";
-const SECS=[["kpi","📊 المؤشرات"],["ord","🧰 إدارة الطلبات"],["dl","⏱ المهل"],["perm","🔐 الصلاحيات"],["not","🔔 الإشعارات"],["bulk","🗂 عمليات جماعية"],["usr","👥 الحسابات والأسماء والوحدات"],["misc","⚙ إعدادات تشغيل"],["girls","🔑 البنات والأرقام السرية"],["rep","📋 التقرير وقايمة الطلبات"]];
+const SECS=[["kpi","📊 المؤشرات"],["dr","📈 تقارير التأخير"],["ord","🧰 إدارة الطلبات"],["dl","⏱ المهل"],["perm","🔐 الصلاحيات"],["not","🔔 الإشعارات"],["bulk","🗂 عمليات جماعية"],["usr","👥 الحسابات والأسماء والوحدات"],["misc","⚙ إعدادات تشغيل"],["girls","🔑 البنات والأرقام السرية"],["rep","📋 التقرير وقايمة الطلبات"]];
 const goSec=id=>{secOpen[id]=true;const e=document.getElementById("sec-"+id);if(e){e.open=true;e.scrollIntoView({behavior:"smooth",block:"start"})}};
 const allSecs=on=>{SECS.forEach(([k])=>secOpen[k]=on);render()};
 const secNav=()=>`<div class="secnav">${SECS.map(([k,t])=>`<button class="b s x" onclick="goSec('${k}')">${t}</button>`).join("")}<button class="b s x" onclick="allSecs(false)">◂ طي الكل</button><button class="b s x" onclick="allSecs(true)">▾ فتح الكل</button></div>`;
@@ -2182,7 +2186,7 @@ function dashView(){
   <div class="card mut">الطلبات الشغالة عند: مخزن مشعل <b style="color:var(--tx);cursor:pointer;text-decoration:underline" onclick="goRep({wh:'wm',ar:'open'})">${wc("wm")}</b> · مخزن أكتوبر <b style="color:var(--tx);cursor:pointer;text-decoration:underline" onclick="goRep({wh:'wo',ar:'open'})">${wc("wo")}</b> · مخزن أبو صير <b style="color:var(--tx);cursor:pointer;text-decoration:underline" onclick="goRep({wh:'wa',ar:'open'})">${wc("wa")}</b> · فيها أصناف لسه مش متوزّعة على مخزن <b style="color:var(--tx);cursor:pointer;text-decoration:underline" onclick="goRep({flag:'unassigned',ar:'open'})">${wc("")}</b></div>
   <div class="card mut">إشارات لم يُؤكَّد الاطلاع عليها: <b style="color:var(--tx)">${orders.reduce((n,o)=>n+pendKeys(o).length,0)}</b>${orders.filter(o=>pendKeys(o).length).map(o=>`<div>#${esc(o.num)}: بانتظار ${pendKeys(o).map(tlabel).join("، ")}</div>`).join("")}</div>
   ${sC}${sO("ord","🧰 إدارة الطلبات")}<div class="card"><b>إدارة الطلبات (للمدير فقط)</b><div class="row" style="margin-top:8px">${wipeAsk?`<span class="hold">متأكد؟ هيتمسح ${orders.length} طلب نهائياً ومينفعش يرجعوا.</span><button class="b x" style="background:var(--bad)" onclick="wipeAll()">نعم، امسح الكل</button><button class="b s x" onclick="wipeAsk=false;render()">إلغاء</button>`:`<button class="b x" style="background:var(--bad)" onclick="wipeAsk=true;render()">🗑 مسح كل الطلبات (${orders.length})</button>`}</div></div>
-  ${sC}${sO("dl","⏱ المهل")}<div class="card"><b>مهلة خروج البضاعة (أقصى مدة للشحن)</b><div class="mut">يوم الجمعة إجازة ومش بيتحسب من المهلة. بتبدأ من أول تأكيد من الحسابات للتحصيل (كامل أو جزئي). تقدر تحدد مدة لكل طريقة شحن، والخانة الفاضية بتاخد المدة العامة.</div>
+  ${sC}${sO("dr","📈 تقارير الأصناف ومدد التأخير")}${drView()}${sC}${sO("dl","⏱ المهل")}<div class="card"><b>مهلة خروج البضاعة (أقصى مدة للشحن)</b><div class="mut">يوم الجمعة إجازة ومش بيتحسب من المهلة. بتبدأ من أول تأكيد من الحسابات للتحصيل (كامل أو جزئي). تقدر تحدد مدة لكل طريقة شحن، والخانة الفاضية بتاخد المدة العامة.</div>
   <div class="row" style="margin-top:8px"><label class="x" style="margin:0">المدة العامة</label><input id="shh" type="number" min="1" value="${shipHours}"><span class="x">ساعة</span></div>
   ${SHIPM.map((m,i)=>`<div class="row" style="margin-top:6px"><label class="x" style="margin:0">${esc(m)}</label><input id="shm-${i}" type="number" min="1" placeholder="زي العامة" value="${shipHoursBy[m]||""}"><span class="x">ساعة</span></div>`).join("")}
   <div class="mut" style="margin-top:12px"><b>مهلة اللوجيستك</b> – بتبدأ من لحظة تسجيل البنت للطلب (مش بتتصفّر لو الطلب اتعدّل) وتنتهي لما اللوجيستك يدخل الأصناف ويوزّعها كلها على المخازن.</div>
