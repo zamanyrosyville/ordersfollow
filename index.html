@@ -14,7 +14,7 @@
 :root[data-theme="dark"]{--bg:#16110e;--card:#211a16;--inp:#2a211c;--tx:#efe6da;--mut:#a89886;--bd:#3a2e27;--pri:#c9a27a;--hd:#0e0a08}
 html{scroll-padding-top:env(safe-area-inset-top,0px)}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--tx);font-family:var(--f);font-size:15px;line-height:1.6}
+body{margin:0;background:var(--bg);color:var(--tx);font-family:var(--f);font-size:var(--fs,15px);line-height:1.6}
 :focus-visible{outline:2px solid var(--acc);outline-offset:2px}
 header{background:var(--hd);color:var(--hdtx);padding:12px 16px 0;position:sticky;top:env(safe-area-inset-top,0px);z-index:5;border-bottom:3px solid var(--acc)}
 .top{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px}
@@ -51,7 +51,7 @@ button.b.ok{background:var(--ok);color:#fff}
 .kpi b{display:block;font-family:var(--fd);font-size:28px;color:var(--pri)}.kpi span{font-size:12px;color:var(--mut)}
 .kpi.on{outline:2px solid var(--acc);border-color:var(--acc)}
 .tw{overflow-x:auto}
-table{width:100%;border-collapse:collapse;font-size:14px}
+table{width:100%;border-collapse:collapse;font-size:calc(var(--fs,15px) - 1px)}
 th,td{padding:9px 8px;text-align:right;border-bottom:1px solid var(--bd);vertical-align:top}
 th{color:var(--mut);font-weight:600;font-size:12px;background:rgba(0,0,0,.025)}
 .mut{color:var(--mut);font-size:12px}
@@ -247,7 +247,7 @@ td{padding:9px 10px}
 .dep{border-radius:var(--rad)}
 nav button{font-size:var(--fs);font-weight:500}
 @media(max-width:899px){
-  body{font-size:14px}
+  body{font-size:var(--fs)}
   button.b{min-height:42px}input,select{min-height:42px;font-size:16px}
   .card{padding:14px 12px}
   th,td{padding:8px 7px}
@@ -273,6 +273,53 @@ nav button{font-size:var(--fs);font-weight:500}
   #printArea.wide th,#printArea.wide td{font-size:10.5px;padding:3px 4px}
 }
 </style>
+<script>
+/* المظهر + التثبيت كتطبيق (PWA). بيتنفّذ بدري عشان ما يبانش وميض ألوان. */
+(function(){
+ var PS={
+  oud:{n:"بني العود",l:{pri:"#5a3a2a",acc:"#b57a2c",hd:"#2a1d17"},d:{pri:"#c9a27a",acc:"#d0953a",hd:"#0e0a08",bg:"#130f0c",card:"#1d1613",inp:"#2a211c",bd:"#33281f"}},
+  green:{n:"أخضر",l:{pri:"#1f5c43",acc:"#2f9a6b",hd:"#12332a",bg:"#e8eeea"},d:{pri:"#6fc29a",acc:"#3fae7c",hd:"#08140f",bg:"#0e1713",card:"#15211b",inp:"#1b2a23",bd:"#25382e"}},
+  blue:{n:"أزرق",l:{pri:"#1f4b8f",acc:"#3b82d6",hd:"#12233f",bg:"#e8ecf2"},d:{pri:"#7fb0f0",acc:"#4a90e2",hd:"#080e1a",bg:"#0d121b",card:"#141b28",inp:"#1a2333",bd:"#243049"}},
+  purple:{n:"بنفسجي",l:{pri:"#5b3a8c",acc:"#9a6ad6",hd:"#261845",bg:"#ece9f2"},d:{pri:"#b79af0",acc:"#9a6ad6",hd:"#0f0a1c",bg:"#120e1a",card:"#1b1527",inp:"#231b32",bd:"#31264a"}},
+  wine:{n:"عنابي",l:{pri:"#8a2a3a",acc:"#d0566a",hd:"#3a1119",bg:"#f1e9ea"},d:{pri:"#e58a9a",acc:"#d0566a",hd:"#17070b",bg:"#180e10",card:"#241518",inp:"#2e1b1f",bd:"#40252b"}},
+  black:{n:"أسود وذهبي",l:{pri:"#2b2b2b",acc:"#c9a24a",hd:"#151515",bg:"#ececec"},d:{pri:"#d9b866",acc:"#c9a24a",hd:"#000000",bg:"#0f0f0f",card:"#1a1a1a",inp:"#222",bd:"#303030"}}
+ };
+ window.UIP=PS;
+ window.uiGet=function(){try{return JSON.parse(localStorage.getItem("zui")||"{}")}catch(e){return {}}};
+ window.uiApply=function(u){
+  u=u||window.uiGet();var r=document.documentElement,mode=u.mode||"auto";
+  if(mode==="auto")r.removeAttribute("data-theme");else r.setAttribute("data-theme",mode);
+  var dark=mode==="dark"||(mode==="auto"&&window.matchMedia&&matchMedia("(prefers-color-scheme:dark)").matches);
+  var p=PS[u.col]||PS.oud,c=dark?p.d:p.l,K=["pri","acc","hd","bg","card","inp","bd"];
+  K.forEach(function(k){if(c[k])r.style.setProperty("--"+k,c[k]);else r.style.removeProperty("--"+k)});
+  if(dark&&c.hd)r.style.setProperty("--sbbg",c.hd);else r.style.removeProperty("--sbbg");
+  r.style.setProperty("--fs",({s:"13px",m:"14px",l:"16.5px"})[u.fs||"m"]);
+  var m=document.querySelector('meta[name="theme-color"]');if(!m){m=document.createElement("meta");m.name="theme-color";document.head.appendChild(m)}m.content=c.hd;
+ };
+ window.uiApply();
+ try{matchMedia("(prefers-color-scheme:dark)").addEventListener("change",function(){window.uiApply()})}catch(e){}
+ /* تثبيت كتطبيق */
+ window._ip=null;
+ window.addEventListener("beforeinstallprompt",function(e){e.preventDefault();window._ip=e;window.uiRefresh&&window.uiRefresh()});
+ window.addEventListener("appinstalled",function(){window._ip=null;window.uiRefresh&&window.uiRefresh()});
+ function icon(sz,pad){
+  try{var c=document.createElement("canvas");c.width=c.height=sz;var x=c.getContext("2d"),p=PS[window.uiGet().col]||PS.oud;
+   x.fillStyle=p.l.hd;if(pad){x.fillRect(0,0,sz,sz)}else{var rd=sz*.22;x.beginPath();x.moveTo(rd,0);x.arcTo(sz,0,sz,sz,rd);x.arcTo(sz,sz,0,sz,rd);x.arcTo(0,sz,0,0,rd);x.arcTo(0,0,sz,0,rd);x.fill()}
+   x.fillStyle=p.l.acc;x.textAlign="center";x.textBaseline="middle";x.font="700 "+Math.round(sz*(pad?.5:.62))+"px 'Reem Kufi','IBM Plex Sans Arabic',Tahoma,Arial,sans-serif";x.fillText("ز",sz/2,sz*.54);
+   return c.toDataURL("image/png")}catch(e){return ""}
+ }
+ try{
+  var i192=icon(192),i512=icon(512),im=icon(512,1),i180=icon(180,1);
+  var base=location.href.split("#")[0].split("?")[0],p0=PS[window.uiGet().col]||PS.oud;
+  var man={name:"متابعة طلبات العملاء – زماني",short_name:"زماني",description:"متابعة طلبات العملاء وأوامر النقل والمخازن",start_url:base,scope:base.replace(/[^\/]*$/,""),id:base,display:"standalone",dir:"rtl",lang:"ar",background_color:p0.l.hd,theme_color:p0.l.hd,
+   icons:[{src:i192,sizes:"192x192",type:"image/png",purpose:"any"},{src:i512,sizes:"512x512",type:"image/png",purpose:"any"},{src:im,sizes:"512x512",type:"image/png",purpose:"maskable"}]};
+  var l=document.createElement("link");l.rel="manifest";l.href=URL.createObjectURL(new Blob([JSON.stringify(man)],{type:"application/manifest+json"}));document.head.appendChild(l);
+  var a=document.createElement("link");a.rel="apple-touch-icon";a.href=i180;document.head.appendChild(a);
+  [["apple-mobile-web-app-capable","yes"],["mobile-web-app-capable","yes"],["apple-mobile-web-app-title","زماني"],["apple-mobile-web-app-status-bar-style","black-translucent"]].forEach(function(z){var m=document.createElement("meta");m.name=z[0];m.content=z[1];document.head.appendChild(m)});
+ }catch(e){}
+ if("serviceWorker" in navigator&&location.protocol.indexOf("http")===0)window.addEventListener("load",function(){navigator.serviceWorker.register("sw.js").catch(function(){})});
+})();
+</script>
 </head>
 <body>
 <div id="msg"></div>
@@ -280,7 +327,7 @@ nav button{font-size:var(--fs);font-weight:500}
 <div id="toast" style="position:fixed;bottom:calc(16px + env(safe-area-inset-bottom,0px));left:12px;right:12px;z-index:20;display:none;background:#b8412f;color:#fff;padding:12px;border-radius:10px;text-align:center"></div>
 <header>
   <div class="top"><h1>زماني <small>متابعة طلبات العملاء</small></h1>
-  <div class="acts"><button class="b s" onclick="newsAll=!newsAll;render()">🆕 الجديد</button><button class="b s" id="refBtn" onclick="location.reload()">🔄 تحديث الصفحة</button><button class="b s" id="chg" style="display:none" onclick="role='';try{localStorage.removeItem('role')}catch(e){};render()">🚪 تسجيل خروج</button><button class="b s" id="ownerBtn" onclick="owner?ownerLogout():ownerLogin()">👑 لوحة المدير</button></div></div>
+  <div class="acts"><button class="b s" onclick="newsAll=!newsAll;render()">🆕 الجديد</button><button class="b s" onclick="uiToggle()" title="المظهر والألوان وتثبيت التطبيق">🎨 المظهر</button><button class="b s" id="refBtn" onclick="location.reload()">🔄 تحديث الصفحة</button><button class="b s" id="chg" style="display:none" onclick="role='';try{localStorage.removeItem('role')}catch(e){};render()">🚪 تسجيل خروج</button><button class="b s" id="ownerBtn" onclick="owner?ownerLogout():ownerLogin()">👑 لوحة المدير</button></div></div>
   <div style="margin-bottom:10px"><select id="who" style="max-width:320px" onchange="who=this.value;try{localStorage.setItem('who_'+role,who)}catch(e){}"></select><div id="whoBox" style="display:none;flex-wrap:wrap;gap:6px;align-items:center"></div></div>
   <nav>
     <button data-v="tele">التيليسيلز</button>
@@ -293,6 +340,7 @@ nav button{font-size:var(--fs);font-weight:500}
     <button data-v="rep">التقارير</button>
   </nav>
 </header>
+<div id="uipanel"></div>
 <div id="topbar"><h2 id="tbTitle"></h2><input id="tbq" type="search" placeholder="🔍 بحث برقم الطلب أو الكود…" oninput="tbSearch(this.value)" aria-label="بحث"><button class="b s tbb" id="tbBell" onclick="tbBell()" title="الإشارات والتنبيهات" aria-label="التنبيهات">🔔<em id="tbN" style="display:none">0</em></button><button class="b s tbb" onclick="tbRefresh()" title="تحديث البيانات" aria-label="تحديث البيانات">⟳</button></div>
 <main id="app"></main>
 <div id="printArea"></div>
@@ -539,13 +587,15 @@ async function ack(oid,mid){
 const mods=o=>(o.log||[]).filter(l=>l.kind==="mod");
 
 /* ---- الصلاحيات (المدير يتحكم فيها) ---- */
-const APP_VER="2026-10-18b";
+const APP_VER="2026-10-19a";
 let secOpen={};
 let accounts=[],announce=null,newsAll=false,selAcct="";
 const seenGet=k=>{try{return localStorage.getItem(k)||""}catch(e){return ""}};
 const seenSet=(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}};
 const curAcct=()=>role==="tele"?(accounts.find(a=>a.name===seenGet("acctn"))||null):null;
-const CHANGES=[{v:APP_VER,ts:Date.parse("2026-10-18T14:00:00Z"),d:"١٨ أكتوبر",items:[
+const CHANGES=[{v:APP_VER,ts:Date.parse("2026-10-19T10:00:00Z"),d:"١٩ أكتوبر",items:[
+ [["owner","tele","log","wm","wo","wa","acc","rd"],"زرار «🎨 المظهر» فوق: تختار الوضع (تلقائي / فاتح / داكن) ولون التطبيق (6 ألوان) وحجم الخط، وبيتحفظ على جهازك. وفيه كمان تثبيت التطبيق على الموبايل أو اللاب توب زي تطبيقات جوجل (أيقونة على الشاشة وبيفتح في نافذة لوحده)."],
+]},{v:"2026-10-18b",ts:Date.parse("2026-10-18T14:00:00Z"),d:"١٨ أكتوبر",items:[
  [["owner"],"شاشة الإدارة: قسم جديد «📈 تقارير الأصناف ومدد التأخير» بمربعات اختيار صغيرة (من غير قوايم): عدد الطلبات والأصناف، المتأخر منها ونسبته، ومتوسط وأقصى وإجمالي مدة التأخير، حسب المخزن أو البنت أو الصنف أو الشهر أو الأسبوع أو شريحة مدة التأخير. التأخير بيتحسب من موعد التحضير لحد ما التحضير يخلص."],
 ]},{v:"2026-10-17b",ts:Date.parse("2026-10-17T15:00:00Z"),d:"١٧ أكتوبر",items:[
  [["owner","log"],"أول ما تكتب أو تلصق كود في خانة الأصناف (طلب جديد أو تعديل الأصناف) بيظهر تحتها رصيد الكود: لو بسلاش يظهر رصيد السلاش ورصيد الكود الأصلي بدون سلاش، لكل مخزن."],
@@ -2296,6 +2346,26 @@ async function savePin(){
   try{await db.collection("settings").doc("pins").set({log:$("#pinin").value.trim(),wm:$("#pinwm").value.trim(),wo:$("#pinwo").value.trim(),acc:$("#pinacc").value.trim()});toast("تم حفظ الرقم السري ✔",true)}catch(e){toast("تعذر الحفظ: "+(e.message||e.code))}
 }
 const HELP={"rep":{"t":"شاشة التقارير","s":["اختار الفلاتر اللي عايزها (مفتوح/أرشيف، النوع، الحالة، المخزن، التحضير، الخروج، التحصيل، تاريخ الشحن الفعلي، تاريخ الإنشاء…) والنتيجة بتتحدّث فوراً.","الأزرار السريعة فوق بتفتح أشهر التقارير بضغطة (المتأخرة، غير المحصّلة، اللي اتشحنت…).","دوس «أصناف» جنب أي طلب تشوف أصنافه.","عمود «تاريخ الشحن» هو وقت ضغط «تم الشحن» الفعلي في المخزن (فاضي للطلبات اللي لسه ما اتشحنتش). في ملف الإكسيل بيتكتب بصيغة 2026-10-05 10:30.","نزّل الجدول Excel (.xlsx) أو اطبعه. الملف بيطلع بالأعمدة اللي صلاحياتك تسمح بيها بس، وفيه ورقة تانية بالفلاتر وتاريخ التصدير. المدير هو اللي بيحدد مين يقدر ينزّل."],"e":"","n":"اللي بتشوفه هنا بيتحدد بصلاحياتك. المدير هو اللي بيحدد مين يشوف الشاشة دي وإيه البيانات اللي تظهر فيها."},"tele": {"t": "التيليسيلز – تسجيل الطلب ومتابعته", "s": ["اكتبي رقم الطلب، كود العميل، اسم العميل، التليفون، قيمة الطلب.", "اختاري طريقة الشحن (واسم الشركة لو الشحن بشركة) واكتبي العنوان: المحافظة والمركز والشارع.", "لو معاكي الأصناف الصقيها من الإكسيل (اختياري، ومروان ممكن يلصقها). الأعمدة بالترتيب الإجباري: كود الصنف | اسم الصنف | الوحدة | الكمية.", "دوسي «إرسال للوجيستك».", "لما العميل يدفع اكتبي المبلغ ودوسي «سجّل تحصيل»، وشيماء هتأكده.", "لو العميل طلب الإلغاء دوسي «تأكيد الإلغاء بطلب العميل».","تقدري تعدّلي طريقة الشحن والعنوان وقيمة الطلب والتحصيل طول ما الطلب لسه في التجهيز ومشعل ما شحنهوش. بعد الشحن بيتقفل التعديل.","الطلبات اللي اتشحنت أو اتقفلت بتروح لقسم «📦 الأرشيف» تحت «طلباتي المفتوحة».","زرار «🆕 الجديد» فوق بيوريكي آخر التحديثات."], "e": "<div class=\"mut\" style=\"direction:rtl;background:rgba(0,0,0,.05);padding:8px 10px;border-radius:8px;white-space:pre;overflow-x:auto;margin:8px 0\">رقم الطلب   كود الصنف   اسم الصنف   الكمية   الوحدة\n300   1000/1   زيت خام   20   عبوة\n300   A101   مياه   5   كرتونة</div>", "n": "رقم الطلب مينفعش يتكرر، لكن اسم العميل وكوده وتليفونه ممكن يتكرروا. مفيش تعديل غير في طلباتك إنتي. أكدي استلام الإشعارات اللي بتوصلك من مروان والمخازن."}, "log": {"t": "اللوجيستك – توزيع الأصناف ومتابعة الطلب", "s": ["اختار اسمك من قايمة «اسمك» فوق (لازم قبل أي حفظ).", "الصق الأصناف من الإكسيل بالترتيب الإجباري: رقم الطلب | كود الصنف | اسم الصنف | الوحدة | الكمية (ينفع طلبات كتير مرة واحدة).", "حدّد مخزن كل صنف (مشعل / أكتوبر / أبو صير) واختار الوحدة، ودوس «حفظ توزيع المخازن». كل مخزن بيشوف أصنافه بس.", "تابع الحالة على الكارت. لما أكتوبر وأبو صير يخرّجوا هتظهر رسالة خضرا «مكونات الطلب اكتملت بكمياتها».", "اختار «أولوية تجهيز الطلب» (🔴 عاجل جدًا / 🟠 عاجل / 🟢 عادي) – إلزامي قبل توزيع الأصناف على المخازن. بترتّب التجهيز بس، ومبتغيّرش المهلة ولا حالة الطلب.","املا بيانات الشحن واطبع بوليصة الشحن. مشعل هو اللي بيشحن للعميل.", "تقدر تسجّل طلب عميل بنفسك زي البنات من «➕ طلب عميل جديد» فوق.","الأصناف اللي كودها فيه /P1 أو /P5 وحدتها جرام أو عبوة، وتختارها من قايمة الوحدة.","لنقل كميات لمشعل أو فرع أو مكتب استخدم «أمر نقل داخلي» واختار الوجهة.","الوحدات: قطعة / عبوة / كرتونة / لتر / دستة (والمدير يقدر يضيف غيرها).","مهلة أكتوبر وأبو صير بتبدأ من لحظة ما تدوس «حفظ توزيع المخازن» وتبعتلهم الأصناف.","أكتوبر وأبو صير مش بيشوفوا أي بيانات عميل (اسم / تليفون / عنوان).","الطلبات اللي مشعل شحنها بتروح لقسم «📦 الأرشيف» تحت، والبحث بيدوّر فيه. زرار «▾ طي» بيصغّر الكارت ويسيب الرقم والمهلة وموقف التحضير والتحصيل.","يوم الجمعة إجازة ومش بيتحسب من المهلة.","شاشة «📊 التقارير» بتظهر لك لو المدير فعّلها.","مهلة اللوجيستك بتبدأ من لحظة تسجيل البنت للطلب وتنتهي لما تدخل الأصناف وتوزّعها كلها على المخازن، وبتظهر على الكارت.","لو الحسابات صرّحت بالشحن أو التسليم من غير تحصيل بيظهر تنبيه على الكارت."], "e": "<div class=\"mut\" style=\"direction:rtl;background:rgba(0,0,0,.05);padding:8px 10px;border-radius:8px;white-space:pre;overflow-x:auto;margin:8px 0\">رقم الطلب   كود الصنف   اسم الصنف   الكمية   الوحدة\n300   1000/1   زيت خام   20   عبوة\n300   A101   مياه   5   كرتونة</div>", "n": "أصناف أكتوبر اللي كودها فيه شرطة (زي 1000/1) وحدتها من الكود. لو غيرت كمية أو مخزن صنف اتحضّر، التحضير بيتصفّر. لو الحسابات منعت الشحن (🚫) محدش يقدر يشحن."}, "wm": {"t": "مخزن مشعل", "s": ["اختار اسمك من القايمة فوق.", "الطلبات مترتبة بالأولوية: 🔴 عاجل جدًا ثم 🟠 عاجل ثم 🟢 عادي. الأولوية بتحدد ترتيب التجهيز بس، والمهلة زي ما هي.","حضّر أصنافك: اكتب الكمية المتحضّرة أو «تم التحضير بالكامل» وبعدين «حفظ التحضير». لو في نقص اختار السبب.", "لما أكتوبر أو أبو صير يشحنوا لك هتلاقي كارت فيه الأصناف والسواق والسيارة. لما توصل دوس «تم استلام كميات …».", "لما تظهر الرسالة الخضرا «مكونات طلب العميل اكتملت» اطبع بوليصة الشحن.", "اكتب عدد الكراتين في خانة «عدد الكراتين» وهيظهر في بوليصة الشحن.","كل أصناف الطلب بتظهر لك. اللي هيجي من أكتوبر أو أبو صير مكتوب جنبه «سوف تأتي من مخزن …» وبعد ما يخرج يتغير لـ«وردت من مخزن …».","سلّم الشحنة واكتب رقمها لو فيه ودوس «تم الخروج للشحن للعميل». الطلب بعدها بيروح لقسم «📦 طلبات اتشحنت (أرشيف)» تحت وتقدر تدوس «استدعاء الطلب» لو احتجته.","بعد التحضير بيظهر تنبيه تفتكر تدوس زرار الخروج.","كارت «📊 موقف المخزن» فوق بيوريك غير المحضّر والمتأخر، وجدول إجمالي المطلوب من كل صنف بيتحدّث لوحده.","بعد «تم الشحن» الطلب بيروح لقسم «📦 الأرشيف» تحت وتقدر تستدعيه. وزرار «▾ طي» بيصغّر الكارت.","لما الحسابات تأكد التحصيل بيظهر لك شريط «تم التحصيل – مصرّح بالشحن».","اكتب عدد الكراتين وهيظهر في البوليصة."], "e": "", "n": "الزرار الأخير مش بيشتغل لو مكونات أكتوبر أو أبو صير ما اكتملتش أو لو الحسابات منعت الشحن. لو دوست بالغلط استخدم «إلغاء الشحن». المهلة المتبقية بتظهر على الكارت وبتحمر لو اتأخرت."}, "wo": {"t": "مخزن أكتوبر", "s": ["اختار اسمك من القايمة فوق.", "الطلبات مترتبة بالأولوية (🔴 عاجل جدًا ثم 🟠 عاجل ثم 🟢 عادي). المهلة زي ما هي.","كل طلب فيه أصنافك بس، وفوق إجمالي المطلوب من كل صنف. الكود «أساسي / رقم العبوة» (1000/1 عبوة كيلو، 1000/2 نص كيلو).", "حضّر واكتب عدد العبوات المتحضّرة أو «تم التحضير بالكامل» وبعدين «حفظ التحضير». لو في نقص اختار السبب.", "اختار اسم السواق واسم السيارة من القايمة، واكتب رقم الشحنة لو فيه، ودوس «تم الخروج».","مهلتك بتبدأ من لحظة ما مروان يبعتلك الأصناف.","بعد التحضير بيظهر تنبيه تفتكر تدوس «تم الخروج»، والطلب بيفضل عليه تنبيه أحمر لحد ما تدوسه.","بيانات العميل (اسم / تليفون / عنوان / مبالغ) مش بتظهر لك.","كارت «📊 موقف المخزن» فوق بيوريك غير المحضّر والمتأخر، وجدول إجمالي المطلوب من كل صنف بيتحدّث لوحده.","بعد «تم الخروج» الطلب بيروح لقسم «📦 الأرشيف» تحت وتقدر تستدعيه. وزرار «▾ طي» بيصغّر الكارت.","يوم الجمعة إجازة ومش بيتحسب من المهلة."], "e": "", "n": "مينفعش «تم الخروج» من غير سواق وسيارة. لو القوايم فاضية كلّم المدير. لو دوست بالغلط استخدم «إلغاء الشحن». لما أكتوبر وأبو صير يخلصوا الاتنين، مروان ومشعل بيعرفوا إن الطلب جاهز."}, "wa": {"t": "مخزن أبو صير", "s": ["اختار اسمك من القايمة فوق.", "الطلبات مترتبة بالأولوية (🔴 عاجل جدًا ثم 🟠 عاجل ثم 🟢 عادي). المهلة زي ما هي.","الأصناف بالوحدة (قطعة / كرتونة / عبوة).", "حضّر واكتب الكمية المتحضّرة أو «تم التحضير بالكامل» وبعدين «حفظ التحضير». لو في نقص اختار السبب.", "اختار السواق والسيارة، واكتب رقم الشحنة لو فيه، ودوس «تم الخروج».","مهلتك بتبدأ من لحظة ما مروان يبعتلك الأصناف.","بعد التحضير بيظهر تنبيه تفتكر تدوس «تم الخروج»، والطلب بيفضل عليه تنبيه أحمر لحد ما تدوسه.","بيانات العميل (اسم / تليفون / عنوان / مبالغ) مش بتظهر لك.","كارت «📊 موقف المخزن» فوق بيوريك غير المحضّر والمتأخر، وجدول إجمالي المطلوب من كل صنف بيتحدّث لوحده.","بعد «تم الخروج» الطلب بيروح لقسم «📦 الأرشيف» تحت وتقدر تستدعيه. وزرار «▾ طي» بيصغّر الكارت.","يوم الجمعة إجازة ومش بيتحسب من المهلة."], "e": "", "n": "شغلك زي مخزن أكتوبر: بتشحن لمخزن مشعل مش للعميل. لو دوست بالغلط استخدم «إلغاء الشحن»."}, "acc": {"t": "الحسابات", "s": ["اختار اسمك من القايمة فوق.", "شوف قيمة الطلب وإيه اللي البنت بلّغت بيه.", "أكد التحصيل: «تأكيد تحصيل كامل»، أو اكتب المبلغ ودوس «تأكيد المبلغ المحصّل» لو جزئي. من هنا بتبدأ مهلة خروج البضاعة.", "لو العميل لسه ما سددش دوس «🚫 عدم الشحن لحين سداد كامل القيمة»، ولما يسدد دوس «رفع منع الشحن».","التحصيلات اللي أكدتها كاملة، والطلبات اللي صرّحت لها بالشحن أو التسليم، بتروح «أرشيف التحصيلات» تحت، وتقدر تصحّح أو تلغي التصريح منها.","مهلتك لتأكيد التحصيل بتبدأ لما البنت تبلّغ بالتحصيل، والمتبقي أو المتأخر على الكارت.","لو العميل مش هيدفع دلوقتي وعايز تسمح بالخروج دوس «✅ التصريح بالشحن» أو «✅ التصريح بالتسليم للعميل». ده بيسجّل اسمك والوقت ونوع الاعتماد، ومش بيتحسب تحصيل نقدي. تقدر تلغيه بـ«إلغاء التصريح»."], "e": "", "n": "المهلة مبتبدأش قبل تأكيدك. لو صححت مبلغ استخدم «حفظ التصحيح» أو «إلغاء تأكيد التحصيل»."}, "dash": {"t": "الإدارة", "s": ["هنا بتشوف كل الطلبات وحالتها والمتأخر والغير محصّل، وبتطبع تقرير الموقف.", "ضيف البنات وغيّر أرقامهم السرية، وحدد الأرقام السرية لباقي الشاشات.", "ضيف أسماء موظفي الشركة (لوجيستك ومخازن وحسابات) وهيختاروها من قايمة «اسمك».", "ضيف السائقين والسيارات (المخازن بتختار منهم) وجهات أوامر النقل الداخلي.", "حدد أسباب التوقف والنقص، ومدة مهلة خروج البضاعة، وصلاحيات كل شاشة، وإعدادات الإشعارات، ورقم تليفون مروان للبوليصة.", "تقدر تحذف طلب، وتدخل أي شاشة تانية من الشريط اللي فوق.","من «وحدات الأصناف» تضيف وتعدّل وتحذف الوحدات (لتر، دستة، …).","من «الحسابات الشخصية» تعمل حساب لأي حد (تقارير أو إنشاء طلبات) بالاسم والرقم السري، ومن جدول الصلاحيات تحدد مين يشوف شاشة التقارير وإيه اللي يظهر له.","من «📢 إعلان للكل» تنشر رسالة تظهر لكل الناس لحد ما يقروها. وزرار «🆕 الجديد» فوق بيعرض قايمة التحديثات.","المربعات فوق بتفتح شاشة التقارير بالفلتر المناسب.","الشاشة أقسام: دوس اسم القسم في الفهرس فوق ينزلك له، والسهم ◂ مطوي و▾ مفتوح، وزرار «⬆ للأعلى» بيرجّعك فوق.","في قسم «المهل» تحدد مهلة اللوجيستك (الافتراضي 72 ساعة) ومهلة الحسابات (الافتراضي 24 ساعة)، وأول الشاشة بيوريك المتأخر.","التحديثات بتفضل ظاهرة للموظفين 48 ساعة بس."], "e": "", "n": "في «أمر نقل داخلي» تقدر تضيف جهة جديدة مباشرة من نفس الخانة."}};
+/* ---- المظهر والألوان + تثبيت التطبيق ---- */
+let uiOpen=false;
+function uiSet(k,v){const u=uiGet();u[k]=v;try{localStorage.setItem("zui",JSON.stringify(u))}catch(e){}uiApply(u);uiRefresh()}
+function uiToggle(){uiOpen=!uiOpen;uiRefresh()}
+async function uiInstall(){if(!window._ip)return;window._ip.prompt();try{await window._ip.userChoice}catch(e){}window._ip=null;uiRefresh()}
+function uiRefresh(){
+  const el=document.getElementById("uipanel");if(!el)return;if(!uiOpen){el.innerHTML="";return}
+  const u=uiGet(),mode=u.mode||"auto",col=u.col||"oud",fs=u.fs||"m";
+  const ch=(on,fn,t,dot)=>`<label class="drcb ${on?"on":""}"><input type="checkbox" ${on?"checked":""} onchange="${fn}">${dot?`<i style="width:14px;height:14px;border-radius:50%;background:${dot};display:inline-block;border:1px solid rgba(0,0,0,.25)"></i>`:""}${t}</label>`;
+  const grp=(t,h)=>`<div class="drg"><span class="drl">${t}</span>${h}</div>`;
+  const standalone=(window.matchMedia&&matchMedia("(display-mode: standalone)").matches)||navigator.standalone,ios=/iphone|ipad|ipod/i.test(navigator.userAgent);
+  const inst=standalone?'<span class="mut">✓ التطبيق شغّال كتطبيق مثبّت.</span>':window._ip?'<button class="b x" onclick="uiInstall()">📲 تثبيت التطبيق على الجهاز</button>':ios?'<span class="mut">آيفون/آيباد: من Safari دوس زرار المشاركة ⬆ ثم «إضافة إلى الشاشة الرئيسية».</span>':'<span class="mut">أندرويد (Chrome): القايمة ⋮ ثم «تثبيت التطبيق» أو «إضافة إلى الشاشة الرئيسية». لاب توب (Chrome / Edge): أيقونة التثبيت ⊕ في شريط العنوان. لو الخيار مش ظاهر افتح الرابط من المتصفح مباشرة وجرّب بعد ثواني.</span>';
+  el.innerHTML=`<div class="card drbox" style="margin:10px 14px 0;max-width:1072px"><div class="row" style="align-items:center"><b style="font-family:var(--fd);color:var(--pri)">🎨 المظهر</b><button class="b s x" style="margin-right:auto" onclick="uiToggle()">✕ إغلاق</button></div>
+  ${grp("الوضع",[["auto","تلقائي (زي الجهاز)"],["light","فاتح"],["dark","داكن"]].map(([k,t])=>ch(mode===k,`uiSet('mode','${k}')`,t)).join(""))}
+  ${grp("اللون",Object.entries(UIP).map(([k,p])=>ch(col===k,`uiSet('col','${k}')`,p.n,p.l.pri)).join(""))}
+  ${grp("حجم الخط",[["s","صغير"],["m","عادي"],["l","كبير"]].map(([k,t])=>ch(fs===k,`uiSet('fs','${k}')`,t)).join(""))}
+  ${grp("التثبيت",inst)}
+  <div class="mut" style="margin-top:6px">الاختيارات بتتحفظ على الجهاز ده بس.</div></div>`;
+}
+window.uiRefresh=uiRefresh;
 let showHelp=false;
 function helpBar(){
   const h=HELP[view];if(!h)return "";
