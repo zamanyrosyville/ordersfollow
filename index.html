@@ -587,13 +587,15 @@ async function ack(oid,mid){
 const mods=o=>(o.log||[]).filter(l=>l.kind==="mod");
 
 /* ---- الصلاحيات (المدير يتحكم فيها) ---- */
-const APP_VER="2026-10-19a";
+const APP_VER="2026-10-19b";
 let secOpen={};
 let accounts=[],announce=null,newsAll=false,selAcct="";
 const seenGet=k=>{try{return localStorage.getItem(k)||""}catch(e){return ""}};
 const seenSet=(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}};
 const curAcct=()=>role==="tele"?(accounts.find(a=>a.name===seenGet("acctn"))||null):null;
-const CHANGES=[{v:APP_VER,ts:Date.parse("2026-10-19T10:00:00Z"),d:"١٩ أكتوبر",items:[
+const CHANGES=[{v:APP_VER,ts:Date.parse("2026-10-19T12:00:00Z"),d:"١٩ أكتوبر",items:[
+ [["owner"],"تقارير التأخير: أوامر النقل بقت بتتحسب من وقت إنشائها (مفيش لها تأكيد حسابات)، والتقرير بقى بيكتب كام تحضير اتشال من الحساب وليه (مهلته لسه ما بدأتش / وقته غير مسجّل) بدل ما يظهر فاضي."],
+]},{v:"2026-10-19a",ts:Date.parse("2026-10-19T10:00:00Z"),d:"١٩ أكتوبر",items:[
  [["owner","tele","log","wm","wo","wa","acc","rd"],"زرار «🎨 المظهر» فوق: تختار الوضع (تلقائي / فاتح / داكن) ولون التطبيق (6 ألوان) وحجم الخط، وبيتحفظ على جهازك. وفيه كمان تثبيت التطبيق على الموبايل أو اللاب توب زي تطبيقات جوجل (أيقونة على الشاشة وبيفتح في نافذة لوحده)."],
 ]},{v:"2026-10-18b",ts:Date.parse("2026-10-18T14:00:00Z"),d:"١٨ أكتوبر",items:[
  [["owner"],"شاشة الإدارة: قسم جديد «📈 تقارير الأصناف ومدد التأخير» بمربعات اختيار صغيرة (من غير قوايم): عدد الطلبات والأصناف، المتأخر منها ونسبته، ومتوسط وأقصى وإجمالي مدة التأخير، حسب المخزن أو البنت أو الصنف أو الشهر أو الأسبوع أو شريحة مدة التأخير. التأخير بيتحسب من موعد التحضير لحد ما التحضير يخلص."],
@@ -2119,25 +2121,26 @@ function prepDoneAt(o,w){
   return l?{t:+l.t,est:true}:null;
 }
 function drUnits(){
-  const now=Date.now(),U=[];let unk=0;
+  const now=Date.now(),U=[],X={nostart:0,notime:0,none:0};
   const lim=!owner&&WHROLES.includes(role)?role:"";
   orders.forEach(o=>{
     if(o.stage==="cancelled")return;
     if(isTr(o)?!dr.ty.t:!dr.ty.c)return;
     whInvolved(o).forEach(w=>{
       if(lim&&w!==lim)return;if(!dr.whs[w])return;
-      const st=isFd(w)?((o.sentAt||{})[w]||o.accAt):o.accAt;if(!st)return;
+      const st=(isFd(w)?((o.sentAt||{})[w]||o.accAt):o.accAt)||(isTr(o)?o.createdAt:0); /* أمر النقل مفيش له تأكيد حسابات: بيتحسب من وقت إنشائه */
+      if(!st){X.nostart++;return}
       if(dr.per!=="all"){const d=new Date(now);const from=dr.per==="m"?new Date(d.getFullYear(),d.getMonth(),1).getTime():now-(+dr.per)*864e5;if(st<from)return}
       const items=(o.items||[]).filter(i=>i.wh===w);if(!items.length)return;
       const due=workDue(st,hoursOfWh(o,w)),full=prepOf(o,w)==="full";
       let end=now,est=false;
-      if(full){const pd=prepDoneAt(o,w);if(!pd){unk++;return}end=pd.t;est=pd.est}
+      if(full){const pd=prepDoneAt(o,w);if(!pd){X.notime++;return}end=pd.t;est=pd.est}
       if(full?!dr.st.done:!dr.st.open)return;
       const late=end>due;
       U.push({o,w,items,st,due,end,full,est,late,delay:late?end-due:0});
     });
   });
-  U.unk=unk;return U;
+  U.unk=X.notime;U.nostart=X.nostart;return U;
 }
 const drPct=(a,b)=>b?Math.round(a*100/b)+"%":"—";
 const drBucket=ms=>ms<=0?"0 · في الميعاد":ms<864e5?"1 · أقل من يوم":ms<3*864e5?"2 · من 1 لـ 3 أيام":ms<7*864e5?"3 · من 3 لـ 7 أيام":"4 · أكتر من 7 أيام";
@@ -2170,12 +2173,12 @@ function drView(){
   const cb=(on,fn,t)=>`<label class="drcb ${on?"on":""}"><input type="checkbox" ${on?"checked":""} onchange="${fn}">${t}</label>`;
   const grp=(t,h)=>`<div class="drg"><span class="drl">${t}</span>${h}</div>`;
   const late=U.filter(u=>u.late),est=U.filter(u=>u.est).length;
-  const sum=`<div class="drsum">تحضيرات: <b>${U.length}</b> · متأخر: <b style="color:#b8412f">${late.length}</b> (${drPct(late.length,U.length)}) · أصناف: <b>${U.reduce((t,u)=>t+u.items.length,0)}</b>، المتأخر منها <b>${late.reduce((t,u)=>t+u.items.length,0)}</b>${late.length?` · متوسط التأخير <b>${esc(fmtDur(late.reduce((t,u)=>t+u.delay,0)/late.length))}</b>`:""}</div>${est?`<div class="mut">${est} تحضير قديم وقته تقديري من السجل.</div>`:""}${U.unk?`<div class="mut">${U.unk} تحضير قديم مفيش له وقت مسجّل فاتشال من الحساب.</div>`:""}`;
+  const sum=`<div class="drsum">تحضيرات: <b>${U.length}</b> · متأخر: <b style="color:#b8412f">${late.length}</b> (${drPct(late.length,U.length)}) · أصناف: <b>${U.reduce((t,u)=>t+u.items.length,0)}</b>، المتأخر منها <b>${late.reduce((t,u)=>t+u.items.length,0)}</b>${late.length?` · متوسط التأخير <b>${esc(fmtDur(late.reduce((t,u)=>t+u.delay,0)/late.length))}</b>`:""}</div>${est?`<div class="mut">${est} تحضير قديم وقته تقديري من السجل.</div>`:""}${U.unk?`<div class="mut">${U.unk} تحضير خلص قبل التحديث ومفيش له وقت مسجّل، فاتشال من الحساب.</div>`:""}${U.nostart?`<div class="mut">${U.nostart} تحضير مهلته لسه ما بدأتش (بانتظار تأكيد الحسابات أو إرسال الأصناف للمخزن)، فاتشال من الحساب.</div>`:""}`;
   return `<div class="card drbox"><div class="mut">التأخير = من موعد التحضير المحدد للمخزن لحد ما تحضيره يخلص (أو لحد دلوقتي لو لسه).</div>
   ${grp("اعرض حسب",DRDIM.filter(([k])=>k!=="girl"||can("cgirl")).map(([k,t])=>cb(dr.dims[k],`drTog('dims','${k}',this.checked)`,t)).join(""))}
   ${grp("الفلتر",Object.entries(WHN).filter(([w])=>!lim||w===lim).map(([w,n])=>cb(dr.whs[w],`drTog('whs','${w}',this.checked)`,n.replace("مخزن ",""))).join("")+'<span class="drsep"></span>'+cb(dr.ty.c,"drTog('ty','c',this.checked)","طلبات عملاء")+cb(dr.ty.t,"drTog('ty','t',this.checked)","أوامر نقل")+'<span class="drsep"></span>'+cb(dr.st.done,"drTog('st','done',this.checked)","اتحضّر")+cb(dr.st.open,"drTog('st','open',this.checked)","لسه"))}
   ${grp("الفترة",DRPER.map(([k,t])=>cb(dr.per===k,`drPer('${k}',this.checked)`,t)).join("")+'<button class="b x s" style="margin-right:auto" onclick="drPrint()">🖨 طباعة</button>')}
-  ${sum}</div>${U.length?drTables(U):'<div class="card"><div class="empty">مفيش بيانات بالاختيارات دي</div></div>'}`;
+  ${sum}</div>${U.length?drTables(U):'<div class="card"><div class="empty">مفيش بيانات بالاختيارات دي'+(U.unk||U.nostart?'<br><span class="mut">السبب فوق: فيه تحضيرات اتشالت لأن مهلتها ما بدأتش أو وقت تحضيرها غير مسجّل.</span>':"")+'</div></div>'}`;
 }
 function drPrint(){doPrint("تقرير الأصناف ومدد التأخير",drTables(drUnits()))}
 
