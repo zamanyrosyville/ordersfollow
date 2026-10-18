@@ -535,13 +535,18 @@ async function ack(oid,mid){
 const mods=o=>(o.log||[]).filter(l=>l.kind==="mod");
 
 /* ---- الصلاحيات (المدير يتحكم فيها) ---- */
-const APP_VER="2026-10-16e";
+const APP_VER="2026-10-18a";
 let secOpen={};
 let accounts=[],announce=null,newsAll=false,selAcct="";
 const seenGet=k=>{try{return localStorage.getItem(k)||""}catch(e){return ""}};
 const seenSet=(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}};
 const curAcct=()=>role==="tele"?(accounts.find(a=>a.name===seenGet("acctn"))||null):null;
-const CHANGES=[{v:APP_VER,ts:Date.parse("2026-10-16T00:10:00Z"),d:"١٦ أكتوبر",items:[
+const CHANGES=[{v:APP_VER,ts:Date.parse("2026-10-18T14:00:00Z"),d:"١٨ أكتوبر",items:[
+ [["owner","log","wm","wo","wa","acc","rd"],"شاشة التقارير: قسم جديد «📈 تقارير الأصناف ومدد التأخير» بمربعات اختيار (من غير قوايم): عدد الطلبات والأصناف، المتأخر منها ونسبته، ومتوسط وأقصى وإجمالي مدة التأخير، حسب المخزن أو البنت أو الصنف أو الشهر أو الأسبوع أو شريحة مدة التأخير. التأخير بيتحسب من موعد التحضير لحد ما التحضير يخلص."],
+]},{v:"2026-10-17b",ts:Date.parse("2026-10-17T15:00:00Z"),d:"١٧ أكتوبر",items:[
+ [["owner","log"],"أول ما تكتب أو تلصق كود في خانة الأصناف (طلب جديد أو تعديل الأصناف) بيظهر تحتها رصيد الكود: لو بسلاش يظهر رصيد السلاش ورصيد الكود الأصلي بدون سلاش، لكل مخزن."],
+ [["owner","log"],"أرصدة المخازن: زرار جديد «رفع شيت الأرصدة المجمّع» — شيت واحد فيه عمود للكود وعمود لكل مخزن (مشعل / أكتوبر / أبو صير). التطبيق بيتعرّف على الأعمدة من العناوين، بيعرض معاينة، وبعد الاعتماد بيحدّث أرصدة المخازن كلها مرة واحدة. الخانة الفاضية = الصنف مش موجود في المخزن ده، والصفر = موجود ورصيده صفر. الرفع لكل مخزن لوحده لسه شغال."]
+]},{v:"2026-10-16e",ts:Date.parse("2026-10-16T00:10:00Z"),d:"١٦ أكتوبر",items:[
  [["owner","wo"],"مخزن أكتوبر: في جدول «إجمالي المتبقي للتجهيز» فيه خانة ✓ قدام كل كود. تعليمها بيحضّر كل المتبقي من الكود ده في كل الطلبات المقبولة (بالترتيب) وبيتسجّل في سجل كل طلب. قسم «اتحضّر» تحت الجدول فيه زرار «تراجع». كروت الطلبات بقت مخفية افتراضيًا، وتحت الجدول مباشرة قسم «🚚 جاهزة للخروج» فيه لكل طلب رقم الشحنة والسائق والسيارة وزرار «تم الخروج» (وتقدر تعلّم أكتر من طلب وتختار السائق والسيارة مرة واحدة وتدوس «خروج المحدد»)، وزرار «عرض كروت الطلبات» بيرجّعها. الخروج بقى بمربعات اختيار: علّم السائق والسيارة والطلبات الجاهزة معلّمة كلها وادوس «خروج» مرة واحدة. وتم إصلاح رجوع التحضير بعد «تراجع» (العمليات بقت بالدور). كروت أكتوبر بقت ملخّص بس (رقم الطلب والتأخير والأولوية وحالة التحضير: كامل/جزئي/لسه) من غير فتح ولا طي ولا تفاصيل الأصناف أو بيانات الشحن."]
 ]},{v:"2026-10-15d",ts:Date.parse("2026-10-15T06:00:00Z"),d:"١٥ أكتوبر",items:[
  [["owner","log","wo"],"مخزن أكتوبر: الأوردرات الجديدة اللي مروان بيحوّل فيها أصناف لأكتوبر مبتظهرش في شاشة أكتوبر لحد ما مسؤول أكتوبر يدوس «قبول أوردرات جديدة». قبل القبول بيشوف أرقامها بس. مروان بيشوف جنب كل طلب «بانتظار قبول المخزن» وبعد القبول بيتسجّل في السجل مين قبل وإمتى. الأوردرات القديمة (قبل التحديث) متقبولة تلقائيًا."]],
@@ -767,11 +772,61 @@ function stkLine(w,code,qty){ /* سطر رصيد مخزن واحد لكود وا
   else{txt="رصيد: "+f(bs);st=bs===undefined?bad:(q?(bs>=q?ok:bad):"")}
   return `<div class="x" style="${st}"><b>${nm}</b> ${txt}</div>`;
 }
+function stkPrevHtml(txt){ /* معاينة أرصدة الأكواد اللي مروان بيكتبها: سلاش + الأصلي بدون سلاش */
+  if(!stockVis().length)return "";
+  const seen=new Set(),L=[];
+  String(txt||"").split(/\r?\n/).forEach(ln=>{const c=sKey(ln.split(/\t|\|/)[0]);if(c&&!seen.has(c)&&/[0-9A-Z]/.test(c)){seen.add(c);L.push(c)}});
+  if(!L.length)return "";
+  return '<div class="card" style="margin-top:6px;padding:8px"><b>📦 الأرصدة</b>'+L.slice(0,40).map(c=>'<div style="border-top:1px solid var(--bd);padding:4px 0"><b dir="ltr">'+esc(c)+'</b>'+stockVis().map(w=>stkLine(w,c,0)).join("")+'</div>').join("")+(L.length>40?'<div class="mut">وباقي الأكواد ('+(L.length-40)+') مش معروضة</div>':"")+'</div>';
+}
+function stkPrevSet(id,v){const e=document.getElementById(id);if(e)e.innerHTML=stkPrevHtml(v)}
 function stockCell(i){return stockVis().map(w=>stkLine(w,i.code,i.qty)).join("")||"—"}
 function stockLook(v){
   const el=document.getElementById("stkRes");if(!el)return;v=(v||"").trim();
   if(!v){el.innerHTML="";return}
   el.innerHTML=stockVis().map(w=>stkLine(w,v,0)).join("")||'<span class="mut">مفيش</span>';
+}
+/* رفع شيت أرصدة مجمّع: كود + عمود رصيد لكل مخزن (مشعل / أكتوبر / أبو صير). العمود الفاضي = الصنف مش موجود في المخزن ده، والصفر = موجود ورصيده صفر. */
+let stkAll=null;
+const stkWhRe={wm:/مشعل|mashal|mash3l/i,wo:/[اأإ]كتوبر|october|oct/i,wa:/[اأإ]بو\s*صير|abu\s*sir|abusir/i};
+function stkAllDetect(rows){
+  const codeRe=/كود|code|sku|item|رقم الصنف|باركود|barcode/i;
+  for(let r=0;r<Math.min(rows.length,10);r++){const row=rows[r]||[],ci=row.findIndex(c=>codeRe.test(String(c||"")));if(ci<0)continue;
+    const cols={};Object.keys(stkWhRe).forEach(w=>{const i=row.findIndex((c,j)=>j!==ci&&stkWhRe[w].test(String(c||"")));if(i>=0)cols[w]=i});
+    if(Object.keys(cols).length)return {hdr:r,code:ci,cols}}
+  return null;
+}
+function stkAllParse(){
+  const out={};
+  Object.entries(stkAll.cols).forEach(([w,ci])=>{const map=new Map();let skipped=0,dup=0,slash=0;
+    stkAll.rows.slice(stkAll.hdr+1).forEach(r=>{const k=sKey(r[stkAll.code]);if(!k)return;const raw=ar2en(String(r[ci]==null?"":r[ci])).replace(/[,\s]/g,"");if(raw==="")return;if(!/^-?\d+(\.\d+)?$/.test(raw)){skipped++;return}
+      const v=parseFloat(raw);if(map.has(k)){dup++;map.set(k,map.get(k)+v)}else map.set(k,v)});
+    map.forEach((v,k)=>{if(k.includes("/"))slash++});out[w]={map,skipped,dup,slash}});
+  return out;
+}
+async function stkAllPick(inp){
+  const f=inp.files&&inp.files[0];if(!f)return;
+  try{const rows=await readSheetFile(f);if(!rows.length)throw new Error("الملف فاضي");
+    const d=stkAllDetect(rows);if(!d){stkAll=null;toast("مقدرتش ألاقي أعمدة المخازن. اكتب في عناوين الأعمدة: الكود، مشعل، أكتوبر، أبو صير");render();return}
+    stkAll={fname:f.name,rows,hdr:d.hdr,code:d.code,cols:d.cols};stockOpen=true;render()}
+  catch(e){stkAll=null;toast("تعذّرت قراءة الملف: "+(e.message||e));render()}
+}
+async function stkAllSave(){
+  if(!stkAll||!db)return;const P=stkAllParse(),ws=Object.keys(P).filter(w=>P[w].map.size);
+  if(!ws.length)return toast("مفيش أصناف بأرصدة صالحة. تأكد من الأعمدة");
+  if(!ws.every(w=>stockUp(w)))return toast("مفيش عندك صلاحية رفع أرصدة كل المخازن دي");
+  for(const w of ws){const old=stockDocs[w],n=P[w].map.size;if(old&&old.n&&n<old.n*0.5&&!confirm("ملف "+WHN[w]+" فيه "+n+" صنف والرصيد الحالي فيه "+old.n+". متأكد؟ هيستبدل رصيد "+WHN[w]+" القديم كله."))return;if(JSON.stringify([...P[w].map]).length>900000)return toast("الملف كبير أوي لـ"+WHN[w]+". قسّمه")}
+  try{await Promise.all(ws.map(w=>{const rows=[...P[w].map].map(([c,q])=>({c,q:sNum(q)}));return db.collection("stock").doc(w).set({wh:w,at:Date.now(),by:actor(),file:String(stkAll.fname||"").slice(0,80),n:rows.length,rows})}));
+    toast("اتحدّثت الأرصدة ✔ "+ws.map(w=>WHN[w].replace("مخزن ","")+" "+P[w].map.size).join(" · "),true);stkAll=null;render()}
+  catch(e){alert("تعذر حفظ الأرصدة: "+(e.message||e.code))}
+}
+function stkAllPrev(){
+  const P=stkAllParse(),hd=stkAll.rows[stkAll.hdr]||[],ws=Object.keys(stkAll.cols);
+  return `<div class="card" style="margin-top:6px;border:2px solid var(--acc)"><b>معاينة الشيت المجمّع ${esc(stkAll.fname)}</b>
+  <div class="mut" style="margin-top:6px">عمود الكود: <b>${esc(String(hd[stkAll.code]||""))}</b> · المخازن اللي اتلقت: ${ws.map(w=>"<b>"+WHN[w]+"</b> (عمود «"+esc(String(hd[stkAll.cols[w]]||""))+"»)").join("، ")}</div>
+  <div class="tw" style="margin-top:6px"><table><tr><th>الكود (كما هو)</th><th>بعد التوحيد</th>${ws.map(w=>"<th>"+WHN[w].replace("مخزن ","")+"</th>").join("")}</tr>${stkAll.rows.slice(stkAll.hdr+1,stkAll.hdr+7).map(x=>`<tr><td>${esc(String(x[stkAll.code]||""))}</td><td dir="ltr">${esc(sKey(x[stkAll.code]))}</td>${ws.map(w=>`<td>${esc(String(x[stkAll.cols[w]]==null?"":x[stkAll.cols[w]]))}</td>`).join("")}</tr>`).join("")}</table></div>
+  <div class="mut" style="margin-top:6px">${ws.map(w=>WHN[w]+": <b>"+P[w].map.size+"</b> كود (منهم <b>"+P[w].slash+"</b> بسلاش)"+(P[w].skipped?" · اتتخطّى "+P[w].skipped+" صف مش رقم":"")+(P[w].dup?" · "+P[w].dup+" مكرر اتجمع":"")).join("<br>")}<br>الحفظ بيستبدل أرصدة المخازن اللي فوق القديمة كلها. الخانة الفاضية = الصنف مش في المخزن ده.</div>
+  <div class="row" style="margin-top:8px"><button class="b ok" onclick="stkAllSave()">اعتماد ورفع الأرصدة</button><button class="b s" onclick="stkAll=null;render()">إلغاء</button></div></div>`;
 }
 function stockCard(scope){
   if(!can("sstock"))return "";
@@ -779,6 +834,7 @@ function stockCard(scope){
   const sum=ws.map(w=>stockDocs[w]?WHN[w].replace("مخزن ","")+" "+fmt(stockDocs[w].at):WHN[w].replace("مخزن ","")+" — لم يُرفع").join(" · ");
   return `<details class="card" ${stockOpen||(stk&&ws.includes(stk.wid))?"open":""} ontoggle="stockOpen=this.open"><summary><b>📦 أرصدة المخازن</b> <span class="mut">${esc(sum)}</span></summary>
   ${stockErr?`<div class="mut" style="color:var(--bad)">تعذّر تحميل الأرصدة (${esc(stockErr)}). لو نشرت قواعد Firebase الجديدة لازم تنشر النسخة المحدّثة منها.</div>`:""}
+  ${scope==="log"&&["wm","wo","wa"].every(stockUp)?`<div class="row" style="margin-top:8px;gap:8px"><b>📤 شيت مجمّع (كل المخازن)</b><label class="b ok" style="cursor:pointer">رفع شيت الأرصدة المجمّع<input type="file" accept=".xlsx,.csv,.txt" style="display:none" onchange="stkAllPick(this);this.value=''"></label><span class="mut">عمود الكود + عمود لكل مخزن (مشعل / أكتوبر / أبو صير)</span></div>${stkAll?stkAllPrev():""}`:""}
   ${ws.map(w=>{const d=stockDocs[w];return `<div class="row" style="margin-top:8px;gap:8px"><b>${WHN[w]}</b><span class="mut">${d?"آخر تحديث: "+esc(stkAge(d))+" · "+esc(d.by||"")+" · "+d.n+" كود":"لم يُرفع رصيد بعد"}</span>${stockUp(w)?`<label class="b s" style="cursor:pointer">📤 رفع ملف الرصيد<input type="file" accept=".xlsx,.csv,.txt" style="display:none" onchange="stkPick('${w}',this);this.value=''"></label>`:""}</div>${stk&&stk.wid===w?stkPrev():""}`}).join("")}
   <div class="row" style="margin-top:10px;gap:6px"><input class="wi" style="max-width:260px" dir="ltr" placeholder="🔍 اعرف رصيد كود (مثلًا 222333/1)" oninput="stockLook(this.value)"></div><div id="stkRes" style="margin-top:6px"></div>
   <div class="mut" style="margin-top:6px">الكود اللي فيه سلاش (222333/1) بيظهر له رصيد السلاش ورصيد الكود الأساسي (222333) جنب بعض. الأرصدة من آخر ملف اترفع، مش لحظية.</div></details>`;
@@ -1320,7 +1376,7 @@ function itemsBox(o){
     <button class="b s" style="margin-top:6px" onclick="editItems='${o.id}';render()">${it.length?"تعديل / لصق من جديد":"📋 لصق الأصناف من الإكسيل"}</button></div>`;
   }
   return `<div><b>الأصناف والكميات</b><div class="mut">انسخ من الإكسيل الأعمدة بالترتيب الإجباري: <b>كود الصنف | اسم الصنف | الوحدة | الكمية</b> (الوحدة: ${UNITS.join(" / ")}، وأصناف /P جرام أو عبوة). كل الأعمدة مطلوبة. الأصناف اللي ليها نفس الكود بتحتفظ بمخزنها وتحضيرها.</div>
-  <textarea class="wi" id="it-${o.id}" rows="7" placeholder="كود الصنف | اسم الصنف | الوحدة | الكمية&#10;1000/1&#9;زيت خام&#9;عبوة&#9;20&#10;1000/2&#9;زيت خام&#9;عبوة&#9;10" style="margin-top:6px">${esc(itemsTsv(o))}</textarea>
+  <textarea class="wi" id="it-${o.id}" rows="7" placeholder="كود الصنف | اسم الصنف | الوحدة | الكمية&#10;1000/1&#9;زيت خام&#9;عبوة&#9;20&#10;1000/2&#9;زيت خام&#9;عبوة&#9;10" style="margin-top:6px" oninput="stkPrevSet('sp-${o.id}',this.value)">${esc(itemsTsv(o))}</textarea><div id="sp-${o.id}">${stkPrevHtml(itemsTsv(o))}</div>
   <div class="row" style="margin-top:6px"><button class="b ok" onclick="saveItems('${o.id}')">حفظ الأصناف</button><button class="b s" onclick="editItems=null;render()">إلغاء</button></div></div>`;
 }
 const allWh=(oid,w)=>{((orders.find(x=>x.id===oid)||{}).items||[]).forEach((_,x)=>pendWh[oid+"-"+x]=w);render()};
@@ -1404,6 +1460,7 @@ function needName(){
 
 async function save(o,text,kind,extra){
   if(!db)return alert("الحفظ غير متاح: افتح الرابط بحساب مسجّل وصلاحية Contributor أو أعلى.");
+  try{const inv=whInvolved(o),pa={...(o.prepAt||{})};inv.forEach(w=>{if(prepOf(o,w)==="full"){if(!pa[w])pa[w]=Date.now()}else delete pa[w]});Object.keys(pa).forEach(w=>{if(!inv.includes(w))delete pa[w]});o.prepAt=pa}catch(e){} /* وقت انتهاء تحضير كل مخزن (للتقارير) */
   o.log=[...(o.log||[]),{t:Date.now(),by:actor(),rl:actorRole(),text,kind:kind||"st",...(extra||{})}];
   try{await db.collection("orders").doc(o.id).set(o);toast("تم الحفظ ✔",true)}catch(e){alert("تعذر الحفظ: "+(e.message||e.code))}
 }
@@ -1447,7 +1504,7 @@ function orderForm(inLog){
   <div id="addrBox" style="grid-column:1/-1"><b style="font-size:14px">عنوان التسليم</b>${addrInputs("a-",{})}</div></div>
   ${inLog?`<div style="margin-top:10px"><label>أولوية تجهيز الطلب <b style="color:var(--bad)">*</b></label><select id="prio">${prioOpts("")}</select></div>`:""}
   <label style="margin-top:12px">الأصناف والكميات (اختياري – انسخي من الإكسيل بالترتيب الإجباري: كود الصنف | اسم الصنف | الوحدة | الكمية)</label>
-  <textarea class="wi" id="itx" rows="5" placeholder="كود الصنف | اسم الصنف | الوحدة | الكمية – سطر لكل صنف&#10;1000/1&#9;زيت خام&#9;عبوة&#9;20"></textarea>
+  <textarea class="wi" id="itx" rows="5" placeholder="كود الصنف | اسم الصنف | الوحدة | الكمية – سطر لكل صنف&#10;1000/1&#9;زيت خام&#9;عبوة&#9;20" oninput="stkPrevSet('sp-new',this.value)"></textarea><div id="sp-new"></div>
   <div style="margin-top:12px"><button class="b" onclick="newOrder()">${inLog?"تسجيل الطلب":"إرسال للوجيستك"}</button></div></${inLog?'details':'div'}>`;
 }
 async function newOrder(){
@@ -1996,7 +2053,79 @@ function repCsv(){
   const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"}));a.download="تقرير-الطلبات.csv";document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500);
 }
 function repPrint(){const rows=repRows(),C=repCols().filter(c=>!(["قيمة الطلب","المحصّل المؤكد"].includes(c[0])&&!can("camt"))&&!(c[0]==="البنت"&&!can("cgirl")));doPrint("تقرير الطلبات ("+rows.length+")",`<table><tr>${C.map(c=>"<th>"+c[0]+"</th>").join("")}</tr>${rows.map(o=>"<tr>"+C.map(c=>"<td>"+esc(c[1](o))+"</td>").join("")+"</tr>").join("")}</table>`)}
-function repView(){
+/* ---- تقارير الأصناف ومدد التأخير: مربعات اختيار (مش قوايم). التأخير = من موعد التحضير المحدد للمخزن لحد ما تحضيره يخلص (أو لحد دلوقتي لو لسه ما خلصش) ---- */
+let dr={dims:{wh:1,girl:1,bucket:1},whs:{wm:1,wo:1,wa:1},ty:{c:1,t:1},st:{done:1,open:1},per:"all"};
+const DRDIM=[["wh","المخزن"],["girl","البنت"],["item","الصنف / الكود"],["month","الشهر"],["week","الأسبوع"],["bucket","شرائح مدة التأخير"]];
+const DRPER=[["all","كل الفترات"],["7","آخر 7 أيام"],["30","آخر 30 يوم"],["m","الشهر ده"]];
+function drTog(g,k,on){if(on)dr[g][k]=1;else delete dr[g][k];render()}
+function drPer(k,on){dr.per=on?k:"all";render()}
+function prepDoneAt(o,w){
+  const pa=(o.prepAt||{})[w];if(pa)return {t:+pa,est:false};
+  const re=new RegExp("^"+(WHN[w]||w)+": (تم التحضير|تحضير)"),l=(o.log||[]).filter(x=>re.test(x.text||"")).sort((a,b)=>b.t-a.t)[0];
+  return l?{t:+l.t,est:true}:null;
+}
+function drUnits(){
+  const now=Date.now(),U=[];let unk=0;
+  const lim=!owner&&WHROLES.includes(role)?role:"";
+  orders.forEach(o=>{
+    if(o.stage==="cancelled")return;
+    if(isTr(o)?!dr.ty.t:!dr.ty.c)return;
+    whInvolved(o).forEach(w=>{
+      if(lim&&w!==lim)return;if(!dr.whs[w])return;
+      const st=isFd(w)?((o.sentAt||{})[w]||o.accAt):o.accAt;if(!st)return;
+      if(dr.per!=="all"){const d=new Date(now);const from=dr.per==="m"?new Date(d.getFullYear(),d.getMonth(),1).getTime():now-(+dr.per)*864e5;if(st<from)return}
+      const items=(o.items||[]).filter(i=>i.wh===w);if(!items.length)return;
+      const due=workDue(st,hoursOfWh(o,w)),full=prepOf(o,w)==="full";
+      let end=now,est=false;
+      if(full){const pd=prepDoneAt(o,w);if(!pd){unk++;return}end=pd.t;est=pd.est}
+      if(full?!dr.st.done:!dr.st.open)return;
+      const late=end>due;
+      U.push({o,w,items,st,due,end,full,est,late,delay:late?end-due:0});
+    });
+  });
+  U.unk=unk;return U;
+}
+const drPct=(a,b)=>b?Math.round(a*100/b)+"%":"—";
+const drBucket=ms=>ms<=0?"0 · في الميعاد":ms<864e5?"1 · أقل من يوم":ms<3*864e5?"2 · من 1 لـ 3 أيام":ms<7*864e5?"3 · من 3 لـ 7 أيام":"4 · أكتر من 7 أيام";
+function drWeek(t){const d=new Date(t);d.setHours(0,0,0,0);d.setDate(d.getDate()-((d.getDay()+1)%7));return d.getFullYear()+"-"+pad2(d.getMonth()+1)+"-"+pad2(d.getDate())}
+function drTable(title,rows,sortBy){
+  const M={};
+  rows.forEach(r=>{const m=M[r.key]=M[r.key]||{label:r.label,ord:new Set(),late:new Set(),n:0,ln:0,d:[]};m.ord.add(r.o.id);m.n+=r.n;if(r.late){m.late.add(r.o.id);m.ln+=r.n;m.d.push(r.delay)}});
+  let L=Object.entries(M).map(([k,m])=>({k,...m,tot:m.d.reduce((a,b)=>a+b,0)}));
+  L.sort(sortBy==="key"?(a,b)=>String(b.k).localeCompare(String(a.k)):sortBy==="keyAsc"?(a,b)=>String(a.k).localeCompare(String(b.k)):(a,b)=>b.late.size/b.ord.size-a.late.size/a.ord.size||b.ln-a.ln);
+  const cut=L.length>50;L=L.slice(0,50);
+  const T=L.reduce((t,m)=>({o:t.o+m.ord.size,l:t.l+m.late.size,n:t.n+m.n,ln:t.ln+m.ln,d:t.d+m.tot,mx:Math.max(t.mx,...m.d,0),c:t.c+m.d.length}),{o:0,l:0,n:0,ln:0,d:0,mx:0,c:0});
+  const dur=ms=>ms>0?esc(fmtDur(ms)):"—",red=v=>v?'style="color:#b8412f;font-weight:700"':"";
+  return `<div class="card" style="margin-top:8px"><b>${esc(title)}</b><div class="tw" style="margin-top:6px"><table><tr><th></th><th>الطلبات</th><th>الأصناف</th><th>طلبات متأخرة</th><th>نسبة الطلبات المتأخرة</th><th>أصناف متأخرة</th><th>نسبة الأصناف المتأخرة</th><th>متوسط التأخير</th><th>أقصى تأخير</th><th>إجمالي التأخير</th></tr>
+  ${L.map(m=>`<tr><td><b>${esc(m.label)}</b></td><td>${m.ord.size}</td><td>${m.n}</td><td ${red(m.late.size)}>${m.late.size}</td><td ${red(m.late.size)}>${drPct(m.late.size,m.ord.size)}</td><td ${red(m.ln)}>${m.ln}</td><td ${red(m.ln)}>${drPct(m.ln,m.n)}</td><td>${dur(m.d.length?m.tot/m.d.length:0)}</td><td>${dur(Math.max(0,...m.d))}</td><td>${dur(m.tot)}</td></tr>`).join("")}
+  <tr style="font-weight:700;background:rgba(0,0,0,.05)"><td>الإجمالي</td><td>${T.o}</td><td>${T.n}</td><td>${T.l}</td><td>${drPct(T.l,T.o)}</td><td>${T.ln}</td><td>${drPct(T.ln,T.n)}</td><td>${dur(T.c?T.d/T.c:0)}</td><td>${dur(T.mx)}</td><td>${dur(T.d)}</td></tr></table></div>${cut?'<div class="mut">معروض أول 50 صف بس.</div>':""}</div>`;
+}
+function drTables(U){
+  const R=[],g=(k,t,rows,so)=>dr.dims[k]&&R.push(drTable(t,rows,so));
+  const per=f=>U.map(u=>({...f(u),o:u.o,n:u.items.length,late:u.late,delay:u.delay}));
+  g("wh","حسب المخزن",per(u=>({key:u.w,label:WHN[u.w]||u.w})));
+  if(can("cgirl"))g("girl","حسب البنت",per(u=>({key:u.o.createdBy||"—",label:u.o.createdBy||"— (من اللوجيستك / الإدارة)"})));
+  if(dr.dims.item){const rows=[];U.forEach(u=>u.items.forEach(i=>{const c=sKey(i.code)||"—";rows.push({key:c,label:c+(i.name?" – "+i.name:""),o:u.o,n:1,late:u.late,delay:u.delay})}));R.push(drTable("حسب الصنف / الكود",rows))}
+  g("month","حسب الشهر (من بداية مهلة التحضير)",per(u=>{const d=new Date(u.st),k=d.getFullYear()+"-"+pad2(d.getMonth()+1);return {key:k,label:k}}),"key");
+  g("week","حسب الأسبوع (بيبدأ السبت)",per(u=>{const k=drWeek(u.st);return {key:k,label:"أسبوع "+k}}),"key");
+  g("bucket","شرائح مدة التأخير",per(u=>{const k=drBucket(u.delay);return {key:k,label:k.replace(/^\d · /,"")}}),"keyAsc");
+  return R.join("");
+}
+function drView(){
+  const U=drUnits(),lim=!owner&&WHROLES.includes(role)?role:"",cb=(on,fn,t)=>`<label class="drcb"><input type="checkbox" ${on?"checked":""} onchange="${fn}" style="width:22px;height:22px;padding:0;margin-left:6px;vertical-align:middle">${t}</label>`;
+  const late=U.filter(u=>u.late),est=U.filter(u=>u.est).length;
+  const sum=`<div style="margin-top:8px">تحضيرات محسوبة: <b>${U.length}</b> · متأخر: <b style="color:#b8412f">${late.length}</b> (${drPct(late.length,U.length)}) · أصناف في التحضيرات دي: <b>${U.reduce((t,u)=>t+u.items.length,0)}</b>, المتأخر منها <b>${late.reduce((t,u)=>t+u.items.length,0)}</b>${late.length?` · متوسط التأخير <b>${esc(fmtDur(late.reduce((t,u)=>t+u.delay,0)/late.length))}</b>`:""}</div>${est?`<div class="mut">${est} تحضير قديم وقت انتهائه تقديري من سجل الطلب. التحضيرات الجديدة وقتها بيتسجّل بدقة.</div>`:""}${U.unk?`<div class="mut">${U.unk} تحضير خلص قبل التحديث ومفيش له وقت مسجّل، فاتشال من الحساب.</div>`:""}`;
+  return `<div class="card"><b>📈 تقارير الأصناف ومدد التأخير</b><div class="mut">علّم اللي عايزه والجداول بتتحدّث فوراً. التأخير بيتحسب من موعد التحضير المحدد للمخزن (مهلته من الإعدادات) لحد ما تحضير المخزن يخلص، ولو لسه ما خلصش بيتحسب لحد دلوقتي.</div>
+  <div style="margin-top:8px"><b>اعرض حسب:</b> ${DRDIM.filter(([k])=>k!=="girl"||can("cgirl")).map(([k,t])=>cb(dr.dims[k],`drTog('dims','${k}',this.checked)`,t)).join("")}</div>
+  <div style="margin-top:6px"><b>المخازن:</b> ${Object.entries(WHN).filter(([w])=>!lim||w===lim).map(([w,n])=>cb(dr.whs[w],`drTog('whs','${w}',this.checked)`,n)).join("")}</div>
+  <div style="margin-top:6px"><b>النوع:</b> ${cb(dr.ty.c,"drTog('ty','c',this.checked)","طلبات العملاء")}${cb(dr.ty.t,"drTog('ty','t',this.checked)","أوامر النقل")} <b style="margin-right:10px">الحالة:</b> ${cb(dr.st.done,"drTog('st','done',this.checked)","اتحضّر")}${cb(dr.st.open,"drTog('st','open',this.checked)","لسه ما اتحضّرش")}</div>
+  <div style="margin-top:6px"><b>الفترة:</b> ${DRPER.map(([k,t])=>cb(dr.per===k,`drPer('${k}',this.checked)`,t)).join("")}</div>
+  ${sum}<div class="row" style="margin-top:8px"><button class="b x" onclick="drPrint()">🖨 طباعة</button></div></div>${U.length?drTables(U):'<div class="card"><div class="empty">مفيش بيانات بالاختيارات دي</div></div>'}`;
+}
+function drPrint(){doPrint("تقرير الأصناف ومدد التأخير",drTables(drUnits()))}
+
+function repView(){return drView()+repView0()}
+function repView0(){
   const rows=repRows(),sel=(k,l,opts)=>`<div><label>${l}</label><select onchange="rp.${k}=this.value;render()">${opts.map(([v,t])=>`<option value="${esc(v)}" ${rp[k]===v?"selected":""}>${esc(t)}</option>`).join("")}</select></div>`;
   const girls=[...new Set(orders.map(o=>o.createdBy).filter(Boolean))];
   const ca=can("camt"),tot=rows.filter(noT).reduce((t,o)=>t+(+o.amount||0),0),col=rows.filter(o=>noT(o)&&o.acct).reduce((t,o)=>t+(+o.accAmt||0),0);
