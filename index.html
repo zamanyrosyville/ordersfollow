@@ -505,6 +505,7 @@ async function setNotif(ev,rc,v){
   try{await db.collection("settings").doc("notif").set(nperms);toast("تم حفظ إعداد الإشعارات ✔",true)}catch(e){toast("تعذر الحفظ: "+(e.message||e.code))}
 }
 function targets(r,o,text){
+  if(/^مشعل: (جاهز ومستني|إلغاء سبب الانتظار)/.test(text))return []; /* تعليم سبب الانتظار مفيهوش إشعارات */
   const c="tele:"+o.createdBy,whs=[...new Set((o.items||[]).map(i=>i.wh).filter(Boolean))];
   let ev="";
   if(r==="tele")ev=/^التحصيل/.test(text)?"tele_collect":/^إلغاء/.test(text)?"tele_cancel":"tele_edit";
@@ -587,13 +588,15 @@ async function ack(oid,mid){
 const mods=o=>(o.log||[]).filter(l=>l.kind==="mod");
 
 /* ---- الصلاحيات (المدير يتحكم فيها) ---- */
-const APP_VER="2026-10-19b";
+const APP_VER="2026-10-19c";
 let secOpen={};
 let accounts=[],announce=null,newsAll=false,selAcct="";
 const seenGet=k=>{try{return localStorage.getItem(k)||""}catch(e){return ""}};
 const seenSet=(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}};
 const curAcct=()=>role==="tele"?(accounts.find(a=>a.name===seenGet("acctn"))||null):null;
-const CHANGES=[{v:APP_VER,ts:Date.parse("2026-10-19T12:00:00Z"),d:"١٩ أكتوبر",items:[
+const CHANGES=[{v:APP_VER,ts:Date.parse("2026-10-19T16:00:00Z"),d:"١٩ أكتوبر",items:[
+ [["owner","log","wm","acc","rd"],"مهلة مشعل بقت عادلة: لو الطلب فيه أجزاء من أكتوبر / أبو صير، مهلة تحضير مشعل بتبدأ من وصول آخر جزء (مش من تأكيد الحسابات)، وبتنتهي لما مشعل يخلّص التحضير مش لما الطلب يخرج. ولما مشعل يجهّز ويستنى شركة الشحن أو العميل، بيعلّم مربع «مستني» (شركة الشحن / العميل / سبب تاني) والانتظار ده مش بيتحسب عليه. المدد بتتحدد من ⏱ المهل، وتقرير الانتظار في شاشة الإدارة."],
+]},{v:"2026-10-19b",ts:Date.parse("2026-10-19T12:00:00Z"),d:"١٩ أكتوبر",items:[
  [["owner"],"تقارير التأخير: أوامر النقل بقت بتتحسب من وقت إنشائها (مفيش لها تأكيد حسابات)، والتقرير بقى بيكتب كام تحضير اتشال من الحساب وليه (مهلته لسه ما بدأتش / وقته غير مسجّل) بدل ما يظهر فاضي."],
 ]},{v:"2026-10-19a",ts:Date.parse("2026-10-19T10:00:00Z"),d:"١٩ أكتوبر",items:[
  [["owner","tele","log","wm","wo","wa","acc","rd"],"زرار «🎨 المظهر» فوق: تختار الوضع (تلقائي / فاتح / داكن) ولون التطبيق (6 ألوان) وحجم الخط، وبيتحفظ على جهازك. وفيه كمان تثبيت التطبيق على الموبايل أو اللاب توب زي تطبيقات جوجل (أيقونة على الشاشة وبيفتح في نافذة لوحده)."],
@@ -1155,7 +1158,7 @@ async function createOrder(o){
 }
 
 /* ---- مهلة خروج البضاعة + بيانات الشحن + الطباعة ---- */
-let logHours=72,accHours=24,shipHours=72,shipHoursBy={},whHours={},editShip=null;
+let logHours=72,accHours=24,shipHours=72,shipHoursBy={},whHours={},editShip=null,wmAfter=0,waitGrace=12;
 const SHIPM=["شركة شحن","تسليم الشركة"],HR=3600000;
 const fmtDur=ms=>{ms=Math.abs(ms);const d=Math.floor(ms/864e5),h=Math.floor(ms%864e5/HR),m=Math.floor(ms%HR/6e4);return ((d?d+" يوم ":"")+(h?h+" ساعة ":"")+(!d?m+" دقيقة":"")).trim()};
 function workDue(st,h){let t=st,rem=h*HR,g=0;while(rem>0&&g++<5000){const d=new Date(t),nm=new Date(d.getFullYear(),d.getMonth(),d.getDate()+1).getTime();if(d.getDay()===5){t=nm;continue}const ch=Math.min(rem,nm-t);t+=ch;rem-=ch}return t}
@@ -1173,8 +1176,30 @@ function dueInfo(o){
 }
 const whHrs=w=>+whHours[w]>0?+whHours[w]:0;
 const hoursOfWh=(o,w)=>whHrs(w)||hoursOf(o);
+/* ساعة مشعل في طلبات العملاء: لو فيه أجزاء من أكتوبر/أبو صير بتبدأ من وصول آخرها، وبتنتهي لما مشعل يخلّص التحضير (مش الخروج) */
+function wmClock(o){
+  const f=feedSt(o),h0=hoursOfWh(o,"wm");
+  if(!o.accAt)return {wait:"acc",h:h0};
+  if(f){if(!f.complete)return {wait:"parts",missing:f.missing,h:wmAfter>0?wmAfter:h0};
+    const arr=Math.max(0,...f.feeds.map(x=>+(((o.ship||{})[x])||{}).t||0));
+    return {st:Math.max(o.accAt,arr),h:wmAfter>0?wmAfter:h0,fed:true}}
+  return {st:o.accAt,h:h0};
+}
+function dueInfoWm(o){
+  const nm=WHN.wm,sh=(o.ship||{}).wm||{},k=wmClock(o);
+  if(k.wait==="acc")return {c:"wait",t:"مهلة "+nm+" ("+k.h+" ساعة) لسه ما بدأتش – بانتظار تأكيد الحسابات للتحصيل"};
+  if(k.wait==="parts")return {c:"wait",t:nm+": بانتظار وصول أجزاء من "+k.missing.map(x=>WHN[x]).join(" و")+" – مهلة التحضير بتبدأ بعد وصولها ("+k.h+" ساعة)"};
+  const due=workDue(k.st,k.h),full=prepOf(o,"wm")==="full",rd=full?prepDoneAt(o,"wm"):null;
+  if(rd||(sh.done&&sh.t)){const at=rd?rd.t:+sh.t,wt=sh.done?"":" – جاهز ومستني الشحن";
+    return at<=due?{c:"ok",t:nm+": جهّز في الوقت ✓"+wt}:{c:"late",t:nm+": جهّز متأخر "+fmtDur(at-due)+wt}}
+  if(full)return {c:"ok",t:nm+": جهّز"+(sh.done?"":" ومستني الشحن")};
+  const left=due-Date.now();
+  if(left<=0)return {c:"late",t:nm+": متأخر "+fmtDur(left)+" عن مهلة التحضير",late:true};
+  return {c:left<12*HR?"warn":"ok",t:nm+": باقي "+fmtDur(left)+" على انتهاء التحضير (آخر موعد "+fmt(due)+")"};
+}
 function dueInfoWh(o,w){
   if(o.stage==="cancelled")return null;
+  if(w==="wm"&&noT(o))return dueInfoWm(o);
   const h=hoursOfWh(o,w),sh=(o.ship||{})[w]||{},nm=WHN[w]||w;
   const st=isFd(w)?((o.sentAt||{})[w]||o.accAt):o.accAt;
   if(!st)return {c:"wait",t:"مهلة "+nm+" ("+h+" ساعة) لسه ما بدأتش"+(isFd(w)?" – بتبدأ لما اللوجيستك يبعتلها الأصناف":" – بانتظار تأكيد الحسابات للتحصيل")};
@@ -1279,7 +1304,8 @@ async function saveRules(){
   const h=+$("#shh").value;if(!(h>0))return toast("اكتب عدد ساعات صحيح");const lh=+$("#lgh").value,ah=+$("#ach").value;if(!(lh>0)||!(ah>0))return toast("اكتب ساعات صحيحة لمهلة اللوجيستك ومهلة الحسابات");
   const by={};SHIPM.forEach((m,i)=>{const v=+($("#shm-"+i)?.value||0);if(v>0)by[m]=v});
   const bw={};Object.keys(WHN).forEach(w=>{const v=+($("#shw-"+w)?.value||0);if(v>0)bw[w]=v});
-  try{await db.collection("settings").doc("rules").set({shipHours:h,byMethod:by,byWh:bw,logHours:lh,accHours:ah});toast("تم حفظ المهل ✔",true)}catch(e){toast("تعذر الحفظ: "+(e.message||e.code))}
+  const wma=+($("#wma")?.value||0),wgr=$("#wgr")?.value===""?12:+$("#wgr").value;if(!(wma>=0)||!(wgr>=0))return toast("اكتب ساعات صحيحة");
+  try{await db.collection("settings").doc("rules").set({shipHours:h,byMethod:by,byWh:bw,logHours:lh,accHours:ah,wmAfter:wma,waitGrace:wgr});toast("تم حفظ المهل ✔",true)}catch(e){toast("تعذر الحفظ: "+(e.message||e.code))}
 }
 function dashRows(){
   const unpaid=orders.filter(o=>o.acct!=="full"&&o.stage!=="cancelled"&&noT(o)),modded=orders.filter(o=>mods(o).length);
@@ -1848,6 +1874,25 @@ function readyNotOut(o,wid){
   return true;
 }
 const readyBox=(o,wid)=>readyNotOut(o,wid)?`<div style="margin-top:6px;border:2px solid #d63b3b;background:rgba(214,59,59,.12);border-radius:8px;padding:8px 10px;font-weight:700">⚠ التحضير خلص لكن الطلب لسه ما خرجش! دوس زرار «${exitLbl(wid)}» تحت عشان ${isFd(wid)?"مشعل واللوجيستك يعرفوا إن الطلب خرج":"الطلب يتسجّل خرج"}. التنبيه ده هيفضل لحد ما تدوسه.</div>`:"";
+/* بعد ما مشعل يجهّز: مستني شركة الشحن أو العميل؟ مربعات سبب الانتظار */
+const WAITR=[["ship","شركة الشحن لسه ما جتش"],["cust","العميل لسه ما جاش"],["other","سبب تاني"]];
+function waitInfo(o){
+  if(!noT(o)||o.stage==="cancelled"||prepOf(o,"wm")!=="full")return null;
+  const sh=(o.ship||{}).wm||{};if(sh.done)return null;
+  const rd=prepDoneAt(o,"wm");if(!rd)return null;
+  const r=(o.wait||{}).r||{};return {since:rd.t,r,has:Object.keys(r).length>0,el:Date.now()-rd.t};
+}
+function waitBox(o,wid){
+  if(wid!=="wm")return "";const w=waitInfo(o);if(!w)return "";
+  const ed=owner||role==="wm"||role==="log";
+  const chips=WAITR.map(([k,t])=>`<label class="drcb ${w.r[k]?"on":""}"><input type="checkbox" ${w.r[k]?"checked":""} ${ed?"":"disabled"} onchange="waitSet('${o.id}','${k}',this.checked)">${t}</label>`).join("");
+  const warn=!w.has&&w.el>waitGrace*HR?`<div class="hold" style="margin-top:4px">⚠ مستني من ${esc(fmtDur(w.el))} ولسه ما اتعلّمش سبب الانتظار.</div>`:"";
+  return `<div style="margin-top:6px;border:1px dashed var(--bd);border-radius:8px;padding:8px 10px"><b>⏳ جاهز ومستني الشحن</b> <span class="mut">من ${esc(fmt(w.since))} (${esc(fmtDur(w.el))})</span><div class="drg"><span class="drl">مستني:</span>${chips}</div>${warn}</div>`;
+}
+function waitSet(id,k,on){
+  const lbl=(WAITR.find(x=>x[0]===k)||[])[1]||k;
+  upd(id,o=>{o.wait=o.wait||{};o.wait.r=o.wait.r||{};if(on)o.wait.r[k]=Date.now();else delete o.wait.r[k]},"مشعل: "+(on?"جاهز ومستني – ":"إلغاء سبب الانتظار – ")+lbl,undefined,undefined,true);
+}
 const readyAlert=(wid)=>setTimeout(()=>alert("✅ تم التحضير\n\n⚠ متنساش تدوس زرار «"+exitLbl(wid)+"» عشان الطلب يخرج رسمياً"+(isFd(wid)?" ومشعل واللوجيستك يعرفوا.":".")+"\nالطلب هيفضل متعلّق عندك بتنبيه أحمر لحد ما تدوسه."),80);
 const cartonBox=o=>noT(o)?`<div class="row" style="margin-top:8px"><span>📦 عدد الكراتين (بيظهر في البوليصة)</span><input class="wi" type="number" min="0" id="ct-${o.id}" value="${esc(o.cartons||"")}" style="max-width:110px" placeholder="العدد"><button class="b s x" onclick="saveCartons('${o.id}')">حفظ</button></div>`:"";
 function saveCartons(id){
@@ -1903,7 +1948,7 @@ function whView(wid){
       <div class="mut">التوزيع: ${esc(byPackTxt(by))}</div>
       <div class="tw"><table>${hdrPack}${G.rows.map(r=>whRow(o,r,done,r.p)).join("")}</table></div></div>`}).join("");
     const others=sp.other.length?`<div class="tw" style="margin-top:8px"><table>${hdrStd}${sp.other.map(z=>whRow(o,z,done,isPk(wid)?null:undefined)).join("")}</table></div>`:"";
-    return `<div class="card" style="${can("cdue",wid)?lateStyleWh(o,wid):""}"><div class="row"><div>${woChk(o,wid)}<b>${cT(o,wid)}</b>${isTr(o)?` <span class="tag" style="background:#3d6f8e">أمر نقل داخلي</span>`:""}<div class="mut">${metaLine(o,wid)}</div>${onyxBox(o,wid)}${nameBox(o,wid)+linkBox(o,wid)}</div><div class="x">${prioTag(o,wid)}${tag(o.stage)} <button class="b s x" onclick="toggleFold('${o.id}')">${fold[o.id]?"◂ فتح":"▾ طي"}</button></div></div>${can("cdue",wid)?dueBadgeWh(o,wid):""}${fold[o.id]?foldLine(o,wid):""}${readyBox(o,wid)}<div ${fold[o.id]?'style="display:none"':""}>${isFd(wid)?(o.noShip?'<div class="hold" style="margin-top:6px">⛔ الشحن متوقف حالياً. كلّم مروان.</div>':""):holdBanner(o)}${wid==="wm"?payOkBanner(o)+relBanner(o)+compBanner(o):""}<div style="margin-top:4px">${can("cship",wid)?shipLine(o):""}${wid==="wm"&&can("cwaybill",wid)?`<button class="b s x" onclick="printWaybill('${o.id}')">🖨 بوليصة شحن</button>`:""}</div>
+    return `<div class="card" style="${can("cdue",wid)?lateStyleWh(o,wid):""}"><div class="row"><div>${woChk(o,wid)}<b>${cT(o,wid)}</b>${isTr(o)?` <span class="tag" style="background:#3d6f8e">أمر نقل داخلي</span>`:""}<div class="mut">${metaLine(o,wid)}</div>${onyxBox(o,wid)}${nameBox(o,wid)+linkBox(o,wid)}</div><div class="x">${prioTag(o,wid)}${tag(o.stage)} <button class="b s x" onclick="toggleFold('${o.id}')">${fold[o.id]?"◂ فتح":"▾ طي"}</button></div></div>${can("cdue",wid)?dueBadgeWh(o,wid):""}${fold[o.id]?foldLine(o,wid):""}${readyBox(o,wid)}${waitBox(o,wid)}<div ${fold[o.id]?'style="display:none"':""}>${isFd(wid)?(o.noShip?'<div class="hold" style="margin-top:6px">⛔ الشحن متوقف حالياً. كلّم مروان.</div>':""):holdBanner(o)}${wid==="wm"?payOkBanner(o)+relBanner(o)+compBanner(o):""}<div style="margin-top:4px">${can("cship",wid)?shipLine(o):""}${wid==="wm"&&can("cwaybill",wid)?`<button class="b s x" onclick="printWaybill('${o.id}')">🖨 بوليصة شحن</button>`:""}</div>
     ${lm&&!(isFd(wid)&&/تحصيل|سداد|الحسابات|دفع/.test(lm.text))&&(can("cship",wid)||/الأصناف|الكميات|تحضير/.test(lm.text))&&!(isFd(wid)&&/بيانات الشحن/.test(lm.text))?`<div class="hold" style="color:#7b5aa6">آخر تعديل: ${esc(lm.text)}</div>`:""}
     <div class="mut" style="margin-top:6px">جاهز ${rd} من ${mi.length} صنف عندك${done?" · <b>تم الشحن</b>"+(sh.ref?" (شحنة "+esc(sh.ref)+")":"")+(sh.driver?" · السائق "+esc(sh.driver)+" · "+esc(sh.car):""):""}</div>
     ${wid==="wm"?prepBox(o)+cartonBox(o):""}
@@ -2111,7 +2156,7 @@ function repCsv(){
 function repPrint(){const rows=repRows(),C=repCols().filter(c=>!(["قيمة الطلب","المحصّل المؤكد"].includes(c[0])&&!can("camt"))&&!(c[0]==="البنت"&&!can("cgirl")));doPrint("تقرير الطلبات ("+rows.length+")",`<table><tr>${C.map(c=>"<th>"+c[0]+"</th>").join("")}</tr>${rows.map(o=>"<tr>"+C.map(c=>"<td>"+esc(c[1](o))+"</td>").join("")+"</tr>").join("")}</table>`)}
 /* ---- تقارير الأصناف ومدد التأخير: مربعات اختيار (مش قوايم). التأخير = من موعد التحضير المحدد للمخزن لحد ما تحضيره يخلص (أو لحد دلوقتي لو لسه ما خلصش) ---- */
 let dr={dims:{wh:1,girl:1,bucket:1},whs:{wm:1,wo:1,wa:1},ty:{c:1,t:1},st:{done:1,open:1},per:"all"};
-const DRDIM=[["wh","المخزن"],["girl","البنت"],["item","الصنف / الكود"],["month","الشهر"],["week","الأسبوع"],["bucket","شرائح مدة التأخير"]];
+const DRDIM=[["wh","المخزن"],["girl","البنت"],["item","الصنف / الكود"],["month","الشهر"],["week","الأسبوع"],["bucket","شرائح مدة التأخير"],["wait","الانتظار بعد التحضير (مشعل)"]];
 const DRPER=[["all","كل الفترات"],["7","آخر 7 أيام"],["30","آخر 30 يوم"],["m","الشهر ده"]];
 function drTog(g,k,on){if(on)dr[g][k]=1;else delete dr[g][k];render()}
 function drPer(k,on){dr.per=on?k:"all";render()}
@@ -2121,18 +2166,19 @@ function prepDoneAt(o,w){
   return l?{t:+l.t,est:true}:null;
 }
 function drUnits(){
-  const now=Date.now(),U=[],X={nostart:0,notime:0,none:0};
+  const now=Date.now(),U=[],X={nostart:0,notime:0,parts:0};
   const lim=!owner&&WHROLES.includes(role)?role:"";
   orders.forEach(o=>{
     if(o.stage==="cancelled")return;
     if(isTr(o)?!dr.ty.t:!dr.ty.c)return;
     whInvolved(o).forEach(w=>{
       if(lim&&w!==lim)return;if(!dr.whs[w])return;
-      const st=(isFd(w)?((o.sentAt||{})[w]||o.accAt):o.accAt)||(isTr(o)?o.createdAt:0); /* أمر النقل مفيش له تأكيد حسابات: بيتحسب من وقت إنشائه */
+      let st=(isFd(w)?((o.sentAt||{})[w]||o.accAt):o.accAt)||(isTr(o)?o.createdAt:0),hrs=hoursOfWh(o,w); /* أمر النقل مفيش له تأكيد حسابات: بيتحسب من وقت إنشائه */
+      if(w==="wm"&&noT(o)){const k=wmClock(o);if(k.wait==="parts"){X.parts++;return}if(k.st){st=k.st;hrs=k.h}}
       if(!st){X.nostart++;return}
       if(dr.per!=="all"){const d=new Date(now);const from=dr.per==="m"?new Date(d.getFullYear(),d.getMonth(),1).getTime():now-(+dr.per)*864e5;if(st<from)return}
       const items=(o.items||[]).filter(i=>i.wh===w);if(!items.length)return;
-      const due=workDue(st,hoursOfWh(o,w)),full=prepOf(o,w)==="full";
+      const due=workDue(st,hrs),full=prepOf(o,w)==="full";
       let end=now,est=false;
       if(full){const pd=prepDoneAt(o,w);if(!pd){X.notime++;return}end=pd.t;est=pd.est}
       if(full?!dr.st.done:!dr.st.open)return;
@@ -2140,7 +2186,7 @@ function drUnits(){
       U.push({o,w,items,st,due,end,full,est,late,delay:late?end-due:0});
     });
   });
-  U.unk=X.notime;U.nostart=X.nostart;return U;
+  U.unk=X.notime;U.nostart=X.nostart;U.parts=X.parts;return U;
 }
 const drPct=(a,b)=>b?Math.round(a*100/b)+"%":"—";
 const drBucket=ms=>ms<=0?"0 · في الميعاد":ms<864e5?"1 · أقل من يوم":ms<3*864e5?"2 · من 1 لـ 3 أيام":ms<7*864e5?"3 · من 3 لـ 7 أيام":"4 · أكتر من 7 أيام";
@@ -2157,6 +2203,26 @@ function drTable(title,rows,sortBy){
   ${L.map(m=>`<tr><td><b>${esc(m.label)}</b></td><td>${m.ord.size}</td><td>${m.n}</td><td ${red(m.late.size)}>${m.late.size}</td><td ${red(m.late.size)}>${drPct(m.late.size,m.ord.size)}</td><td ${red(m.ln)}>${m.ln}</td><td ${red(m.ln)}>${drPct(m.ln,m.n)}</td><td>${dur(m.d.length?m.tot/m.d.length:0)}</td><td>${dur(Math.max(0,...m.d))}</td><td>${dur(m.tot)}</td></tr>`).join("")}
   <tr style="font-weight:700;background:rgba(0,0,0,.05)"><td>الإجمالي</td><td>${T.o}</td><td>${T.n}</td><td>${T.l}</td><td>${drPct(T.l,T.o)}</td><td>${T.ln}</td><td>${drPct(T.ln,T.n)}</td><td>${dur(T.c?T.d/T.c:0)}</td><td>${dur(T.mx)}</td><td>${dur(T.d)}</td></tr></table></div>${cut?'<div class="mut">معروض أول 50 صف بس.</div>':""}</div>`;
 }
+function drWait(){
+  const now=Date.now(),R=[];
+  orders.forEach(o=>{
+    if(!noT(o)||o.stage==="cancelled"||!dr.ty.c||prepOf(o,"wm")!=="full")return;
+    const rd=prepDoneAt(o,"wm");if(!rd)return;
+    if(dr.per!=="all"){const d=new Date(now),from=dr.per==="m"?new Date(d.getFullYear(),d.getMonth(),1).getTime():now-(+dr.per)*864e5;if(rd.t<from)return}
+    const sh=(o.ship||{}).wm||{},end=sh.done&&+sh.t?+sh.t:now,wt=Math.max(0,end-rd.t),rs=(o.wait||{}).r||{},ks=Object.keys(rs).sort((a,b)=>rs[b]-rs[a]);
+    const cause=ks.length?ks[0]:(wt>waitGrace*HR?"none":"grace");
+    R.push({o,wt,open:!sh.done,cause,meth:o.shipMethod||"—"});
+  });
+  return R;
+}
+function drWaitTable(){
+  const R=drWait();if(!R.length)return '<div class="card" style="margin-top:8px"><b>الانتظار بعد التحضير (مشعل)</b><div class="empty">مفيش طلبات جاهزة ومستنية بالاختيارات دي</div></div>';
+  const LB={ship:"شركة الشحن لسه ما جتش",cust:"العميل لسه ما جاش",other:"سبب تاني",none:"بدون سبب (بعد فترة السماح)",grace:"ضمن فترة السماح"};
+  const tab=(title,key,lab)=>{const M={};R.forEach(r=>{const k=key(r),m=M[k]=M[k]||{n:0,op:0,d:[]};m.n++;if(r.open)m.op++;m.d.push(r.wt)});
+    const dur=ms=>ms>0?esc(fmtDur(ms)):"—",avg=a=>a.reduce((x,y)=>x+y,0)/a.length;
+    return `<div class="card" style="margin-top:8px"><b>${esc(title)}</b><div class="tw" style="margin-top:6px"><table><tr><th></th><th>الطلبات</th><th>لسه مستني</th><th>متوسط الانتظار</th><th>أقصى انتظار</th><th>إجمالي الانتظار</th></tr>${Object.entries(M).sort((a,b)=>b[1].n-a[1].n).map(([k,m])=>`<tr><td><b>${esc(lab(k))}</b></td><td>${m.n}</td><td>${m.op}</td><td>${dur(avg(m.d))}</td><td>${dur(Math.max(...m.d))}</td><td>${dur(m.d.reduce((x,y)=>x+y,0))}</td></tr>`).join("")}</table></div></div>`};
+  return tab("الانتظار بعد التحضير (مشعل) حسب السبب",r=>r.cause,k=>LB[k]||k)+tab("الانتظار بعد التحضير حسب طريقة الشحن",r=>r.meth,k=>k);
+}
 function drTables(U){
   const R=[],g=(k,t,rows,so)=>dr.dims[k]&&R.push(drTable(t,rows,so));
   const per=f=>U.map(u=>({...f(u),o:u.o,n:u.items.length,late:u.late,delay:u.delay}));
@@ -2165,6 +2231,7 @@ function drTables(U){
   if(dr.dims.item){const rows=[];U.forEach(u=>u.items.forEach(i=>{const c=sKey(i.code)||"—";rows.push({key:c,label:c+(i.name?" – "+i.name:""),o:u.o,n:1,late:u.late,delay:u.delay})}));R.push(drTable("حسب الصنف / الكود",rows))}
   g("month","حسب الشهر (من بداية مهلة التحضير)",per(u=>{const d=new Date(u.st),k=d.getFullYear()+"-"+pad2(d.getMonth()+1);return {key:k,label:k}}),"key");
   g("week","حسب الأسبوع (بيبدأ السبت)",per(u=>{const k=drWeek(u.st);return {key:k,label:"أسبوع "+k}}),"key");
+  if(dr.dims.wait)R.push(drWaitTable());
   g("bucket","شرائح مدة التأخير",per(u=>{const k=drBucket(u.delay);return {key:k,label:k.replace(/^\d · /,"")}}),"keyAsc");
   return R.join("");
 }
@@ -2173,12 +2240,12 @@ function drView(){
   const cb=(on,fn,t)=>`<label class="drcb ${on?"on":""}"><input type="checkbox" ${on?"checked":""} onchange="${fn}">${t}</label>`;
   const grp=(t,h)=>`<div class="drg"><span class="drl">${t}</span>${h}</div>`;
   const late=U.filter(u=>u.late),est=U.filter(u=>u.est).length;
-  const sum=`<div class="drsum">تحضيرات: <b>${U.length}</b> · متأخر: <b style="color:#b8412f">${late.length}</b> (${drPct(late.length,U.length)}) · أصناف: <b>${U.reduce((t,u)=>t+u.items.length,0)}</b>، المتأخر منها <b>${late.reduce((t,u)=>t+u.items.length,0)}</b>${late.length?` · متوسط التأخير <b>${esc(fmtDur(late.reduce((t,u)=>t+u.delay,0)/late.length))}</b>`:""}</div>${est?`<div class="mut">${est} تحضير قديم وقته تقديري من السجل.</div>`:""}${U.unk?`<div class="mut">${U.unk} تحضير خلص قبل التحديث ومفيش له وقت مسجّل، فاتشال من الحساب.</div>`:""}${U.nostart?`<div class="mut">${U.nostart} تحضير مهلته لسه ما بدأتش (بانتظار تأكيد الحسابات أو إرسال الأصناف للمخزن)، فاتشال من الحساب.</div>`:""}`;
+  const sum=`<div class="drsum">تحضيرات: <b>${U.length}</b> · متأخر: <b style="color:#b8412f">${late.length}</b> (${drPct(late.length,U.length)}) · أصناف: <b>${U.reduce((t,u)=>t+u.items.length,0)}</b>، المتأخر منها <b>${late.reduce((t,u)=>t+u.items.length,0)}</b>${late.length?` · متوسط التأخير <b>${esc(fmtDur(late.reduce((t,u)=>t+u.delay,0)/late.length))}</b>`:""}</div>${est?`<div class="mut">${est} تحضير قديم وقته تقديري من السجل.</div>`:""}${U.unk?`<div class="mut">${U.unk} تحضير خلص قبل التحديث ومفيش له وقت مسجّل، فاتشال من الحساب.</div>`:""}${U.parts?`<div class="mut">${U.parts} تحضير في مشعل مستني أجزاء من أكتوبر / أبو صير، فمهلته لسه ما بدأتش.</div>`:""}${U.nostart?`<div class="mut">${U.nostart} تحضير مهلته لسه ما بدأتش (بانتظار تأكيد الحسابات أو إرسال الأصناف للمخزن)، فاتشال من الحساب.</div>`:""}`;
   return `<div class="card drbox"><div class="mut">التأخير = من موعد التحضير المحدد للمخزن لحد ما تحضيره يخلص (أو لحد دلوقتي لو لسه).</div>
   ${grp("اعرض حسب",DRDIM.filter(([k])=>k!=="girl"||can("cgirl")).map(([k,t])=>cb(dr.dims[k],`drTog('dims','${k}',this.checked)`,t)).join(""))}
   ${grp("الفلتر",Object.entries(WHN).filter(([w])=>!lim||w===lim).map(([w,n])=>cb(dr.whs[w],`drTog('whs','${w}',this.checked)`,n.replace("مخزن ",""))).join("")+'<span class="drsep"></span>'+cb(dr.ty.c,"drTog('ty','c',this.checked)","طلبات عملاء")+cb(dr.ty.t,"drTog('ty','t',this.checked)","أوامر نقل")+'<span class="drsep"></span>'+cb(dr.st.done,"drTog('st','done',this.checked)","اتحضّر")+cb(dr.st.open,"drTog('st','open',this.checked)","لسه"))}
   ${grp("الفترة",DRPER.map(([k,t])=>cb(dr.per===k,`drPer('${k}',this.checked)`,t)).join("")+'<button class="b x s" style="margin-right:auto" onclick="drPrint()">🖨 طباعة</button>')}
-  ${sum}</div>${U.length?drTables(U):'<div class="card"><div class="empty">مفيش بيانات بالاختيارات دي'+(U.unk||U.nostart?'<br><span class="mut">السبب فوق: فيه تحضيرات اتشالت لأن مهلتها ما بدأتش أو وقت تحضيرها غير مسجّل.</span>':"")+'</div></div>'}`;
+  ${sum}</div>${U.length||dr.dims.wait?drTables(U):'<div class="card"><div class="empty">مفيش بيانات بالاختيارات دي'+(U.unk||U.nostart?'<br><span class="mut">السبب فوق: فيه تحضيرات اتشالت لأن مهلتها ما بدأتش أو وقت تحضيرها غير مسجّل.</span>':"")+'</div></div>'}`;
 }
 function drPrint(){doPrint("تقرير الأصناف ومدد التأخير",drTables(drUnits()))}
 
@@ -2248,6 +2315,9 @@ function dashView(){
   <div class="row" style="margin-top:6px"><label class="x" style="margin:0">مهلة الحسابات</label><input id="ach" type="number" min="1" value="${accHours}"><span class="x">ساعة (الافتراضي 24)</span></div>
   <div class="mut" style="margin-top:12px"><b>مهلة كل مخزن (منفصلة)</b> – بتبدأ من نفس لحظة تأكيد الحسابات، وبتظهر على كارت المخزن ده بس. الخانة الفاضية بتاخد المدة العامة.</div>
   ${Object.entries(WHN).map(([w,n])=>`<div class="row" style="margin-top:6px"><label class="x" style="margin:0">${esc(n)}</label><input id="shw-${w}" type="number" min="1" placeholder="زي العامة" value="${whHours[w]||""}"><span class="x">ساعة</span></div>`).join("")}
+  <div class="mut" style="margin-top:12px"><b>مخزن مشعل لما فيه أجزاء من أكتوبر / أبو صير</b> – مهلة تحضير مشعل بتبدأ من وقت <b>وصول آخر جزء</b> (وقت خروجه من أكتوبر أو أبو صير) مش من تأكيد الحسابات، وبتنتهي لما مشعل يخلّص التحضير. الانتظار بعد التحضير (شركة الشحن أو العميل) مش بيتحسب على مشعل.</div>
+  <div class="row" style="margin-top:6px"><label class="x" style="margin:0">مهلة مشعل بعد وصول آخر جزء</label><input id="wma" type="number" min="1" placeholder="زي مهلة مشعل" value="${wmAfter||""}"><span class="x">ساعة</span></div>
+  <div class="row" style="margin-top:6px"><label class="x" style="margin:0">سماح الانتظار بعد التحضير</label><input id="wgr" type="number" min="0" placeholder="12" value="${waitGrace}"><span class="x">ساعة قبل ما يتحسب «انتظار بدون سبب»</span></div>
   <div style="margin-top:8px"><button class="b" onclick="saveRules()">حفظ المهل</button></div></div>
   ${sC}${sO("perm","🔐 الصلاحيات")}<div class="card"><b>الصلاحيات – مين يشوف إيه</b><div class="mut">علّم ✔ على اللي تحب يظهر لكل شاشة. أنت بتشوف كل حاجة دايماً، والبنت بتشوف بيانات طلباتها هي. التغيير بيتطبّق فوراً.</div>
   <div class="tw"><table><tr><th>الصلاحية</th><th>اللوجيستك</th><th>الحسابات</th><th>مخزن مشعل</th><th>مخزن أكتوبر</th><th>مخزن أبو صير</th><th>حسابات التقارير</th></tr>
@@ -2436,7 +2506,7 @@ function startListeners(){
   if(listening)return;listening=true;
   db=firebase.firestore();
   const err=e=>{const m=$("#msg");m.style.display="block";m.textContent="خطأ في الاتصال بقاعدة البيانات: "+(e.message||e.code)};
-  db.collection("settings").onSnapshot(x=>{pins={};shipHours=72;logHours=72;accHours=24;shipHoursBy={};whHours={};perms={};nperms={};fleet={drivers:[],cars:[],dests:[SOHAG],staff:[],preps:[],revs:[]};wbill={...WB_DEF};reasons=DEFAULT_REASONS.slice();UNITS=DEF_UNITS.slice();accounts=[];announce=null;x.docs.forEach(d=>{const v=d.data()||{};if(d.id==="reasons"){const l=toArr(v.list).filter(Boolean);reasons=l}else if(d.id==="rules"){whHours=v.byWh||{};{const lh=+v.logHours,ah=+v.accHours;if(lh>0)logHours=lh;if(ah>0)accHours=ah}const h=+v.shipHours;if(h>0)shipHours=h;shipHoursBy=v.byMethod||{}}else if(d.id==="perms"){perms=v}else if(d.id==="notif"){nperms=v}else if(d.id==="fleet"){fleet={drivers:toArr(v.drivers).filter(Boolean),cars:toArr(v.cars).filter(Boolean),dests:v.dests?toArr(v.dests).filter(Boolean):[SOHAG],staff:toArr(v.staff).filter(Boolean),preps:toArr(v.preps).filter(Boolean),revs:toArr(v.revs).filter(Boolean)}}else if(d.id==="accounts"){accounts=toArr(v.list).filter(a=>a&&a.name)}else if(d.id==="announce"){announce=v&&v.id?v:null}else if(d.id==="units"){const l=toArr(v.list).map(z=>String(z).trim()).filter(Boolean);if(l.length)UNITS=l}else if(d.id==="waybill"){wbill={...WB_DEF,...v}}else if(v.phones)contacts=mergeC(toArr(v.phones).filter(x=>x&&x.name));else pins=v});refresh()},err);
+  db.collection("settings").onSnapshot(x=>{pins={};shipHours=72;logHours=72;accHours=24;shipHoursBy={};whHours={};wmAfter=0;waitGrace=12;perms={};nperms={};fleet={drivers:[],cars:[],dests:[SOHAG],staff:[],preps:[],revs:[]};wbill={...WB_DEF};reasons=DEFAULT_REASONS.slice();UNITS=DEF_UNITS.slice();accounts=[];announce=null;x.docs.forEach(d=>{const v=d.data()||{};if(d.id==="reasons"){const l=toArr(v.list).filter(Boolean);reasons=l}else if(d.id==="rules"){whHours=v.byWh||{};{const lh=+v.logHours,ah=+v.accHours;if(lh>0)logHours=lh;if(ah>0)accHours=ah}const h=+v.shipHours;if(h>0)shipHours=h;shipHoursBy=v.byMethod||{};{const wa=+v.wmAfter,g=v.waitGrace===undefined?NaN:+v.waitGrace;if(wa>0)wmAfter=wa;if(g>=0)waitGrace=g}}else if(d.id==="perms"){perms=v}else if(d.id==="notif"){nperms=v}else if(d.id==="fleet"){fleet={drivers:toArr(v.drivers).filter(Boolean),cars:toArr(v.cars).filter(Boolean),dests:v.dests?toArr(v.dests).filter(Boolean):[SOHAG],staff:toArr(v.staff).filter(Boolean),preps:toArr(v.preps).filter(Boolean),revs:toArr(v.revs).filter(Boolean)}}else if(d.id==="accounts"){accounts=toArr(v.list).filter(a=>a&&a.name)}else if(d.id==="announce"){announce=v&&v.id?v:null}else if(d.id==="units"){const l=toArr(v.list).map(z=>String(z).trim()).filter(Boolean);if(l.length)UNITS=l}else if(d.id==="waybill"){wbill={...WB_DEF,...v}}else if(v.phones)contacts=mergeC(toArr(v.phones).filter(x=>x&&x.name));else pins=v});refresh()},err);
   db.collection("stock").onSnapshot(x=>{stockDocs={};stockMap={};stockErr="";x.docs.forEach(d=>{const v=d.data();stockDocs[d.id]=v;stockMap[d.id]=new Map((v.rows||[]).map(r=>[r.c,r.q]))});refresh()},e=>{stockErr=e.code||e.message||"خطأ"});
   db.collection("orders").orderBy("createdAt","desc").onSnapshot(s=>{orders=s.docs.map(d=>d.data());checkNew();refresh()},err);
 }
