@@ -256,6 +256,11 @@ nav button{font-size:var(--fs);font-weight:500}
 
 /* التقارير على الشاشات العريضة: فلاتر في أعمدة وعرض كامل للجداول */
 @media(min-width:700px){.repf{grid-template-columns:repeat(3,1fr)}}
+.frz{max-height:68vh;overflow:auto;border:1px solid var(--bd);border-radius:8px}
+.frz table th{position:sticky;top:0;z-index:3;background:var(--card);box-shadow:0 1px 0 var(--bd)}
+.frz .fz{position:sticky;background:var(--card);z-index:2}.frz th.fz{z-index:4}
+.frz tr.tot td{position:sticky;bottom:0;z-index:3;background:var(--card);box-shadow:0 -1px 0 var(--bd),inset 0 0 0 999px rgba(0,0,0,.05)}
+.frz tr.tot td.fz{z-index:4}
 .drbox{padding:10px}.drg{display:flex;flex-wrap:wrap;align-items:center;gap:4px;margin-top:6px}.drl{font-weight:700;font-size:13px;min-width:64px}
 .drcb{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--bd);border-radius:14px;padding:3px 10px;font-size:13px;cursor:pointer;white-space:nowrap}
 .drcb.on{background:rgba(47,125,91,.16);border-color:#2f7d5b;font-weight:700}
@@ -511,11 +516,13 @@ function targets(r,o,text){
   if(r==="tele")ev=/^التحصيل/.test(text)?"tele_collect":/^إلغاء/.test(text)?"tele_cancel":"tele_edit";
   else if(r==="log")ev=/^(تحويل|تحديث الأصناف|تعديل \(اللوجيستك\): تحديث الأصناف)/.test(text)?"log_assign":"log_edit";
   else if(r==="acc")ev=/عدم الشحن|رفع منع/.test(text)?"acc_hold":"acc_confirm";else if(r==="wm")ev="wm_edit";else if(r==="wo")ev=/اكتملت مكونات/.test(text)?"feed_done":/تم الشحن/.test(text)?"wo_ship":"wo_edit";else if(r==="wa")ev=/اكتملت مكونات/.test(text)?"feed_done":/تم الشحن/.test(text)?"wa_ship":"wa_edit";
-  let tg=evTargets(ev,o,(ev==="log_assign"||ev==="acc_hold")?whs:WHROLES);
+  let tg=evTargets(ev,o,(ev==="log_assign"||ev==="acc_hold")?whs:whNotif(o));
   if(isTr(o)){tg=tg.filter(k=>k.indexOf("tele:")!==0&&k!=="acc"&&!(k==="wm"&&o.destType!=="wm"))}
   if(r==="acc")tg=tg.filter(k=>!isFd(k)); /* أكتوبر وأبو صير ميعرفوش حاجة عن التحصيل والسداد */
   return tg;
 }
+/* أكتوبر وأبو صير ما يوصلهمش إشعار على طلب مفيهوش أصناف ليهم (مشعل زي ما هو) */
+const whNotif=o=>WHROLES.filter(w=>!isFd(w)||(o.items||[]).some(i=>i.wh===w));
 function evTargets(ev,o,whOk){
   if(!ev)return [];const t=[];
   NRC.forEach(([rc])=>{if(!nVal(ev,rc))return;if(rc==="girl"){if(!o.byStaff)t.push("tele:"+o.createdBy)}else if(WHROLES.includes(rc)){if(whOk.includes(rc))t.push(rc)}else t.push(rc)});
@@ -588,13 +595,17 @@ async function ack(oid,mid){
 const mods=o=>(o.log||[]).filter(l=>l.kind==="mod");
 
 /* ---- الصلاحيات (المدير يتحكم فيها) ---- */
-const APP_VER="2026-10-19d";
+const APP_VER="2026-10-22a";
 let secOpen={};
 let accounts=[],announce=null,newsAll=false,selAcct="";
 const seenGet=k=>{try{return localStorage.getItem(k)||""}catch(e){return ""}};
 const seenSet=(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}};
 const curAcct=()=>role==="tele"?(accounts.find(a=>a.name===seenGet("acctn"))||null):null;
-const CHANGES=[{v:APP_VER,ts:Date.parse("2026-10-19T20:00:00Z"),d:"١٩ أكتوبر",items:[
+const CHANGES=[{v:APP_VER,ts:Date.parse("2026-10-22T05:00:00Z"),d:"٢٢ أكتوبر",items:[
+ [["owner","log","wm","wo","wa"],"الإشعارات: أي تعديل على طلب ما يخصش أكتوبر أو أبو صير (مفيهوش أصناف ليهم) ما بيوصلهمش إشعار. مشعل زي ما هو."],
+ [["owner","wo","wa","wm"],"الجدول المجمّع «إجمالي المتبقي للتجهيز»: الهيدر وصف الإجمالي وعمود الكود ثابتين وانت بتسكرول (زي Freeze Panes في الإكسيل). وزرار «🖨 طباعة الجدول المجمّع» يطبعه لوحده."],
+ [["owner","wo","wa","wm"],"على كل كارت أوردر زرار «🖨 طباعة» يطبع جدول أصناف الأوردر ده لوحده (الكود، الصنف، الوحدة، المطلوب، المتحضّر، المتبقي)."],
+]},{v:"2026-10-19d",ts:Date.parse("2026-10-19T20:00:00Z"),d:"١٩ أكتوبر",items:[
  [["owner"],"شاشة الإدارة: قسم «📇 عملاء وجهات ثابتة». سجّل بيانات الشحن (الشركة والعنوان والتليفون) لعميل أو لجهة زي مكتب سوهاج، وأول ما يتكتب لهم طلب أو أمر نقل بتتملّي بيانات الشحن والبوليصة لوحدها. وفي كارت الطلب زرار «📌 ثبّت كعميل ثابت»."],
  [["owner","tele","log","wm"],"عميل ثابت: لما البنت تكتب كود العميل أو اسمه، بيانات الشحن بتتملّي من السجل. مروان ومشعل بيطلعلهم تنبيه على الطلب (وإشعار) يتأكدوا إن البيانات ما اتغيّرتش ويدوسوا «اتأكدت»، ولو البيانات اتغيّرت عن المسجّل بيظهر تحذير. طباعة البوليصة بتنبّه لو لسه محدش اتأكد."],
 ]},{v:"2026-10-19c",ts:Date.parse("2026-10-19T16:00:00Z"),d:"١٩ أكتوبر",items:[
@@ -1678,7 +1689,7 @@ async function newOrder(){
   const staffMade=((owner?view:role)!=="tele"),prio=staffMade?($("#prio")?.value||""):"";
   if(staffMade&&!PRIO[prio])return toast("اختار أولوية تجهيز الطلب (إلزامي)");
   const o={id:oidOf(num),items:pn,num,customer:c,phone:$("#ph").value.trim(),amount:+$("#amt").value||0,createdAt:Date.now(),createdBy:who||actor(),...(((owner?view:role)!=="tele")?{byStaff:true}:{}),stage:"new",paid:false,holdReason:"",shipRef:"",...(prio?{prio,prioBy:actor(),prioAt:Date.now()}:{}),ccode:cc,shipMethod:sm,shipCo:co2?"":sc,addr:co2?{}:ad,shipData:co2?"":addrTxt(ad),accAt:0,shippedAt:0,collected:0,acct:"",accAmt:0,log:[],mentions:[]};
-  const nt=evTargets("tele_new",o,WHROLES).filter(k=>!(o.byStaff&&k==="log"));
+  const nt=evTargets("tele_new",o,whNotif(o)).filter(k=>!(o.byStaff&&k==="log"));
   if(nt.length)o.mentions=[{id:""+Date.now(),t:Date.now(),by:actor(),from:"tele",text:"طلب جديد",to:nt,ack:{}}];
   const rg=regMatch("c",{code:cc,name:c});
   if(rg){o.reg={id:rg.id,name:rg.name,changed:!regSame(rg,{shipMethod:sm,shipCo:co2?"":sc,addr:co2?{}:ad,phone:phn}),at:Date.now()};
@@ -1851,10 +1862,24 @@ async function woTickRun(enc,on){
 }
 /* مسؤول أكتوبر (مش المدير): كارت الطلب ملخّص بس، من غير فتح/طي ومن غير تفاصيل الأصناف أو بيانات الشحن أو التعديلات */
 const woSum=wid=>wid==="wo"&&role==="wo"&&!owner;
+function woMergedPrint(wid){
+  const t=document.getElementById("mt-"+wid);if(!t)return toast("مفيش جدول للطباعة");
+  const c=t.cloneNode(true);c.removeAttribute("id");
+  c.querySelectorAll("tr").forEach(r=>{const k=r.cells[0];if(k&&k.classList.contains("fz")&&k.style.right==="0px"&&(r.cells.length>1&&r.cells[1].classList.contains("fz")))k.remove()});
+  c.querySelectorAll("input,button").forEach(e=>e.remove());c.querySelectorAll(".fz").forEach(e=>{e.classList.remove("fz");e.removeAttribute("style")});c.querySelectorAll("tr.tot").forEach(e=>e.classList.remove("tot"));
+  doPrint("إجمالي المتبقي للتجهيز – "+WHN[wid],c.outerHTML+'<div style="font-size:11px;margin-top:6px">الأرقام = عدد العبوات المتبقية بعد التحضير.</div>');
+}
+function woPrintOrder(id,wid){
+  const o=orders.find(x=>x.id===id);if(!o)return;
+  const mi=mineItems(o,wid);if(!mi.length)return toast("مفيش أصناف للمخزن ده في الطلب");
+  const rows=mi.slice().sort((a,b)=>String(a.i.code||"").localeCompare(String(b.i.code||""))).map(z=>{const q=+z.i.qty||0,p=+z.i.picked||0;return `<tr><td dir="ltr">${esc(z.i.code||"")}</td><td>${esc(z.i.name)}</td><td>${esc(unitOf(z.i)||"—")}</td><td><b>${esc(q)}</b></td><td>${esc(p)}</td><td>${esc(Math.max(0,q-p))}</td></tr>`}).join("");
+  doPrint("جدول تحضير "+WHN[wid]+" – طلب "+dnum(o,wid),`<div style="margin:4px 0 8px"><b>${cT(o,wid)}</b>${isTr(o)?" (أمر نقل داخلي)":""}</div><table><tr><th>الكود</th><th>اسم الصنف</th><th>الوحدة</th><th>المطلوب</th><th>المتحضّر</th><th>المتبقي</th></tr>${rows}</table>`);
+}
+const woPrBtn=(o,wid)=>mineItems(o,wid).length?`<button class="b s x" style="margin-right:6px" onclick="woPrintOrder('${o.id}','${wid}')" title="طباعة جدول أصناف الأوردر ده لوحده">🖨 طباعة</button>`:"";
 function woSumCard(o,wid){
   const mi=mineItems(o,wid),rd=mi.filter(z=>+z.i.qty>0&&+z.i.picked>=+z.i.qty).length,pr=prepOf(o,wid),ready=mi.length>0&&rd===mi.length;
   const pt=pr==="full"?"✅ متحضّر بالكامل":pr==="part"?"🟡 متحضّر جزئيًا ("+rd+" من "+mi.length+" بند جاهز)":"⚪ لسه ما اتحضّرش ("+mi.length+" بند)";
-  return `<div class="card" style="${can("cdue",wid)?lateStyleWh(o,wid):""}"><div class="row"><div>${woChk(o,wid)}<b>${cT(o,wid)}</b>${isTr(o)?` <span class="tag" style="background:#3d6f8e">أمر نقل داخلي</span>`:""}<div class="mut">${metaLine(o,wid)}</div>${onyxBox(o,wid)}${linkBox(o,wid)}</div><div class="x">${prioTag(o,wid)}${tag(o.stage)}</div></div>${can("cdue",wid)?dueBadgeWh(o,wid):""}<div style="margin-top:6px"><b>${pt}</b></div>${readyBox(o,wid)}${o.noShip?'<div class="hold" style="margin-top:6px">⛔ الشحن متوقف حالياً. كلّم مروان.</div>':""}
+  return `<div class="card" style="${can("cdue",wid)?lateStyleWh(o,wid):""}"><div class="row"><div>${woChk(o,wid)}<b>${cT(o,wid)}</b>${isTr(o)?` <span class="tag" style="background:#3d6f8e">أمر نقل داخلي</span>`:""}<div class="mut">${metaLine(o,wid)}</div>${onyxBox(o,wid)}${linkBox(o,wid)}</div><div class="x">${prioTag(o,wid)}${tag(o.stage)}${woPrBtn(o,wid)}</div></div>${can("cdue",wid)?dueBadgeWh(o,wid):""}<div style="margin-top:6px"><b>${pt}</b></div>${readyBox(o,wid)}${o.noShip?'<div class="hold" style="margin-top:6px">⛔ الشحن متوقف حالياً. كلّم مروان.</div>':""}
 </div>`;
 }
 function woReadyList(wid){
@@ -1909,7 +1934,7 @@ function woMerged(wid){
   L.forEach(G=>{cols.forEach(c=>tc[c]=(tc[c]||0)+(G.cell[c]||0));Object.entries(G.oth).forEach(([u,q])=>ot[u]=(ot[u]||0)+q)});
   const othTxt=o=>Object.entries(o).map(([u,q])=>n3(q)+(u?" "+esc(u):"")).join(" + ");
   const hd=cols.map(c=>`<th class="craw">/${esc(c)}${WCOLS.indexOf(c)<0?" ⚠":""}</th>`).join("");
-  return `<details class="card" open><summary><b>إجمالي المتبقي للتجهيز في ${WHN[wid]} (طلبات عملاء + أوامر نقل، بيتحدّث لوحده)</b></summary>${tk?'<div class="row" style="margin:6px 0"><button class="b ok x" onclick="woTickAll()">✓ حضّرت كل اللي في الجدول</button></div>':""}<div class="tw"><table><tr>${tk?"<th>✓ حضّرت</th>":""}<th>كود الصنف</th>${hd}<th>أخرى</th><th>إجمالي الزيوت بالكيلو</th></tr>${L.map(G=>`<tr>${tk?`<td><input type="checkbox" title="حضّرت كل المتبقي من الكود ده" aria-label="حضّرت" onchange="woTick('${woEnc(G.base)}',this.checked)" style="width:26px;height:26px;padding:0"></td>`:""}<td><b class="craw">${esc(G.base)}</b><div class="mut">${esc(G.name)}</div></td>${cols.map(c=>`<td>${G.cell[c]?"<b>"+n3(G.cell[c])+"</b>":'<span class="mut">·</span>'}</td>`).join("")}<td>${othTxt(G.oth)||'<span class="mut">·</span>'}</td><td><b>${G.g?kg(G.g):"—"}</b>${G.unk?'<div class="hold">⚠ فيه عبوة وزنها غير معروف</div>':""}</td></tr>`).join("")}<tr style="font-weight:700;background:rgba(0,0,0,.05)">${tk?"<td></td>":""}<td>الإجمالي</td>${cols.map(c=>`<td>${tc[c]?n3(tc[c]):"·"}</td>`).join("")}<td>${othTxt(ot)||"·"}</td><td>${kg(tot)}</td></tr></table></div><div class="mut">الأرقام = عدد العبوات المتبقية بعد التحضير.${tk?" علامة ✓ = حضّرت كل المتبقي من الكود في كل الطلبات (للتحضير الجزئي: «عرض كروت الطلبات»).":""} الطلبات اللي خرجت من عندك أو اتلغت مش محسوبة. الإجمالي بالكيلو بيتحسب من وزن كل عبوة (مش من عدد العبوات).</div>${doneBox}</details>`;
+  return `<details class="card" open><summary><b>إجمالي المتبقي للتجهيز في ${WHN[wid]} (طلبات عملاء + أوامر نقل، بيتحدّث لوحده)</b></summary><div class="row" style="margin:6px 0">${tk?'<button class="b ok x" onclick="woTickAll()">✓ حضّرت كل اللي في الجدول</button>':""}<button class="b s x" onclick="woMergedPrint('${wid}')">🖨 طباعة الجدول المجمّع</button></div><div class="tw frz"><table id="mt-${wid}"><tr>${tk?'<th class="fz" style="right:0;min-width:66px;width:66px">✓ حضّرت</th>':""}<th class="fz" style="right:${tk?66:0}px;min-width:96px">كود الصنف</th>${hd}<th>أخرى</th><th>إجمالي الزيوت بالكيلو</th></tr>${L.map(G=>`<tr>${tk?`<td class="fz" style="right:0"><input type="checkbox" title="حضّرت كل المتبقي من الكود ده" aria-label="حضّرت" onchange="woTick('${woEnc(G.base)}',this.checked)" style="width:26px;height:26px;padding:0"></td>`:""}<td class="fz" style="right:${tk?66:0}px"><b class="craw">${esc(G.base)}</b><div class="mut">${esc(G.name)}</div></td>${cols.map(c=>`<td>${G.cell[c]?"<b>"+n3(G.cell[c])+"</b>":'<span class="mut">·</span>'}</td>`).join("")}<td>${othTxt(G.oth)||'<span class="mut">·</span>'}</td><td><b>${G.g?kg(G.g):"—"}</b>${G.unk?'<div class="hold">⚠ فيه عبوة وزنها غير معروف</div>':""}</td></tr>`).join("")}<tr class="tot" style="font-weight:700">${tk?'<td class="fz" style="right:0"></td>':""}<td class="fz" style="right:${tk?66:0}px">الإجمالي</td>${cols.map(c=>`<td>${tc[c]?n3(tc[c]):"·"}</td>`).join("")}<td>${othTxt(ot)||"·"}</td><td>${kg(tot)}</td></tr></table></div><div class="mut">الأرقام = عدد العبوات المتبقية بعد التحضير.${tk?" علامة ✓ = حضّرت كل المتبقي من الكود في كل الطلبات (للتحضير الجزئي: «عرض كروت الطلبات»).":""} الطلبات اللي خرجت من عندك أو اتلغت مش محسوبة. الإجمالي بالكيلو بيتحسب من وزن كل عبوة (مش من عدد العبوات).</div>${doneBox}</details>`;
 }
 const PACKLEGEND=`<details class="card"><summary>دليل أكواد العبوات (الكود الأساسي / رقم العبوة)</summary><div class="mut" style="margin-top:6px">/1 = عبوة كيلو · /2 = عبوة نص كيلو · /4 = عبوة ربع كيلو · /100 = عبوة 100 جرام · /50 = عبوة 50 جرام · /5 = عبوة 5 كيلو · /P1 = 1 كيلو · /P5 = 5 كيلو · /25 = برميل 25 كيلو. الكمية المكتوبة = عدد العبوات.</div></details>`;
 /* اكتمال مكونات طلب العميل عند مشعل (أكتوبر + أبو صير) */
@@ -2024,7 +2049,7 @@ function whView(wid){
       <div class="mut">التوزيع: ${esc(byPackTxt(by))}</div>
       <div class="tw"><table>${hdrPack}${G.rows.map(r=>whRow(o,r,done,r.p)).join("")}</table></div></div>`}).join("");
     const others=sp.other.length?`<div class="tw" style="margin-top:8px"><table>${hdrStd}${sp.other.map(z=>whRow(o,z,done,isPk(wid)?null:undefined)).join("")}</table></div>`:"";
-    return `<div class="card" style="${can("cdue",wid)?lateStyleWh(o,wid):""}"><div class="row"><div>${woChk(o,wid)}<b>${cT(o,wid)}</b>${isTr(o)?` <span class="tag" style="background:#3d6f8e">أمر نقل داخلي</span>`:""}<div class="mut">${metaLine(o,wid)}</div>${onyxBox(o,wid)}${nameBox(o,wid)+linkBox(o,wid)}</div><div class="x">${prioTag(o,wid)}${tag(o.stage)} <button class="b s x" onclick="toggleFold('${o.id}')">${fold[o.id]?"◂ فتح":"▾ طي"}</button></div></div>${can("cdue",wid)?dueBadgeWh(o,wid):""}${fold[o.id]?foldLine(o,wid):""}${readyBox(o,wid)}${waitBox(o,wid)}${regBanner(o,wid)}<div ${fold[o.id]?'style="display:none"':""}>${isFd(wid)?(o.noShip?'<div class="hold" style="margin-top:6px">⛔ الشحن متوقف حالياً. كلّم مروان.</div>':""):holdBanner(o)}${wid==="wm"?payOkBanner(o)+relBanner(o)+compBanner(o):""}<div style="margin-top:4px">${can("cship",wid)?shipLine(o):""}${wid==="wm"&&can("cwaybill",wid)?`<button class="b s x" onclick="printWaybill('${o.id}')">🖨 بوليصة شحن</button>`:""}</div>
+    return `<div class="card" style="${can("cdue",wid)?lateStyleWh(o,wid):""}"><div class="row"><div>${woChk(o,wid)}<b>${cT(o,wid)}</b>${isTr(o)?` <span class="tag" style="background:#3d6f8e">أمر نقل داخلي</span>`:""}<div class="mut">${metaLine(o,wid)}</div>${onyxBox(o,wid)}${nameBox(o,wid)+linkBox(o,wid)}</div><div class="x">${prioTag(o,wid)}${tag(o.stage)}${woPrBtn(o,wid)} <button class="b s x" onclick="toggleFold('${o.id}')">${fold[o.id]?"◂ فتح":"▾ طي"}</button></div></div>${can("cdue",wid)?dueBadgeWh(o,wid):""}${fold[o.id]?foldLine(o,wid):""}${readyBox(o,wid)}${waitBox(o,wid)}${regBanner(o,wid)}<div ${fold[o.id]?'style="display:none"':""}>${isFd(wid)?(o.noShip?'<div class="hold" style="margin-top:6px">⛔ الشحن متوقف حالياً. كلّم مروان.</div>':""):holdBanner(o)}${wid==="wm"?payOkBanner(o)+relBanner(o)+compBanner(o):""}<div style="margin-top:4px">${can("cship",wid)?shipLine(o):""}${wid==="wm"&&can("cwaybill",wid)?`<button class="b s x" onclick="printWaybill('${o.id}')">🖨 بوليصة شحن</button>`:""}</div>
     ${lm&&!(isFd(wid)&&/تحصيل|سداد|الحسابات|دفع/.test(lm.text))&&(can("cship",wid)||/الأصناف|الكميات|تحضير/.test(lm.text))&&!(isFd(wid)&&/بيانات الشحن/.test(lm.text))?`<div class="hold" style="color:#7b5aa6">آخر تعديل: ${esc(lm.text)}</div>`:""}
     <div class="mut" style="margin-top:6px">جاهز ${rd} من ${mi.length} صنف عندك${done?" · <b>تم الشحن</b>"+(sh.ref?" (شحنة "+esc(sh.ref)+")":"")+(sh.driver?" · السائق "+esc(sh.driver)+" · "+esc(sh.car):""):""}</div>
     ${wid==="wm"?prepBox(o)+cartonBox(o):""}
