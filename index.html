@@ -598,14 +598,15 @@ async function ack(oid,mid){
 const mods=o=>(o.log||[]).filter(l=>l.kind==="mod");
 
 /* ---- الصلاحيات (المدير يتحكم فيها) ---- */
-const APP_VER="2026-10-25a";
+const APP_VER="2026-10-25b";
 let secOpen={};
 let accounts=[],announce=null,newsAll=false,selAcct="";
 const seenGet=k=>{try{return localStorage.getItem(k)||""}catch(e){return ""}};
 const seenSet=(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}};
 const curAcct=()=>role==="tele"?(accounts.find(a=>a.name===seenGet("acctn"))||null):null;
-const CHANGES=[{v:APP_VER,ts:Date.parse("2026-10-25T08:00:00Z"),d:"٢٥ أكتوبر",items:[
- [["owner","tele","log"],"ربط ليستة الأسعار: لما البنت تدوس «➕ ابعت لتطبيق الأوردرات» في الليستة بيفتح «طلب عميل جديد» والأصناف مكتوبة (كود | صنف | وحدة | كمية) واسم العميل وتليفونه. بتكمّل رقم الطلب وكود العميل والشحن والعنوان وبعدين إرسال. مفيش نسخ ولصق. الأصناف بتستنى ساعتين، وطول ما هي مستنية بيظهر شريط تنبيه فيه الوقت المتبقي، ولو عدّت الساعتين بتتمسح ويظهر تنبيه."]]},{v:"2026-10-23a",ts:Date.parse("2026-10-23T08:30:00Z"),d:"٢٣ أكتوبر",items:[
+const CHANGES=[{v:APP_VER,ts:Date.parse("2026-10-25T13:00:00Z"),d:"٢٥ أكتوبر",items:[
+ [["owner","tele","log"],"حسابات بالتليفون: المدير بيضيف لكل بنت (ولمروان وله هو) حساب فيه الاسم والتليفون والرقم السري من «الحسابات الشخصية». نفس التليفون والرقم بيدخل بيهم الليستة (🔒 دخول الموظفين) وتطبيق الأوردرات (أو ادخلي برقم التليفون). وبتظهر في الطلب «اتبعتوا من حساب: الاسم»."]]},{v:"2026-10-25a",ts:Date.parse("2026-10-25T08:00:00Z"),d:"٢٥ أكتوبر",items:[
+ [["owner","tele","log"],"ربط ليستة الأسعار: لما البنت تدوس «➕ ابعت لتطبيق الأوردرات» في الليستة بيفتح «طلب عميل جديد» والأصناف مكتوبة (كود | صنف | وحدة | كمية) واسم العميل وتليفونه. بتكمّل رقم الطلب وكود العميل والشحن والعنوان وبعدين إرسال. مفيش نسخ ولصق. الأصناف بتستنى ساعتين، وبتفضل في خانة الأصناف حتى لو الشاشة اتحدّثت أو اخترتي الاسم، ولحد ما الطلب يتسجّل أو تدوسي «مسح». طول ما هي مستنية بيظهر شريط تنبيه، ولو عدّت الساعتين بتتمسح ويظهر تنبيه."]]},{v:"2026-10-23a",ts:Date.parse("2026-10-23T08:30:00Z"),d:"٢٣ أكتوبر",items:[
  [["owner","tele","log","wm","wo","wa","acc","rd"],"تثبيت التطبيق على الموبايل بقى حقيقي: زرار أخضر «📲 ثبّت التطبيق» فوق (بيختفي بعد التثبيت)، وبيتثبّت بأيقونته وبيفتح لوحده زي تطبيقات الموبايل من غير شريط المتصفح. لازم ترفع ملفات التطبيق كلها جنب الصفحة (manifest.webmanifest و sw.js والأيقونات)."]]},{v:"2026-10-22b",ts:Date.parse("2026-10-22T10:30:00Z"),d:"٢٢ أكتوبر",items:[
  [["owner","wa"],"شاشة مخزن أبو صير بقت مبسّطة: أرقام كبيرة فوق (عليك تجهّزها / متأخرة / جاهزة ولسه ما خرجتش)، ثم ① حضّر: كل صنف مجمّع من كل الطلبات وجنبه زرار كبير «✓ حضّرت»، ثم ② خروج: الطلبات الجاهزة بتظهر لوحدها واختار السائق والسيارة بدوسة واحدة ودوس «🚚 خروج»، ثم ③ الطلبات: كل طلب كارت صغير فيه رقمه والمهلة، وفيه «✏ تفاصيل» لو الكمية أقل من المطلوب. نفس فكرة أكتوبر بس بخطوات وأزرار أكبر ومناسبة للموبايل."],
  [["owner","wa"],"زرار «🔧 العرض الكامل» / «🟢 العرض المبسّط» بيبدّل بين الشاشتين (بيتحفظ على الجهاز). مسؤول أبو صير بيفتح على المبسّط، والمدير على الكامل."]]},{v:"2026-10-22a",ts:Date.parse("2026-10-22T05:00:00Z"),d:"٢٢ أكتوبر",items:[
@@ -1104,23 +1105,39 @@ const chkUnit=v=>!v?"اكتب اسم الوحدة":v==="جرام"?"«جرام» 
 const addUnit=()=>{const v=($("#un-new").value||"").trim(),m=chkUnit(v);if(m)return toast(m);if(UNITS.includes(v))return toast("الوحدة دي موجودة قبل كده");saveUnits([...UNITS,v])};
 const editUnit=i=>{const v=($("#un-"+i).value||"").trim(),m=chkUnit(v);if(m)return toast(m);if(v===UNITS[i])return toast("مفيش تغيير");if(UNITS.includes(v))return toast("الوحدة دي موجودة قبل كده");saveUnits(UNITS.map((u,k)=>k===i?v:u))};
 const delUnit=i=>{if(UNITS.length<=1)return toast("لازم تفضل وحدة واحدة على الأقل");if(!confirm("حذف الوحدة «"+UNITS[i]+"» من القايمة؟ الأصناف القديمة اللي بيها هتفضل زي ما هي."))return;saveUnits(UNITS.filter((_,k)=>k!==i))};
+/* ===== حسابات بالتليفون: نفس الحساب بيدخل بيه الليستة وتطبيق الأوردرات ===== */
+const phNorm=v=>ar2en(String(v||"")).replace(/\D/g,"").slice(-10);
+async function zlHash(phone,pin){
+  const enc=new TextEncoder(),key=await crypto.subtle.importKey("raw",enc.encode(phNorm(phone)+"|"+ar2en(String(pin||"")).trim()),"PBKDF2",false,["deriveBits"]);
+  const bits=await crypto.subtle.deriveBits({name:"PBKDF2",salt:enc.encode("zamany-list-v1"),iterations:100000,hash:"SHA-256"},key,256);
+  return [...new Uint8Array(bits)].map(b=>b.toString(16).padStart(2,"0")).join("");
+}
+/* قايمة الموظفين اللي الليستة بتقراها: الاسم + بصمة (التليفون+الرقم السري) من غير أرقام صريحة */
+async function publishStaffList(l){
+  if(!db||!owner)return;
+  try{
+    const out=[];for(const a of l){if(phNorm(a.phone).length===10&&a.pin)out.push({n:a.name,h:await zlHash(a.phone,a.pin)})}
+    await db.collection("public").doc("staffList").set({list:out,t:Date.now()});
+  }catch(e){toast("تعذر نشر قايمة الليستة: "+(e.message||e.code)+" (تأكد إنك نشرت القواعد الجديدة)")}
+}
 async function saveAccounts(l){
   if(!db)return toast("الحفظ غير متاح");
-  try{await db.collection("settings").doc("accounts").set({list:l});toast("تم حفظ الحسابات ✔",true);syncNameFlag(["log","acc","wm"].some(x=>permVal("ename",x))||l.some(a=>a.ename))}catch(e){toast("تعذر الحفظ: "+(e.message||e.code))}
+  try{await db.collection("settings").doc("accounts").set({list:l});toast("تم حفظ الحسابات ✔",true);publishStaffList(l);syncNameFlag(["log","acc","wm"].some(x=>permVal("ename",x))||l.some(a=>a.ename))}catch(e){toast("تعذر الحفظ: "+(e.message||e.code))}
 }
 function addAcct(){
-  const n=($("#ac-n").value||"").trim(),pn=($("#ac-p").value||"").trim(),o=$("#ac-o").checked,r=$("#ac-r").checked;
-  if(!n||!pn)return toast("اكتب الاسم والرقم السري");if(!o&&!r)return toast("اختار صلاحية واحدة على الأقل (طلبات أو تقارير)");
+  const n=($("#ac-n").value||"").trim(),pn=($("#ac-p").value||"").trim(),ph=($("#ac-t").value||"").trim(),o=$("#ac-o").checked,r=$("#ac-r").checked;
+  if(!n||!pn)return toast("اكتب الاسم والرقم السري");if(ph&&phNorm(ph).length!==10)return toast("رقم التليفون لازم يبقى 11 رقم (مثال 01012345678)");if(ph&&accounts.some(a=>phNorm(a.phone)===phNorm(ph)))return toast("رقم التليفون ده مستخدم في حساب تاني");if(!o&&!r)return toast("اختار صلاحية واحدة على الأقل (طلبات أو تقارير)");
   if(accounts.some(a=>a.name===n)||contacts.some(c=>c.name===n))return toast("الاسم ده موجود");
-  saveAccounts([...accounts,{name:n,pin:pn,orders:o,reports:r}]);
+  saveAccounts([...accounts,{name:n,pin:pn,...(ph?{phone:ph}:{}),orders:o,reports:r}]);
 }
 const delAcct=i=>{if(confirm("حذف حساب «"+accounts[i].name+"»؟"))saveAccounts(accounts.filter((_,k)=>k!==i))};
 const setAcct=(i,k,v)=>saveAccounts(accounts.map((a,j)=>j===i?{...a,[k]:v}:a));
+const setAcctPhone=i=>{const v=($("#aph-"+i).value||"").trim();if(v&&phNorm(v).length!==10)return toast("رقم التليفون لازم يبقى 11 رقم (مثال 01012345678)");if(v&&accounts.some((a,j)=>j!==i&&phNorm(a.phone)===phNorm(v)))return toast("رقم التليفون ده مستخدم في حساب تاني");setAcct(i,"phone",v)};
 const setAcctPin=i=>{const v=($("#ap2-"+i).value||"").trim();if(!v)return toast("اكتب رقم سري");setAcct(i,"pin",v)};
 function accountsCard(){
-  return `<div class="card"><b>الحسابات الشخصية (تقارير / إنشاء طلبات)</b><div class="mut">اعمل حساب لأي شخص باسمه ورقمه السري. «إنشاء طلبات» بيخليه يسجّل طلبات عملاء ويتابعها زي البنات. «عرض التقارير» بيفتح له شاشة التقارير، والبيانات اللي تظهر له بتتحدد من جدول الصلاحيات (عمود حسابات التقارير). اللي معاه تقارير بس بيشوف شاشة التقارير فقط.</div>
-  ${accounts.map((a,i)=>`<div class="row" style="margin-top:8px;border-top:1px solid var(--bd);padding-top:8px"><b style="min-width:90px">${esc(a.name)}</b><input id="ap2-${i}" value="${esc(a.pin)}" style="max-width:110px"><button class="b s x" onclick="setAcctPin(${i})">حفظ الرقم</button><label class="x" style="margin:0"><input type="checkbox" style="width:auto" ${a.orders?"checked":""} onchange="setAcct(${i},'orders',this.checked)"> إنشاء طلبات</label><label class="x" style="margin:0"><input type="checkbox" style="width:auto" ${a.reports?"checked":""} onchange="setAcct(${i},'reports',this.checked)"> عرض التقارير</label><label class="x" style="margin:0"><input type="checkbox" style="width:auto" ${a.ename?"checked":""} onchange="setAcct(${i},'ename',this.checked)"> تعديل أسماء العملاء</label><button class="b s x" onclick="delAcct(${i})">حذف</button></div>`).join("")||'<div class="mut" style="margin-top:6px">لسه مفيش حسابات</div>'}
-  <div class="row" style="margin-top:10px"><input id="ac-n" placeholder="الاسم" style="max-width:150px"><input id="ac-p" placeholder="الرقم السري" style="max-width:120px"><label class="x" style="margin:0"><input type="checkbox" id="ac-o" style="width:auto"> إنشاء طلبات</label><label class="x" style="margin:0"><input type="checkbox" id="ac-r" style="width:auto" checked> عرض التقارير</label><button class="b x" onclick="addAcct()">إضافة حساب</button></div></div>`;
+  return `<div class="card"><b>الحسابات الشخصية (تقارير / إنشاء طلبات)</b><div class="mut">اعمل حساب لأي شخص باسمه وتليفونه ورقمه السري (نفس التليفون والرقم بيدخل بيهم الليستة وتطبيق الأوردرات). «إنشاء طلبات» بيخليه يسجّل طلبات عملاء ويتابعها زي البنات. «عرض التقارير» بيفتح له شاشة التقارير، والبيانات اللي تظهر له بتتحدد من جدول الصلاحيات (عمود حسابات التقارير). اللي معاه تقارير بس بيشوف شاشة التقارير فقط.</div>
+  ${accounts.map((a,i)=>`<div class="row" style="margin-top:8px;border-top:1px solid var(--bd);padding-top:8px"><b style="min-width:90px">${esc(a.name)}</b><input id="aph-${i}" value="${esc(a.phone||"")}" placeholder="التليفون" inputmode="tel" style="max-width:130px"><button class="b s x" onclick="setAcctPhone(${i})">حفظ التليفون</button><input id="ap2-${i}" value="${esc(a.pin)}" style="max-width:110px"><button class="b s x" onclick="setAcctPin(${i})">حفظ الرقم</button><label class="x" style="margin:0"><input type="checkbox" style="width:auto" ${a.orders?"checked":""} onchange="setAcct(${i},'orders',this.checked)"> إنشاء طلبات</label><label class="x" style="margin:0"><input type="checkbox" style="width:auto" ${a.reports?"checked":""} onchange="setAcct(${i},'reports',this.checked)"> عرض التقارير</label><label class="x" style="margin:0"><input type="checkbox" style="width:auto" ${a.ename?"checked":""} onchange="setAcct(${i},'ename',this.checked)"> تعديل أسماء العملاء</label><button class="b s x" onclick="delAcct(${i})">حذف</button></div>`).join("")||'<div class="mut" style="margin-top:6px">لسه مفيش حسابات</div>'}
+  <div class="row" style="margin-top:10px"><input id="ac-n" placeholder="الاسم" style="max-width:150px"><input id="ac-t" placeholder="التليفون (11 رقم)" inputmode="tel" style="max-width:150px"><input id="ac-p" placeholder="الرقم السري" style="max-width:120px"><label class="x" style="margin:0"><input type="checkbox" id="ac-o" style="width:auto"> إنشاء طلبات</label><label class="x" style="margin:0"><input type="checkbox" id="ac-r" style="width:auto" checked> عرض التقارير</label><button class="b x" onclick="addAcct()">إضافة حساب</button></div><div class="row" style="margin-top:8px"><button class="b s x" onclick="publishStaffList(accounts).then(()=>toast('اتنشرت قايمة موظفي الليستة ✔',true))">🔄 نشر قايمة موظفي الليستة</button><span class="mut">بتتنشر لوحدها مع أي حفظ للحسابات. دوس الزرار لو حسابات قديمة أضفت لها تليفون.</span></div></div>`;
 }
 async function saveAnnounce(clear){
   if(!db)return toast("الحفظ غير متاح");
@@ -1701,7 +1718,7 @@ async function newOrder(){
   const rg=regMatch("c",{code:cc,name:c});
   if(rg){o.reg={id:rg.id,name:rg.name,changed:!regSame(rg,{shipMethod:sm,shipCo:co2?"":sc,addr:co2?{}:ad,phone:phn}),at:Date.now()};
     o.mentions=[...(o.mentions||[]),{id:""+(Date.now()+1),t:Date.now(),by:actor(),from:"tele",text:regMsg(o.reg),to:["log","wm"],ack:{}}]}
-  if(await createOrder(o)){if(nt.length)pushMention(o,o.mentions[0]);if(o.reg)pushMention(o,o.mentions[o.mentions.length-1]);window._regApplied="";render()}
+  if(await createOrder(o)){zlClear();if(nt.length)pushMention(o,o.mentions[0]);if(o.reg)pushMention(o,o.mentions[o.mentions.length-1]);window._regApplied="";render()}
 }
 
 /* ---- Logistics ---- */
@@ -2549,11 +2566,22 @@ function acctCard(){
   const a=accounts.find(x=>x.name===selAcct);
   return `<div class="card"><h3 style="margin:0 0 2px;font-family:var(--fd);font-size:17px;color:var(--pri)">حساب شخصي</h3><div class="mut" style="margin-bottom:10px">للتقارير أو إنشاء الطلبات. اختار اسمك واكتب رقمك السري.</div>
   <div class="pills">${accounts.map((x,i)=>`<button class="b ${x.name===selAcct?"ok":"s"}" onclick="selAcct=accounts[${i}].name;render()">${x.name===selAcct?"✓ ":""}${esc(x.name)}</button>`).join("")}</div>
-  ${a?`<div class="row" style="margin-top:12px"><input class="ci" id="pinacc2" type="password" placeholder="الرقم السري"><button class="b x" style="flex:1" onclick="pickAcct()">دخول باسم ${esc(a.name)}</button></div>`:""}</div>`;
+  ${a?`<div class="row" style="margin-top:12px"><input class="ci" id="pinacc2" type="password" placeholder="الرقم السري"><button class="b x" style="flex:1" onclick="pickAcct()">دخول باسم ${esc(a.name)}</button></div>`:""}
+  ${accounts.some(x=>phNorm(x.phone).length===10)?`<div style="margin-top:14px;border-top:1px solid var(--bd);padding-top:10px"><b>أو ادخلي برقم التليفون</b><div class="row" style="margin-top:8px"><input class="ci" id="accph" type="tel" inputmode="tel" placeholder="رقم التليفون"><input class="ci" id="accphpin" type="password" placeholder="الرقم السري"><button class="b x" style="flex:1" onclick="pickAcctPhone()">دخول</button></div></div>`:""}</div>`;
+}
+function pickAcctPhone(){
+  const ph=phNorm($("#accph")?.value||""),pn=($("#accphpin")?.value||"").trim();
+  if(ph.length!==10)return toast("اكتب رقم التليفون كامل (11 رقم)");
+  const a=accounts.find(x=>phNorm(x.phone)===ph&&String(x.pin)===ar2en(pn));
+  if(!a)return toast("التليفون أو الرقم السري غلط");
+  loginAcct(a);
 }
 function pickAcct(){
   const a=accounts.find(x=>x.name===selAcct);if(!a)return toast("اختار اسمك الأول");
   if(($("#pinacc2")?.value||"")!==String(a.pin))return toast("الرقم السري غلط");
+  loginAcct(a);
+}
+function loginAcct(a){
   seenSet("acctn",a.name);
   if(a.orders){selGirl=a.name;role="tele";try{localStorage.setItem("role","tele");localStorage.setItem("who_tele",a.name)}catch(e){};who=a.name;view="tele"}
   else{role="rd";try{localStorage.setItem("role","rd")}catch(e){};who=a.name;view="rep";rp={...REP0,ar:"open"}}
@@ -2631,33 +2659,40 @@ function helpBar(){
   const m=/[#&]zl=([^&]+)/.exec(location.hash);if(!m)return;
   let b=m[1].replace(/-/g,"+").replace(/_/g,"/");while(b.length%4)b+="=";
   const j=JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(b),c=>c.charCodeAt(0))));
-  if(j&&typeof j.t==="string"&&j.t.length<30000)localStorage.setItem("zlPend",JSON.stringify({n:String(j.n||"").slice(0,80),p:String(j.p||"").slice(0,30),t:j.t,ts:Date.now()}));
+  if(j&&typeof j.t==="string"&&j.t.length<30000)localStorage.setItem("zlPend",JSON.stringify({n:String(j.n||"").slice(0,80),p:String(j.p||"").slice(0,30),by:String(j.by||"").slice(0,60),t:j.t,ts:Date.now()}));
   history.replaceState(null,"",location.pathname+location.search);
 }catch(e){}})();
 const ZL_TTL=2*3600e3;
-function zlBanner(P){
+const zlGet=()=>{try{return JSON.parse(localStorage.getItem("zlPend")||"null")}catch(e){return null}};
+const zlClear=()=>{try{localStorage.removeItem("zlPend")}catch(e){}};
+const zlCount=P=>P.t.split(/\r?\n/).filter(l=>l.trim()&&!/^\s*(كود|code)/i.test(l)).length;
+function zlDiscard(){const it=document.getElementById("itx");if(it&&zlGet()&&zlGet().applied)it.value="";zlClear();render()}
+function zlBanner(P,applied){
   const a=document.getElementById("app");if(!a)return;
-  const left=Math.max(1,Math.round((P.ts+ZL_TTL-Date.now())/60000)),n=P.t.split(/\r?\n/).filter(l=>l.trim()&&!/^\s*(كود|code)/i.test(l)).length;
-  a.insertAdjacentHTML("afterbegin",`<div class="card" style="border:2px solid #1f7a6b;background:rgba(31,122,107,.10)"><div class="row"><div><b>📥 في ${n} صنف جايين من ليستة الأسعار مستنيين</b><div class="mut">افتحي شاشة «طلب عميل جديد» (التيليسيلز) وهينزلوا لوحدهم. هيتمسحوا بعد ${left} دقيقة.</div></div><button class="b s x" onclick="try{localStorage.removeItem('zlPend')}catch(e){}render()">🗑 مسح</button></div></div>`);
+  const left=Math.max(1,Math.round((P.ts+ZL_TTL-Date.now())/60000)),n=zlCount(P);
+  a.insertAdjacentHTML("afterbegin",`<div class="card" style="border:2px solid #1f7a6b;background:rgba(31,122,107,.10)"><div class="row"><div>${applied?`<b>📥 ${n} صنف من ليستة الأسعار متحمّلين في الطلب</b>${P.by?`<div class="mut">اتبعتوا من حساب: <b>${esc(P.by)}</b></div>`:""}<div class="mut">كمّلي رقم الطلب وباقي البيانات وبعدين «إرسال». لو مش عايزاهم دوسي «مسح».</div>`:`<b>📥 في ${n} صنف جايين من ليستة الأسعار مستنيين</b>${P.by?`<div class="mut">اتبعتوا من حساب: <b>${esc(P.by)}</b></div>`:""}<div class="mut">افتحي شاشة «طلب عميل جديد» وهينزلوا لوحدهم. هيتمسحوا بعد ${left} دقيقة.</div>`}</div><button class="b s x" onclick="zlDiscard()">🗑 مسح</button></div></div>`);
 }
+/* بتتنفّذ بعد كل عرض للشاشة: لو فيه أصناف جاية من الليستة ولسه الطلب ما اتسجّلش، بتحطها في خانة الأصناف (حتى لو الشاشة اتعرضت تاني ومسحت الخانة). */
 function zlApply(){
-  let P=null;try{P=JSON.parse(localStorage.getItem("zlPend")||"null")}catch(e){}
-  if(!P)return;
-  if(!P.t){try{localStorage.removeItem("zlPend")}catch(e){}return}
-  if(Date.now()-P.ts>ZL_TTL){try{localStorage.removeItem("zlPend")}catch(e){}toast("⏱ أصناف الليستة اللي كانت مستنية اتمسحت لأن عدّى عليها ساعتين. ارجعي للليستة وابعتيها تاني.");return}
+  const P=zlGet();if(!P)return;
+  if(!P.t){zlClear();return}
+  if(Date.now()-P.ts>ZL_TTL){zlClear();toast("⏱ أصناف الليستة اللي كانت مستنية اتمسحت لأن عدّى عليها ساعتين. ارجعي للليستة وابعتيها تاني.");return}
   const it=document.getElementById("itx");
-  if(!it){zlBanner(P);return}
+  if(!it){zlBanner(P,false);return}
   const d=it.closest("details");if(d)d.open=true;
   const put=(id,v)=>{const e=document.getElementById(id);if(e&&v&&!e.value){e.value=v;e.dispatchEvent(new Event("input",{bubbles:true}))}};
   put("cust",P.n);put("ph",P.p);
   let lines=P.t.split(/\r?\n/).filter(l=>l.trim());
-  if(it.value.trim()&&lines.length&&/كود|code/i.test(lines[0]))lines=lines.slice(1);
-  it.value=(it.value.trim()?it.value.trim()+"\n":"")+lines.join("\n");
-  it.dispatchEvent(new Event("input",{bubbles:true}));
-  try{localStorage.removeItem("zlPend")}catch(e){}
-  const n=lines.filter(l=>!/^\s*(كود|code)/i.test(l)).length;
-  toast("📥 اتنقلت "+n+" صنف من ليستة الأسعار. كمّلي رقم الطلب وكود العميل والشحن والعنوان وبعدين «إرسال للوجيستك».");
-  try{it.scrollIntoView({behavior:"smooth",block:"center"})}catch(e){}
+  if(!it.value.trim()){
+    it.value=lines.join("\n");it.dispatchEvent(new Event("input",{bubbles:true}));
+    if(!P.applied){toast("📥 اتنقلت "+zlCount(P)+" صنف من ليستة الأسعار. كمّلي رقم الطلب وكود العميل والشحن والعنوان وبعدين «إرسال للوجيستك».");try{it.scrollIntoView({behavior:"smooth",block:"center"})}catch(e){}}
+  }else if(!P.applied&&it.value.trim()!==lines.join("\n")){
+    if(/كود|code/i.test(lines[0]))lines=lines.slice(1);
+    it.value=it.value.trim()+"\n"+lines.join("\n");it.dispatchEvent(new Event("input",{bubbles:true}));
+    toast("📥 اتضافت "+zlCount(P)+" صنف من ليستة الأسعار للأصناف المكتوبة.");
+  }
+  if(!P.applied){P.applied=Date.now();try{localStorage.setItem("zlPend",JSON.stringify(P))}catch(e){}}
+  zlBanner(P,true);
 }
 function render(){
   try{render0()}catch(e){const m=$("#msg");if(m){m.style.display="block";m.textContent="حصل خطأ في عرض الشاشة: "+(e.message||e)}}
