@@ -320,19 +320,9 @@ input.wa-cb{width:30px;height:30px;min-height:0;flex:0 0 auto;padding:0;min-widt
  window._ip=null;
  window.addEventListener("beforeinstallprompt",function(e){e.preventDefault();window._ip=e;window.uiRefresh&&window.uiRefresh()});
  window.addEventListener("appinstalled",function(){window._ip=null;window.uiRefresh&&window.uiRefresh()});
- function icon(sz,pad){
-  try{var c=document.createElement("canvas");c.width=c.height=sz;var x=c.getContext("2d"),p=PS[window.uiGet().col]||PS.oud;
-   x.fillStyle=p.l.hd;if(pad){x.fillRect(0,0,sz,sz)}else{var rd=sz*.22;x.beginPath();x.moveTo(rd,0);x.arcTo(sz,0,sz,sz,rd);x.arcTo(sz,sz,0,sz,rd);x.arcTo(0,sz,0,0,rd);x.arcTo(0,0,sz,0,rd);x.fill()}
-   x.fillStyle=p.l.acc;x.textAlign="center";x.textBaseline="middle";x.font="700 "+Math.round(sz*(pad?.5:.62))+"px 'Reem Kufi','IBM Plex Sans Arabic',Tahoma,Arial,sans-serif";x.fillText("ز",sz/2,sz*.54);
-   return c.toDataURL("image/png")}catch(e){return ""}
- }
  try{
-  var i192=icon(192),i512=icon(512),im=icon(512,1),i180=icon(180,1);
-  var base=location.href.split("#")[0].split("?")[0],p0=PS[window.uiGet().col]||PS.oud;
-  var man={name:"متابعة طلبات العملاء – زماني",short_name:"زماني",description:"متابعة طلبات العملاء وأوامر النقل والمخازن",start_url:base,scope:base.replace(/[^\/]*$/,""),id:base,display:"standalone",dir:"rtl",lang:"ar",background_color:p0.l.hd,theme_color:p0.l.hd,
-   icons:[{src:i192,sizes:"192x192",type:"image/png",purpose:"any"},{src:i512,sizes:"512x512",type:"image/png",purpose:"any"},{src:im,sizes:"512x512",type:"image/png",purpose:"maskable"}]};
-  var l=document.createElement("link");l.rel="manifest";l.href=URL.createObjectURL(new Blob([JSON.stringify(man)],{type:"application/manifest+json"}));document.head.appendChild(l);
-  var a=document.createElement("link");a.rel="apple-touch-icon";a.href=i180;document.head.appendChild(a);
+  var a=document.createElement("link");a.rel="apple-touch-icon";a.href="apple-touch-icon.png";document.head.appendChild(a);
+  var l=document.createElement("link");l.rel="manifest";l.href="manifest.webmanifest";document.head.appendChild(l);
   [["apple-mobile-web-app-capable","yes"],["mobile-web-app-capable","yes"],["apple-mobile-web-app-title","زماني"],["apple-mobile-web-app-status-bar-style","black-translucent"]].forEach(function(z){var m=document.createElement("meta");m.name=z[0];m.content=z[1];document.head.appendChild(m)});
  }catch(e){}
  if("serviceWorker" in navigator&&location.protocol.indexOf("http")===0)window.addEventListener("load",function(){navigator.serviceWorker.register("sw.js").catch(function(){})});
@@ -345,7 +335,7 @@ input.wa-cb{width:30px;height:30px;min-height:0;flex:0 0 auto;padding:0;min-widt
 <div id="toast" style="position:fixed;bottom:calc(16px + env(safe-area-inset-bottom,0px));left:12px;right:12px;z-index:20;display:none;background:#b8412f;color:#fff;padding:12px;border-radius:10px;text-align:center"></div>
 <header>
   <div class="top"><h1>زماني <small>متابعة طلبات العملاء</small></h1>
-  <div class="acts"><button class="b s" onclick="newsAll=!newsAll;render()">🆕 الجديد</button><button class="b s" onclick="uiToggle()" title="المظهر والألوان وتثبيت التطبيق">🎨 المظهر</button><button class="b s" id="refBtn" onclick="location.reload()">🔄 تحديث الصفحة</button><button class="b s" id="chg" style="display:none" onclick="role='';try{localStorage.removeItem('role')}catch(e){};render()">🚪 تسجيل خروج</button><button class="b s" id="ownerBtn" onclick="owner?ownerLogout():ownerLogin()">👑 لوحة المدير</button></div></div>
+  <div class="acts"><button class="b s" onclick="newsAll=!newsAll;render()">🆕 الجديد</button><button class="b s" id="instBtn" onclick="uiInstallHelp()" style="display:none;background:#2f7d5b;color:#fff">📲 ثبّت التطبيق</button><button class="b s" onclick="uiToggle()" title="المظهر والألوان وتثبيت التطبيق">🎨 المظهر</button><button class="b s" id="refBtn" onclick="location.reload()">🔄 تحديث الصفحة</button><button class="b s" id="chg" style="display:none" onclick="role='';try{localStorage.removeItem('role')}catch(e){};render()">🚪 تسجيل خروج</button><button class="b s" id="ownerBtn" onclick="owner?ownerLogout():ownerLogin()">👑 لوحة المدير</button></div></div>
   <div style="margin-bottom:10px"><select id="who" style="max-width:320px" onchange="who=this.value;try{localStorage.setItem('who_'+role,who)}catch(e){}"></select><div id="whoBox" style="display:none;flex-wrap:wrap;gap:6px;align-items:center"></div></div>
   <nav>
     <button data-v="tele">التيليسيلز</button>
@@ -608,13 +598,15 @@ async function ack(oid,mid){
 const mods=o=>(o.log||[]).filter(l=>l.kind==="mod");
 
 /* ---- الصلاحيات (المدير يتحكم فيها) ---- */
-const APP_VER="2026-10-22b";
+const APP_VER="2026-10-25a";
 let secOpen={};
 let accounts=[],announce=null,newsAll=false,selAcct="";
 const seenGet=k=>{try{return localStorage.getItem(k)||""}catch(e){return ""}};
 const seenSet=(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}};
 const curAcct=()=>role==="tele"?(accounts.find(a=>a.name===seenGet("acctn"))||null):null;
-const CHANGES=[{v:APP_VER,ts:Date.parse("2026-10-22T10:30:00Z"),d:"٢٢ أكتوبر",items:[
+const CHANGES=[{v:APP_VER,ts:Date.parse("2026-10-25T08:00:00Z"),d:"٢٥ أكتوبر",items:[
+ [["owner","tele","log"],"ربط ليستة الأسعار: لما البنت تدوس «➕ ابعت لتطبيق الأوردرات» في الليستة بيفتح «طلب عميل جديد» والأصناف مكتوبة (كود | صنف | وحدة | كمية) واسم العميل وتليفونه. بتكمّل رقم الطلب وكود العميل والشحن والعنوان وبعدين إرسال. مفيش نسخ ولصق. الأصناف بتستنى ساعتين، وطول ما هي مستنية بيظهر شريط تنبيه فيه الوقت المتبقي، ولو عدّت الساعتين بتتمسح ويظهر تنبيه."]]},{v:"2026-10-23a",ts:Date.parse("2026-10-23T08:30:00Z"),d:"٢٣ أكتوبر",items:[
+ [["owner","tele","log","wm","wo","wa","acc","rd"],"تثبيت التطبيق على الموبايل بقى حقيقي: زرار أخضر «📲 ثبّت التطبيق» فوق (بيختفي بعد التثبيت)، وبيتثبّت بأيقونته وبيفتح لوحده زي تطبيقات الموبايل من غير شريط المتصفح. لازم ترفع ملفات التطبيق كلها جنب الصفحة (manifest.webmanifest و sw.js والأيقونات)."]]},{v:"2026-10-22b",ts:Date.parse("2026-10-22T10:30:00Z"),d:"٢٢ أكتوبر",items:[
  [["owner","wa"],"شاشة مخزن أبو صير بقت مبسّطة: أرقام كبيرة فوق (عليك تجهّزها / متأخرة / جاهزة ولسه ما خرجتش)، ثم ① حضّر: كل صنف مجمّع من كل الطلبات وجنبه زرار كبير «✓ حضّرت»، ثم ② خروج: الطلبات الجاهزة بتظهر لوحدها واختار السائق والسيارة بدوسة واحدة ودوس «🚚 خروج»، ثم ③ الطلبات: كل طلب كارت صغير فيه رقمه والمهلة، وفيه «✏ تفاصيل» لو الكمية أقل من المطلوب. نفس فكرة أكتوبر بس بخطوات وأزرار أكبر ومناسبة للموبايل."],
  [["owner","wa"],"زرار «🔧 العرض الكامل» / «🟢 العرض المبسّط» بيبدّل بين الشاشتين (بيتحفظ على الجهاز). مسؤول أبو صير بيفتح على المبسّط، والمدير على الكامل."]]},{v:"2026-10-22a",ts:Date.parse("2026-10-22T05:00:00Z"),d:"٢٢ أكتوبر",items:[
  [["owner","log","wm","wo","wa"],"الإشعارات: أي تعديل على طلب ما يخصش أكتوبر أو أبو صير (مفيهوش أصناف ليهم) ما بيوصلهمش إشعار. مشعل زي ما هو."],
@@ -2603,6 +2595,14 @@ const HELP={"rep":{"t":"شاشة التقارير","s":["اختار الفلات
 let uiOpen=false;
 function uiSet(k,v){const u=uiGet();u[k]=v;try{localStorage.setItem("zui",JSON.stringify(u))}catch(e){}uiApply(u);uiRefresh()}
 function uiToggle(){uiOpen=!uiOpen;uiRefresh()}
+const uiStandalone=()=>(window.matchMedia&&matchMedia("(display-mode: standalone)").matches)||navigator.standalone;
+function uiInstBtn(){const b=document.getElementById("instBtn");if(b)b.style.display=uiStandalone()?"none":""}
+function uiInstallHelp(){
+  if(window._ip)return uiInstall();
+  const ios=/iphone|ipad|ipod/i.test(navigator.userAgent);
+  alert(ios?"آيفون: افتح الرابط من Safari، دوس زرار المشاركة ⬆ ثم «إضافة إلى الشاشة الرئيسية».":"أندرويد (Chrome): دوس القايمة ⋮ فوق ثم «تثبيت التطبيق» أو «إضافة إلى الشاشة الرئيسية».\nلو الخيار مش ظاهر افتح الرابط من Chrome مش من داخل واتساب.");
+}
+uiInstBtn();window.addEventListener("appinstalled",uiInstBtn);
 async function uiInstall(){if(!window._ip)return;window._ip.prompt();try{await window._ip.userChoice}catch(e){}window._ip=null;uiRefresh()}
 function uiRefresh(){
   const el=document.getElementById("uipanel");if(!el)return;if(!uiOpen){el.innerHTML="";return}
@@ -2626,8 +2626,42 @@ function helpBar(){
   if(!showHelp)return btn;
   return btn+`<div class="card" style="border:2px solid var(--ok)"><b style="font-size:17px">${h.t}</b><ol style="margin:10px 0;padding-inline-start:22px;line-height:2">${h.s.map(x=>`<li>${esc(x)}</li>`).join("")}</ol>${h.e}<div class="hold" style="margin-top:8px">⚠ ${esc(h.n)}</div><button class="b s" style="margin-top:10px" onclick="showHelp=false;render()">إغلاق التعليمات</button></div>`;
 }
+/* استقبال طلب من ليستة الأسعار: الرابط بيجي بـ #zl=<base64url JSON {n,p,t}> وبنحفظه لحد ما تفتح شاشة طلب عميل جديد */
+(function(){try{
+  const m=/[#&]zl=([^&]+)/.exec(location.hash);if(!m)return;
+  let b=m[1].replace(/-/g,"+").replace(/_/g,"/");while(b.length%4)b+="=";
+  const j=JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(b),c=>c.charCodeAt(0))));
+  if(j&&typeof j.t==="string"&&j.t.length<30000)localStorage.setItem("zlPend",JSON.stringify({n:String(j.n||"").slice(0,80),p:String(j.p||"").slice(0,30),t:j.t,ts:Date.now()}));
+  history.replaceState(null,"",location.pathname+location.search);
+}catch(e){}})();
+const ZL_TTL=2*3600e3;
+function zlBanner(P){
+  const a=document.getElementById("app");if(!a)return;
+  const left=Math.max(1,Math.round((P.ts+ZL_TTL-Date.now())/60000)),n=P.t.split(/\r?\n/).filter(l=>l.trim()&&!/^\s*(كود|code)/i.test(l)).length;
+  a.insertAdjacentHTML("afterbegin",`<div class="card" style="border:2px solid #1f7a6b;background:rgba(31,122,107,.10)"><div class="row"><div><b>📥 في ${n} صنف جايين من ليستة الأسعار مستنيين</b><div class="mut">افتحي شاشة «طلب عميل جديد» (التيليسيلز) وهينزلوا لوحدهم. هيتمسحوا بعد ${left} دقيقة.</div></div><button class="b s x" onclick="try{localStorage.removeItem('zlPend')}catch(e){}render()">🗑 مسح</button></div></div>`);
+}
+function zlApply(){
+  let P=null;try{P=JSON.parse(localStorage.getItem("zlPend")||"null")}catch(e){}
+  if(!P)return;
+  if(!P.t){try{localStorage.removeItem("zlPend")}catch(e){}return}
+  if(Date.now()-P.ts>ZL_TTL){try{localStorage.removeItem("zlPend")}catch(e){}toast("⏱ أصناف الليستة اللي كانت مستنية اتمسحت لأن عدّى عليها ساعتين. ارجعي للليستة وابعتيها تاني.");return}
+  const it=document.getElementById("itx");
+  if(!it){zlBanner(P);return}
+  const d=it.closest("details");if(d)d.open=true;
+  const put=(id,v)=>{const e=document.getElementById(id);if(e&&v&&!e.value){e.value=v;e.dispatchEvent(new Event("input",{bubbles:true}))}};
+  put("cust",P.n);put("ph",P.p);
+  let lines=P.t.split(/\r?\n/).filter(l=>l.trim());
+  if(it.value.trim()&&lines.length&&/كود|code/i.test(lines[0]))lines=lines.slice(1);
+  it.value=(it.value.trim()?it.value.trim()+"\n":"")+lines.join("\n");
+  it.dispatchEvent(new Event("input",{bubbles:true}));
+  try{localStorage.removeItem("zlPend")}catch(e){}
+  const n=lines.filter(l=>!/^\s*(كود|code)/i.test(l)).length;
+  toast("📥 اتنقلت "+n+" صنف من ليستة الأسعار. كمّلي رقم الطلب وكود العميل والشحن والعنوان وبعدين «إرسال للوجيستك».");
+  try{it.scrollIntoView({behavior:"smooth",block:"center"})}catch(e){}
+}
 function render(){
   try{render0()}catch(e){const m=$("#msg");if(m){m.style.display="block";m.textContent="حصل خطأ في عرض الشاشة: "+(e.message||e)}}
+  try{zlApply()}catch(e){}
 }
 function shipUi(){const v=$("#sm")?.value||"",h=v==="تسليم الشركة";const a=$("#scBox"),b=$("#addrBox");if(a)a.style.display=h?"none":"";if(b)b.style.display=h?"none":""}
 function tbSearch(v){v=v||"";if(view==="rep")rp.q=v;else qNum=v;dRender()}
