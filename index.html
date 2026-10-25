@@ -605,7 +605,7 @@ const seenGet=k=>{try{return localStorage.getItem(k)||""}catch(e){return ""}};
 const seenSet=(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}};
 const curAcct=()=>role==="tele"?(accounts.find(a=>a.name===seenGet("acctn"))||null):null;
 const CHANGES=[{v:APP_VER,ts:Date.parse("2026-10-25T13:00:00Z"),d:"٢٥ أكتوبر",items:[
- [["owner","tele","log"],"حسابات بالتليفون: المدير بيضيف لكل بنت (ولمروان وله هو) حساب فيه الاسم والتليفون والرقم السري من «الحسابات الشخصية». نفس التليفون والرقم بيدخل بيهم الليستة (🔒 دخول الموظفين) وتطبيق الأوردرات (أو ادخلي برقم التليفون). وبتظهر في الطلب «اتبعتوا من حساب: الاسم»."]]},{v:"2026-10-25a",ts:Date.parse("2026-10-25T08:00:00Z"),d:"٢٥ أكتوبر",items:[
+ [["owner","tele","log"],"حسابات بالتليفون: البنات الموجودين بيدخلوا بتليفونهم المسجّل في «أرقام البنات» ورقمهم السري، ولمروان وللمدير حسابات من «الحسابات الشخصية» (اسم + تليفون + رقم سري). نفس التليفون والرقم بيدخل بيهم الليستة (🔒 دخول الموظفين) وتطبيق الأوردرات (أو ادخلي برقم التليفون). وبتظهر في الطلب «اتبعتوا من حساب: الاسم»."]]},{v:"2026-10-25a",ts:Date.parse("2026-10-25T08:00:00Z"),d:"٢٥ أكتوبر",items:[
  [["owner","tele","log"],"ربط ليستة الأسعار: لما البنت تدوس «➕ ابعت لتطبيق الأوردرات» في الليستة بيفتح «طلب عميل جديد» والأصناف مكتوبة (كود | صنف | وحدة | كمية) واسم العميل وتليفونه. بتكمّل رقم الطلب وكود العميل والشحن والعنوان وبعدين إرسال. مفيش نسخ ولصق. الأصناف بتستنى ساعتين، وبتفضل في خانة الأصناف حتى لو الشاشة اتحدّثت أو اخترتي الاسم، ولحد ما الطلب يتسجّل أو تدوسي «مسح». طول ما هي مستنية بيظهر شريط تنبيه، ولو عدّت الساعتين بتتمسح ويظهر تنبيه."]]},{v:"2026-10-23a",ts:Date.parse("2026-10-23T08:30:00Z"),d:"٢٣ أكتوبر",items:[
  [["owner","tele","log","wm","wo","wa","acc","rd"],"تثبيت التطبيق على الموبايل بقى حقيقي: زرار أخضر «📲 ثبّت التطبيق» فوق (بيختفي بعد التثبيت)، وبيتثبّت بأيقونته وبيفتح لوحده زي تطبيقات الموبايل من غير شريط المتصفح. لازم ترفع ملفات التطبيق كلها جنب الصفحة (manifest.webmanifest و sw.js والأيقونات)."]]},{v:"2026-10-22b",ts:Date.parse("2026-10-22T10:30:00Z"),d:"٢٢ أكتوبر",items:[
  [["owner","wa"],"شاشة مخزن أبو صير بقت مبسّطة: أرقام كبيرة فوق (عليك تجهّزها / متأخرة / جاهزة ولسه ما خرجتش)، ثم ① حضّر: كل صنف مجمّع من كل الطلبات وجنبه زرار كبير «✓ حضّرت»، ثم ② خروج: الطلبات الجاهزة بتظهر لوحدها واختار السائق والسيارة بدوسة واحدة ودوس «🚚 خروج»، ثم ③ الطلبات: كل طلب كارت صغير فيه رقمه والمهلة، وفيه «✏ تفاصيل» لو الكمية أقل من المطلوب. نفس فكرة أكتوبر بس بخطوات وأزرار أكبر ومناسبة للموبايل."],
@@ -1116,7 +1116,8 @@ async function zlHash(phone,pin){
 async function publishStaffList(l){
   if(!db||!owner)return;
   try{
-    const out=[];for(const a of l){if(phNorm(a.phone).length===10&&a.pin)out.push({n:a.name,h:await zlHash(a.phone,a.pin)})}
+    const out=[],seen=new Set();
+    for(const a of [...(l||accounts),...contacts]){if(phNorm(a.phone).length===10&&a.pin&&!seen.has(phNorm(a.phone))){seen.add(phNorm(a.phone));out.push({n:a.name,h:await zlHash(a.phone,a.pin)})}}
     await db.collection("public").doc("staffList").set({list:out,t:Date.now()});
   }catch(e){toast("تعذر نشر قايمة الليستة: "+(e.message||e.code)+" (تأكد إنك نشرت القواعد الجديدة)")}
 }
@@ -1126,13 +1127,13 @@ async function saveAccounts(l){
 }
 function addAcct(){
   const n=($("#ac-n").value||"").trim(),pn=($("#ac-p").value||"").trim(),ph=($("#ac-t").value||"").trim(),o=$("#ac-o").checked,r=$("#ac-r").checked;
-  if(!n||!pn)return toast("اكتب الاسم والرقم السري");if(ph&&phNorm(ph).length!==10)return toast("رقم التليفون لازم يبقى 11 رقم (مثال 01012345678)");if(ph&&accounts.some(a=>phNorm(a.phone)===phNorm(ph)))return toast("رقم التليفون ده مستخدم في حساب تاني");if(!o&&!r)return toast("اختار صلاحية واحدة على الأقل (طلبات أو تقارير)");
+  if(!n||!pn)return toast("اكتب الاسم والرقم السري");if(ph&&phNorm(ph).length!==10)return toast("رقم التليفون لازم يبقى 11 رقم (مثال 01012345678)");if(ph&&[...accounts,...contacts].some(a=>phNorm(a.phone)===phNorm(ph)))return toast("رقم التليفون ده مستخدم عند حد تاني");if(!o&&!r)return toast("اختار صلاحية واحدة على الأقل (طلبات أو تقارير)");
   if(accounts.some(a=>a.name===n)||contacts.some(c=>c.name===n))return toast("الاسم ده موجود");
   saveAccounts([...accounts,{name:n,pin:pn,...(ph?{phone:ph}:{}),orders:o,reports:r}]);
 }
 const delAcct=i=>{if(confirm("حذف حساب «"+accounts[i].name+"»؟"))saveAccounts(accounts.filter((_,k)=>k!==i))};
 const setAcct=(i,k,v)=>saveAccounts(accounts.map((a,j)=>j===i?{...a,[k]:v}:a));
-const setAcctPhone=i=>{const v=($("#aph-"+i).value||"").trim();if(v&&phNorm(v).length!==10)return toast("رقم التليفون لازم يبقى 11 رقم (مثال 01012345678)");if(v&&accounts.some((a,j)=>j!==i&&phNorm(a.phone)===phNorm(v)))return toast("رقم التليفون ده مستخدم في حساب تاني");setAcct(i,"phone",v)};
+const setAcctPhone=i=>{const v=($("#aph-"+i).value||"").trim();if(v&&phNorm(v).length!==10)return toast("رقم التليفون لازم يبقى 11 رقم (مثال 01012345678)");if(v&&[...accounts.filter((a,j)=>j!==i),...contacts].some(a=>phNorm(a.phone)===phNorm(v)))return toast("رقم التليفون ده مستخدم عند حد تاني");setAcct(i,"phone",v)};
 const setAcctPin=i=>{const v=($("#ap2-"+i).value||"").trim();if(!v)return toast("اكتب رقم سري");setAcct(i,"pin",v)};
 function accountsCard(){
   return `<div class="card"><b>الحسابات الشخصية (تقارير / إنشاء طلبات)</b><div class="mut">اعمل حساب لأي شخص باسمه وتليفونه ورقمه السري (نفس التليفون والرقم بيدخل بيهم الليستة وتطبيق الأوردرات). «إنشاء طلبات» بيخليه يسجّل طلبات عملاء ويتابعها زي البنات. «عرض التقارير» بيفتح له شاشة التقارير، والبيانات اللي تظهر له بتتحدد من جدول الصلاحيات (عمود حسابات التقارير). اللي معاه تقارير بس بيشوف شاشة التقارير فقط.</div>
@@ -2526,7 +2527,7 @@ function dashView(){
   <div class="card"><b>أسباب عدم الشحن / التوقف (أنت اللي بتحددها)</b><div class="mut">المخزن واللوجيستك مجبرين يختاروا من القايمة دي بس، مفيش كتابة حرة.</div>
   ${reasons.map((r,i)=>`<div class="row" style="margin-top:6px"><span>${esc(r)}</span><button class="b s x" onclick="delReason(${i})">حذف</button></div>`).join("")||'<div class="mut" style="margin-top:6px">مفيش أسباب – ضيف سبب واحد على الأقل</div>'}
   <div class="row" style="margin-top:8px"><input id="rn" placeholder="سبب جديد، مثلاً: العميل رفض الاستلام"><button class="b x" onclick="addReason()">إضافة</button></div></div>
-  ${sC}${sO("girls","🔑 البنات والأرقام السرية")}<div class="card"><b>البنات: الأرقام والرقم السري لكل واحدة</b><div class="mut">كل بنت بتدخل باسمها ورقمها السري بس، ومش بتقدر تشوف أو تعدّل طلبات غيرها. رقم الموبايل للإشعار الراجع لها.</div>
+  ${sC}${sO("girls","🔑 البنات والأرقام السرية")}<div class="card"><b>البنات: الأرقام والرقم السري لكل واحدة</b><div class="mut">كل بنت بتدخل باسمها ورقمها السري بس، ومش بتقدر تشوف أو تعدّل طلبات غيرها. رقم الموبايل للإشعار الراجع لها، وهو نفسه اللي بتدخل بيه الليستة (تليفون + الرقم السري، لازم يكون ليها رقم سري).</div>
   ${contacts.map((c,i)=>`<div class="row" style="margin-top:8px"><span><b>${esc(c.name)}</b> – ${esc(c.phone)}${c.pin?"":' <span class="hold">(بدون رقم سري)</span>'}</span><input class="wi" id="gp-${i}" value="${esc(c.pin)}" placeholder="الرقم السري" style="max-width:150px"><button class="b x" onclick="setGirlPin(${i})">حفظ الرقم السري</button><button class="b s x" onclick="delContact(${i})">حذف</button></div>`).join("")}
   <div class="row" style="margin-top:10px"><input id="cn" placeholder="الاسم"><input id="cp" placeholder="رقم الموبايل"><input id="cpin" placeholder="الرقم السري"><button class="b x" onclick="addContact()">إضافة بنت</button></div></div>
   <div class="card"><b>الأرقام السرية للشاشات</b><div class="mut">كل شاشة ليها رقم سري زي البنات. اكتب الرقم واضغط حفظ لأي شاشة، وتقدر تغيّره في أي وقت. لو سبت الخانة فاضية الشاشة بتفتح من غير رقم.</div>
@@ -2559,22 +2560,30 @@ function chooser(){
   <div class="card"><h3 style="margin:0 0 2px;font-family:var(--fd);font-size:17px;color:var(--pri)">التيليسيلز</h3><div class="mut" style="margin-bottom:10px">اختاري اسمك${selGirl&&pinOf(selGirl)?" ثم اكتبي رقمك السري":""}.</div>
   <div class="pills">${names.map((n,i)=>`<button class="b ${n===selGirl?"ok":"s"}" onclick="selGirl=namesList()[${i}];render()">${n===selGirl?"✓ ":""}${esc(n)}</button>`).join("")||'<span class="mut">مفيش أسماء مسجلة. المدير يضيفها من الإدارة.</span>'}</div>
   ${selGirl?`<div class="row" style="margin-top:12px">${pinOf(selGirl)?'<input class="ci" id="pint" type="password" placeholder="الرقم السري بتاعك">':""}<button class="b x" style="flex:1" onclick="pick('tele')">دخول باسم ${esc(selGirl)}</button></div>`:""}</div>
-  ${acctCard()}<div class="tiles">${tile("log","اللوجيستك","توزيع الأصناف على المخازن ومتابعة الحالة")}${tile("acc","الحسابات","تأكيد التحصيل")}${tile("wm","مخزن مشعل","تجهيز الأصناف وطباعة البوليصة")}${tile("wo","مخزن أكتوبر","تجهيز الأصناف حسب العبوات")}${tile("wa","مخزن أبو صير","تجهيز الأصناف حسب العبوات")}</div>
+  ${phoneLoginCard()}${acctCard()}<div class="tiles">${tile("log","اللوجيستك","توزيع الأصناف على المخازن ومتابعة الحالة")}${tile("acc","الحسابات","تأكيد التحصيل")}${tile("wm","مخزن مشعل","تجهيز الأصناف وطباعة البوليصة")}${tile("wo","مخزن أكتوبر","تجهيز الأصناف حسب العبوات")}${tile("wa","مخزن أبو صير","تجهيز الأصناف حسب العبوات")}</div>
   <div class="mut" style="margin-top:14px;text-align:center">الإدارة متاحة للمدير فقط، من زر «لوحة المدير» فوق.</div></div>`}
+function phoneLoginCard(){
+  if(![...accounts,...contacts].some(x=>phNorm(x.phone).length===10&&x.pin))return "";
+  return `<div class="card"><h3 style="margin:0 0 2px;font-family:var(--fd);font-size:17px;color:var(--pri)">الدخول برقم التليفون</h3><div class="mut" style="margin-bottom:10px">اكتبي رقم تليفونك المسجّل ورقمك السري.</div><div class="row"><input class="ci" id="accph" type="tel" inputmode="tel" placeholder="رقم التليفون"><input class="ci" id="accphpin" type="password" placeholder="الرقم السري"><button class="b x" style="flex:1" onclick="pickAcctPhone()">دخول</button></div></div>`;
+}
 function acctCard(){
   if(!accounts.length)return "";
   const a=accounts.find(x=>x.name===selAcct);
   return `<div class="card"><h3 style="margin:0 0 2px;font-family:var(--fd);font-size:17px;color:var(--pri)">حساب شخصي</h3><div class="mut" style="margin-bottom:10px">للتقارير أو إنشاء الطلبات. اختار اسمك واكتب رقمك السري.</div>
   <div class="pills">${accounts.map((x,i)=>`<button class="b ${x.name===selAcct?"ok":"s"}" onclick="selAcct=accounts[${i}].name;render()">${x.name===selAcct?"✓ ":""}${esc(x.name)}</button>`).join("")}</div>
   ${a?`<div class="row" style="margin-top:12px"><input class="ci" id="pinacc2" type="password" placeholder="الرقم السري"><button class="b x" style="flex:1" onclick="pickAcct()">دخول باسم ${esc(a.name)}</button></div>`:""}
-  ${accounts.some(x=>phNorm(x.phone).length===10)?`<div style="margin-top:14px;border-top:1px solid var(--bd);padding-top:10px"><b>أو ادخلي برقم التليفون</b><div class="row" style="margin-top:8px"><input class="ci" id="accph" type="tel" inputmode="tel" placeholder="رقم التليفون"><input class="ci" id="accphpin" type="password" placeholder="الرقم السري"><button class="b x" style="flex:1" onclick="pickAcctPhone()">دخول</button></div></div>`:""}</div>`;
+</div>`;
 }
 function pickAcctPhone(){
   const ph=phNorm($("#accph")?.value||""),pn=($("#accphpin")?.value||"").trim();
   if(ph.length!==10)return toast("اكتب رقم التليفون كامل (11 رقم)");
   const a=accounts.find(x=>phNorm(x.phone)===ph&&String(x.pin)===ar2en(pn));
-  if(!a)return toast("التليفون أو الرقم السري غلط");
-  loginAcct(a);
+  if(a)return loginAcct(a);
+  const g=contacts.find(x=>phNorm(x.phone)===ph&&x.pin&&String(x.pin)===ar2en(pn));
+  if(!g)return toast("التليفون أو الرقم السري غلط");
+  seenSet("acctn","");selGirl=g.name;role="tele";view="tele";who=g.name;
+  try{localStorage.setItem("role","tele");localStorage.setItem("who_tele",g.name)}catch(e){}
+  typing=false;render();
 }
 function pickAcct(){
   const a=accounts.find(x=>x.name===selAcct);if(!a)return toast("اختار اسمك الأول");
@@ -2604,7 +2613,7 @@ function pick(r){
 }
 async function saveContacts(l){
   if(!db)return toast("الحفظ غير متاح");
-  try{await db.collection("settings").doc("contacts").set({phones:l});toast("تم الحفظ ✔",true)}catch(e){toast("تعذر الحفظ: "+(e.message||e.code))}
+  try{await db.collection("settings").doc("contacts").set({phones:l});toast("تم الحفظ ✔",true);if(owner){contacts=l;publishStaffList(accounts)}}catch(e){toast("تعذر الحفظ: "+(e.message||e.code))}
 }
 const addContact=()=>{const n=$("#cn").value.trim(),p=$("#cp").value.trim(),pn=$("#cpin").value.trim();if(!n||!p)return toast("اكتب الاسم والرقم");if(contacts.some(c=>c.name===n))return toast("الاسم ده موجود");saveContacts([...contacts,{name:n,phone:p,pin:pn}])};
 const setGirlPin=i=>saveContacts(contacts.map((c,k)=>k===i?{...c,pin:$("#gp-"+i).value.trim()}:c));
