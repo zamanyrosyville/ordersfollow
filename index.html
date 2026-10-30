@@ -598,13 +598,15 @@ async function ack(oid,mid){
 const mods=o=>(o.log||[]).filter(l=>l.kind==="mod");
 
 /* ---- الصلاحيات (المدير يتحكم فيها) ---- */
-const APP_VER="2026-10-27b";
+const APP_VER="2026-10-30a";
 let secOpen={};
 let accounts=[],announce=null,newsAll=false,selAcct="";
 const seenGet=k=>{try{return localStorage.getItem(k)||""}catch(e){return ""}};
 const seenSet=(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}};
 const curAcct=()=>role==="tele"?(accounts.find(a=>a.name===seenGet("acctn"))||null):null;
-const CHANGES=[{v:APP_VER,ts:Date.parse("2026-10-27T19:10:00Z"),d:"٢٧ أكتوبر",items:[
+const CHANGES=[{v:APP_VER,ts:Date.parse("2026-10-30T19:30:00Z"),d:"٣٠ أكتوبر",items:[
+ [["tele","owner"],"توفر الأصناف: لما تلصقي الأصناف (أو تبعتيها من الليستة) بيظهر تحت الخانة لكل صنف ✅ متوفر / ⚠ متوفر جزء بس / ❌ غير متوفر، من أرصدة المخازن اللي مروان بيرفعها. استرشادي، ومروان هو اللي بيوزّع."],
+ [["owner"],"ملخص اليوم في أول لوحة المدير: كام طلب اتسجّل وخرج النهارده، المتأخر، الجاهز ولسه ما خرجش في كل مخزن، غير المحصّل، والبنات النهارده. وزرار «ابعت واتساب» و«نسخ»."]]},{v:"2026-10-27b",ts:Date.parse("2026-10-27T19:10:00Z"),d:"٢٧ أكتوبر",items:[
  [["owner","wa"],"شاشة مخزن أبو صير رجعت زي ما كانت (العرض الكامل بالجداول). الشاشة المبسّطة لسه موجودة لو حبيت: دوس «🟢 العرض المبسّط» فوق، وبترجع بـ«🔧 العرض الكامل»."]]},{v:"2026-10-27a",ts:Date.parse("2026-10-27T06:00:00Z"),d:"٢٧ أكتوبر",items:[
  [["owner","log","wm","wo","wa"],"الجداول الكبيرة والأقسام (زي «إجمالي المطلوب من كل صنف» والأرشيف) بتفضل زي ما قفلتها أو فتحتها، ومبقتش بترجع تتفتح لوحدها وتزق الكروت. وزرار «فتح/طي» على الكارت بيسيبه في مكانه من غير ما الشاشة تنط."]]},{v:"2026-10-25b",ts:Date.parse("2026-10-25T13:00:00Z"),d:"٢٥ أكتوبر",items:[
  [["owner","tele","log"],"حسابات بالتليفون: البنات الموجودين بيدخلوا بتليفونهم المسجّل في «أرقام البنات» ورقمهم السري، ولمروان وللمدير حسابات من «الحسابات الشخصية» (اسم + تليفون + رقم سري). نفس التليفون والرقم بيدخل بيهم الليستة (🔒 دخول الموظفين) وتطبيق الأوردرات (أو ادخلي برقم التليفون). وبتظهر في الطلب «اتبعتوا من حساب: الاسم»."]]},{v:"2026-10-25a",ts:Date.parse("2026-10-25T08:00:00Z"),d:"٢٥ أكتوبر",items:[
@@ -855,8 +857,31 @@ function stkLine(w,code,qty){ /* سطر رصيد مخزن واحد لكود وا
   else{txt="رصيد: "+f(bs);st=bs===undefined?bad:(q?(bs>=q?ok:bad):"")}
   return `<div class="x" style="${st}"><b>${nm}</b> ${txt}</div>`;
 }
+/* توفر الصنف للبنات وقت تسجيل الطلب: مجموع أرصدة المخازن اللي اترفع لها شيت (متوفر / جزئي / غير متوفر) */
+function availOf(code,qty){
+  const k=sKey(code);if(!k)return null;
+  const hs=k.includes("/"),b=sBase(k);let have=0,any=false,up=false,old=false;
+  ["wm","wo","wa"].forEach(w=>{const m=stockMap[w];if(!m)return;up=true;const at=(stockDocs[w]||{}).at||0;if(at&&Date.now()-at>48*3600e3)old=true;const v=hs?m.get(k):m.get(b);if(v!==undefined){any=true;have+=+sNum(v)||0}});
+  const q=+qty||0;
+  if(!up)return {st:"na",q};
+  if(!any)return {st:"none",have:0,q,old};
+  return {st:q>0&&have>=q?"ok":have>0?"part":"zero",have:sNum(have),q,old};
+}
+function availHtml(txt){
+  const L=[],seen=new Set();
+  String(txt||"").split(/\r?\n/).forEach(ln=>{
+    const c=ln.indexOf("\t")>=0?ln.split("\t"):ln.split("|");const code=sKey(c[0]);
+    if(!code||seen.has(code)||!/[0-9A-Z]/.test(code)||/^(كود|CODE)/.test(code))return;
+    const q=+ar2en(String(c[c.length-1]||"")).replace(",",".");seen.add(code);L.push({code,name:String(c[1]||"").trim(),q:isNaN(q)?0:q})});
+  if(!L.length)return "";
+  const R=L.slice(0,60).map(x=>({...x,a:availOf(x.code,x.q)}));
+  if(R.every(x=>x.a&&x.a.st==="na"))return '<div class="mut" style="margin-top:6px">📦 أرصدة المخازن لسه ما اترفعتش، مفيش معاينة لتوفر الأصناف.</div>';
+  const bad=R.filter(x=>x.a&&["zero","none","part"].includes(x.a.st)),old=R.some(x=>x.a&&x.a.old);
+  const ic={ok:["✅","#2f7d5b","متوفر"],part:["⚠","#c97a1a","متوفر جزء بس"],zero:["❌","#b8412f","غير متوفر"],none:["❔","#b8412f","مش موجود في الأرصدة"],na:["⚪","var(--mut)","—"]};
+  return `<div class="card" style="margin-top:6px;padding:8px;border:2px solid ${bad.length?"#c97a1a":"#2f7d5b"}"><b>📦 توفر الأصناف ${bad.length?`<span style="color:#b8412f">– ${bad.length} صنف محتاج انتباه</span>`:'<span style="color:#2f7d5b">– كله متوفر ✅</span>'}</b>${R.map(x=>{const a=x.a||{st:"na"},i=ic[a.st];return `<div style="border-top:1px solid var(--bd);padding:4px 0;color:${i[1]}"><b dir="ltr">${esc(x.code)}</b> ${esc(x.name)} – ${i[0]} ${i[2]}${a.st==="part"||a.st==="zero"?` (المطلوب ${esc(x.q)} · المتاح ${esc(a.have)})`:""}</div>`}).join("")}${L.length>60?'<div class="mut">وباقي الأصناف ('+(L.length-60)+') مش معروضة</div>':""}${old?'<div class="mut" style="margin-top:4px">⚠ بعض الأرصدة قديمة (أكتر من يومين)، راجعي مع مروان لو الصنف مهم.</div>':""}<div class="mut" style="margin-top:4px">التوفر استرشادي من أرصدة المخازن، ومروان هو اللي بيوزّع.</div></div>`;
+}
 function stkPrevHtml(txt){ /* معاينة أرصدة الأكواد اللي مروان بيكتبها: سلاش + الأصلي بدون سلاش */
-  if(!stockVis().length)return "";
+  if(!stockVis().length)return (role==="tele"&&!owner)?availHtml(txt):"";
   const seen=new Set(),L=[];
   String(txt||"").split(/\r?\n/).forEach(ln=>{const c=sKey(ln.split(/\t|\|/)[0]);if(c&&!seen.has(c)&&/[0-9A-Z]/.test(c)){seen.add(c);L.push(c)}});
   if(!L.length)return "";
@@ -2489,6 +2514,40 @@ function alertsCard(){
 const kpiCol=k=>(STAGES[k]&&STAGES[k][1])||({all:"#5a3a2a",modded:"#7b5aa6",unpaid:"#b57a2c",late:"#b8412f"}[k]||"#6f6459");
 function pipeBar(kp){const st=kp.filter(x=>STAGES[x[0]]&&x[2]>0),tot=st.reduce((t,x)=>t+x[2],0);if(!tot)return "";
   return `<div class="pipe" role="img" aria-label="توزيع الطلبات على المراحل">${st.map(([k,t,n])=>`<i style="width:${n/tot*100}%;background:${kpiCol(k)}" title="${esc(t)}: ${n}" onclick="kpiGo('${k}')"></i>`).join("")}</div><div class="pipeleg">${st.map(([k,t,n])=>`<span style="--c:${kpiCol(k)}">${esc(t)} <b>${n}</b></span>`).join("")}</div>`}
+/* ملخص اليوم للمدير: أرقام جاهزة + زرار واتساب ونسخ */
+function dailyData(){
+  const t0=new Date();t0.setHours(0,0,0,0);const T=t0.getTime();
+  const open=orders.filter(o=>!["delivered","cancelled"].includes(o.stage)&&!isArchived(o,"log"));
+  const made=orders.filter(o=>(o.createdAt||0)>=T&&o.stage!=="cancelled"),shipped=orders.filter(o=>(o.shippedAt||0)>=T||["wm","wo","wa"].some(w=>((o.ship||{})[w]||{}).t>=T));
+  const late=open.filter(isLate),unp=orders.filter(o=>o.acct!=="full"&&!o.release&&o.stage!=="cancelled"&&noT(o)&&o.stage!=="delivered");
+  const unassigned=open.filter(o=>!(o.items||[]).length||(o.items||[]).some(i=>!i.wh));
+  const wh=w=>{const L=orders.filter(o=>!["delivered","cancelled"].includes(o.stage)&&!((o.ship||{})[w]||{}).done&&(o.items||[]).some(i=>i.wh===w));return {w,n:L.length,late:L.filter(o=>{const d=dueInfoWh(o,w);return d&&d.late}).length,rdy:L.filter(o=>readyNotOut(o,w)).length}};
+  const by={};made.forEach(o=>{if(o.createdBy)by[o.createdBy]=(by[o.createdBy]||0)+1});
+  return {made,shipped,late,unp,unassigned,whs:["wm","wo","wa"].map(wh),by,amt:unp.reduce((s,o)=>s+(+o.amount||0)-(+o.accAmt||0),0)};
+}
+function dailyText(){
+  const d=dailyData(),n=x=>x.toLocaleString("ar-EG"),dt=new Date().toLocaleDateString("ar-EG",{weekday:"long",day:"numeric",month:"long"});
+  const sh=w=>WHN[w].replace("مخزن ","");
+  return ["📋 ملخص زماني – "+dt,
+   "🆕 اتسجّل النهارده: "+n(d.made.length)+" طلب",
+   "🚚 خرج/اتشحن النهارده: "+n(d.shipped.length),
+   "⏰ متأخر: "+n(d.late.length)+(d.late.length?" ("+d.late.slice(0,8).map(o=>"#"+o.num).join("، ")+(d.late.length>8?" …":"")+")":""),
+   "⚠ جاهز ولسه ما خرجش: "+d.whs.map(x=>sh(x.w)+" "+n(x.rdy)).join(" · "),
+   "🏭 شغّال في المخازن: "+d.whs.map(x=>sh(x.w)+" "+n(x.n)+(x.late?" (متأخر "+n(x.late)+")":"")).join(" · "),
+   "💰 غير محصّل: "+n(d.unp.length)+" طلب – "+n(d.amt)+" ج",
+   "📦 فيها أصناف من غير مخزن: "+n(d.unassigned.length)+" طلب",
+   Object.keys(d.by).length?"👩 البنات النهارده: "+Object.entries(d.by).map(([k,v])=>k+" "+n(v)).join(" · "):""].filter(Boolean).join("\n");
+}
+function dailyCard(){
+  const d=dailyData(),bad=(x,c)=>x?`<b style="color:${c||"#b8412f"}">${x}</b>`:`<b style="color:#2f7d5b">0</b>`;
+  const t=dailyText();
+  return `<div class="card" style="border:2px solid var(--pri)"><div class="row"><b>📋 ملخص اليوم</b><span class="x"><button class="b s x" onclick="dailyCopy()">📋 نسخ</button> <button class="b ok x" onclick="dailyWA()">📤 ابعت واتساب</button></span></div>
+  <div class="row" style="margin-top:8px;gap:6px"><span class="tag" style="background:#3d6f8e">🆕 اتسجّل النهارده: ${d.made.length}</span><span class="tag" style="background:#2f7d5b">🚚 خرج النهارده: ${d.shipped.length}</span><span class="tag" style="background:${d.late.length?"#d63b3b":"#2f7d5b"}">⏰ متأخر: ${d.late.length}</span><span class="tag" style="background:${d.whs.some(x=>x.rdy)?"#c97a1a":"#2f7d5b"}">⚠ جاهز ولسه ما خرجش: ${d.whs.reduce((s,x)=>s+x.rdy,0)}</span><span class="tag" style="background:#6f6459">💰 غير محصّل: ${d.unp.length}</span><span class="tag" style="background:#6f6459">📦 من غير مخزن: ${d.unassigned.length}</span></div>
+  <details style="margin-top:8px"><summary class="mut">شوف نص الرسالة</summary><pre style="white-space:pre-wrap;font-family:inherit;margin:6px 0 0">${esc(t)}</pre></details></div>`;
+}
+function dailyCopy(){copyToClip(dailyText()).then(()=>toast("اتنسخ الملخص ✔",true)).catch(()=>toast("مقدرتش أنسخ"))}
+function dailyWA(){window.open("https://wa.me/?text="+encodeURIComponent(dailyText()),"_blank")}
+const copyToClip=t=>navigator.clipboard&&navigator.clipboard.writeText?navigator.clipboard.writeText(t):Promise.reject();
 function dashView(){
   const c=k=>orders.filter(o=>o.stage===k).length;
   const unpaid=orders.filter(o=>o.acct!=="full"&&o.stage!=="cancelled"&&noT(o));
@@ -2497,7 +2556,7 @@ function dashView(){
   const rows=dashRows();
   const tm=orders.reduce((s,o)=>s+mods(o).length,0);
   const wc=k=>orders.filter(o=>!["delivered","cancelled"].includes(o.stage)&&(k?(o.items||[]).some(i=>i.wh===k):(!(o.items||[]).length||(o.items||[]).some(i=>!i.wh)))).length;
-  return searchBar()+`${secNav()}${sO("kpi","📊 المؤشرات")}${alertsCard()}${pipeBar(kp)}<div class="kpis">${kp.map(([k,t,n])=>`<div class="kpi ${filter===k?"on":""}" style="--kc:${kpiCol(k)}" title="اضغط لعرض الطلبات" onclick="kpiGo('${k}')"><b>${n}</b><span>${t}</span></div>`).join("")}</div>
+  return searchBar()+`${secNav()}${sO("kpi","📊 المؤشرات")}${dailyCard()}${alertsCard()}${pipeBar(kp)}<div class="kpis">${kp.map(([k,t,n])=>`<div class="kpi ${filter===k?"on":""}" style="--kc:${kpiCol(k)}" title="اضغط لعرض الطلبات" onclick="kpiGo('${k}')"><b>${n}</b><span>${t}</span></div>`).join("")}</div>
   <div class="card mut">إجمالي التعديلات: <b style="color:var(--tx)">${tm}</b> · من العميل: <b style="color:var(--tx)">${cnt(SRC[0])}</b> · من اللوجيستك: <b style="color:var(--tx)">${cnt(SRC[1])}</b> · أخطاء تيليسيلز: <b style="color:var(--tx)">${cnt(SRC[2])}</b> · غير محصّل: <b style="color:var(--tx)">${unpaid.reduce((s,o)=>s+(o.amount||0)-(o.accAmt||0),0).toLocaleString("ar-EG")}</b></div>
   <div class="card mut">الطلبات الشغالة عند: مخزن مشعل <b style="color:var(--tx);cursor:pointer;text-decoration:underline" onclick="goRep({wh:'wm',ar:'open'})">${wc("wm")}</b> · مخزن أكتوبر <b style="color:var(--tx);cursor:pointer;text-decoration:underline" onclick="goRep({wh:'wo',ar:'open'})">${wc("wo")}</b> · مخزن أبو صير <b style="color:var(--tx);cursor:pointer;text-decoration:underline" onclick="goRep({wh:'wa',ar:'open'})">${wc("wa")}</b> · فيها أصناف لسه مش متوزّعة على مخزن <b style="color:var(--tx);cursor:pointer;text-decoration:underline" onclick="goRep({flag:'unassigned',ar:'open'})">${wc("")}</b></div>
   <div class="card mut">إشارات لم يُؤكَّد الاطلاع عليها: <b style="color:var(--tx)">${orders.reduce((n,o)=>n+pendKeys(o).length,0)}</b>${orders.filter(o=>pendKeys(o).length).map(o=>`<div>#${esc(o.num)}: بانتظار ${pendKeys(o).map(tlabel).join("، ")}</div>`).join("")}</div>
