@@ -290,6 +290,14 @@ input.wa-cb{width:30px;height:30px;min-height:0;flex:0 0 auto;padding:0;min-widt
   #printArea th,#printArea td{border:1px solid #444!important;vertical-align:top}
   #printArea.wide th,#printArea.wide td{font-size:10.5px;padding:3px 4px}
 }
+/* كروت الطلبات المضغوطة (بتتغيّر من 🎨 المظهر ← حجم الكروت) */
+.cmp .oc{padding:10px 12px;margin-bottom:8px}
+.cmp .oc label{margin:6px 0 2px}
+.cmp .oc th,.cmp .oc td{padding:5px 7px}
+.cmp .oc input,.cmp .oc select{padding:6px 9px}
+.cmp .oc .g2{grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px}
+.cmp .oc .tw{max-height:min(60vh,420px);overflow:auto}
+.cmp .oc .tw th{position:sticky;top:0;z-index:2;background:var(--card)}
 </style>
 <script>
 /* المظهر + التثبيت كتطبيق (PWA). بيتنفّذ بدري عشان ما يبانش وميض ألوان. */
@@ -311,6 +319,7 @@ input.wa-cb{width:30px;height:30px;min-height:0;flex:0 0 auto;padding:0;min-widt
   var p=PS[u.col]||PS.oud,c=dark?p.d:p.l,K=["pri","acc","hd","bg","card","inp","bd"];
   K.forEach(function(k){if(c[k])r.style.setProperty("--"+k,c[k]);else r.style.removeProperty("--"+k)});
   if(dark&&c.hd)r.style.setProperty("--sbbg",c.hd);else r.style.removeProperty("--sbbg");
+  r.classList.toggle("cmp",(u.cd||"c")==="c");
   r.style.setProperty("--fs",({s:"13px",m:"14px",l:"16.5px"})[u.fs||"m"]);
   var m=document.querySelector('meta[name="theme-color"]');if(!m){m=document.createElement("meta");m.name="theme-color";document.head.appendChild(m)}m.content=c.hd;
  };
@@ -598,7 +607,7 @@ async function ack(oid,mid){
 const mods=o=>(o.log||[]).filter(l=>l.kind==="mod");
 
 /* ---- الصلاحيات (المدير يتحكم فيها) ---- */
-const APP_VER="2026-10-31b";
+const APP_VER="2026-11-01a";
 let secOpen={};
 let accounts=[],announce=null,newsAll=false,selAcct="";
 const seenGet=k=>{try{return localStorage.getItem(k)||""}catch(e){return ""}};
@@ -1844,7 +1853,7 @@ async function createTransfer(){
 const printBar=()=>can("cprint","log")?`<div class="card"><b>طباعة قوائم التجهيز</b><div class="row" style="margin-top:8px">${Object.entries(WHN).map(([w,n])=>`<button class="b s x" onclick="printWh('${w}','need')">🖨 المطلوب – ${n}</button><button class="b s x" onclick="printWh('${w}','done')">🖨 المجهّز – ${n}</button>`).join("")}</div></div>`:"";
 function logView(){
   const rel=orders.filter(match),act=rel.filter(o=>!isArchived(o,"log")).sort(byPrio),arch=rel.filter(o=>isArchived(o,"log"));
-  const logCard=o=>`<div class="card" style="${can("cdue","log")?lateStyle(o):""}"><div class="row"><div><b>${cT(o,"log")}</b>${isTr(o)?` <span class="tag" style="background:#3d6f8e">أمر نقل داخلي</span> <span class="mut">← ${esc(o.dest||"")}</span>`:""}<div class="mut">${metaLine(o,"log")}</div>${onyxBox(o,"log")}${onyxAlertBox(o,"log")}${nameBox(o,"log")+linkBox(o,"log")}</div><div class="x">${prioTag(o,"log")}${tag(o.stage)} ${mods(o).length?`<span class="mod">${mods(o).length} تعديل</span>`:""} <button class="b s x" onclick="toggleFold('${o.id}')">${fold[o.id]?"◂ فتح":"▾ طي"}</button></div></div>
+  const logCard=o=>`<div class="card oc" style="${can("cdue","log")?lateStyle(o):""}"><div class="row"><div><b>${cT(o,"log")}</b>${isTr(o)?` <span class="tag" style="background:#3d6f8e">أمر نقل داخلي</span> <span class="mut">← ${esc(o.dest||"")}</span>`:""}<div class="mut">${metaLine(o,"log")}</div>${onyxBox(o,"log")}${onyxAlertBox(o,"log")}${nameBox(o,"log")+linkBox(o,"log")}</div><div class="x">${prioTag(o,"log")}${tag(o.stage)} ${mods(o).length?`<span class="mod">${mods(o).length} تعديل</span>`:""} <button class="b s x" onclick="toggleFold('${o.id}')">${fold[o.id]?"◂ فتح":"▾ طي"}</button></div></div>
   <div class="mut">${whTxt(o)}</div>${can("cdue","log")?dueBadge(o)+logBadge(o)+whDueRows(o):""}${can("camt","log")?accBadge(o):""}${holdBanner(o)}${fold[o.id]?foldLine(o,"log"):""}<div ${fold[o.id]?'style="display:none"':""}>${regBanner(o,"log")}${prioBox(o)}<div style="margin-top:4px">${can("cship","log")&&noT(o)?shipBox(o):(o.reg?shipLine(o):"")}${compBanner(o)}${can("cwaybill","log")&&(noT(o)||o.reg)?`<button class="b s x" onclick="printWaybill('${o.id}')">🖨 بوليصة شحن</button>`:""}</div>${!(o.items||[]).length?`<div class="hold">⚠ لسه ما اتسجلتش أصناف للطلب (الصق الأصناف من الإكسيل)</div>`:(o.items||[]).some(i=>!i.wh)?`<div class="hold">⚠ فيه أصناف لسه ما اتحدّدش لها مخزن</div>`:""}${o.stage==="modified"?`<div class="hold" style="color:#8a4fd6">⚠ آخر تعديل: ${esc(mods(o).slice(-1)[0]?.text)}</div>`:""}
   <div class="g2"><div><label>حالة الطلب</label><select onchange="setStage('${o.id}',this.value)">${Object.entries(STAGES).map(([v,s])=>`<option value="${v}" ${o.stage===v?"selected":""}>${s[0]}</option>`).join("")}</select></div>
   <div><label>سبب التوقف</label>${reasonSel("hr-"+o.id,o.holdReason,"setHold('"+o.id+"',this.value)")}</div>
@@ -1995,7 +2004,7 @@ const woPrBtn=(o,wid)=>mineItems(o,wid).length?`<button class="b s x" style="mar
 function woSumCard(o,wid){
   const mi=mineItems(o,wid),rd=mi.filter(z=>+z.i.qty>0&&+z.i.picked>=+z.i.qty).length,pr=prepOf(o,wid),ready=mi.length>0&&rd===mi.length;
   const pt=pr==="full"?"✅ متحضّر بالكامل":pr==="part"?"🟡 متحضّر جزئيًا ("+rd+" من "+mi.length+" بند جاهز)":"⚪ لسه ما اتحضّرش ("+mi.length+" بند)";
-  return `<div class="card" style="${can("cdue",wid)?lateStyleWh(o,wid):""}"><div class="row"><div>${woChk(o,wid)}<b>${cT(o,wid)}</b>${isTr(o)?` <span class="tag" style="background:#3d6f8e">أمر نقل داخلي</span>`:""}<div class="mut">${metaLine(o,wid)}</div>${onyxBox(o,wid)}${linkBox(o,wid)}</div><div class="x">${prioTag(o,wid)}${tag(o.stage)}${woPrBtn(o,wid)}</div></div>${can("cdue",wid)?dueBadgeWh(o,wid):""}<div style="margin-top:6px"><b>${pt}</b></div>${readyBox(o,wid)}${o.noShip?'<div class="hold" style="margin-top:6px">⛔ الشحن متوقف حالياً. كلّم مروان.</div>':""}
+  return `<div class="card oc" style="${can("cdue",wid)?lateStyleWh(o,wid):""}"><div class="row"><div>${woChk(o,wid)}<b>${cT(o,wid)}</b>${isTr(o)?` <span class="tag" style="background:#3d6f8e">أمر نقل داخلي</span>`:""}<div class="mut">${metaLine(o,wid)}</div>${onyxBox(o,wid)}${linkBox(o,wid)}</div><div class="x">${prioTag(o,wid)}${tag(o.stage)}${woPrBtn(o,wid)}</div></div>${can("cdue",wid)?dueBadgeWh(o,wid):""}<div style="margin-top:6px"><b>${pt}</b></div>${readyBox(o,wid)}${o.noShip?'<div class="hold" style="margin-top:6px">⛔ الشحن متوقف حالياً. كلّم مروان.</div>':""}
 </div>`;
 }
 function woReadyList(wid){
@@ -2170,7 +2179,7 @@ function whView(wid){
       <div class="mut">التوزيع: ${esc(byPackTxt(by))}</div>
       <div class="tw"><table>${hdrPack}${G.rows.map(r=>whRow(o,r,done,r.p)).join("")}</table></div></div>`}).join("");
     const others=sp.other.length?`<div class="tw" style="margin-top:8px"><table>${hdrStd}${sp.other.map(z=>whRow(o,z,done,isPk(wid)?null:undefined)).join("")}</table></div>`:"";
-    return `<div class="card" style="${can("cdue",wid)?lateStyleWh(o,wid):""}"><div class="row"><div>${woChk(o,wid)}<b>${cT(o,wid)}</b>${isTr(o)?` <span class="tag" style="background:#3d6f8e">أمر نقل داخلي</span>`:""}<div class="mut">${metaLine(o,wid)}</div>${onyxBox(o,wid)}${nameBox(o,wid)+linkBox(o,wid)}</div><div class="x">${prioTag(o,wid)}${tag(o.stage)}${woPrBtn(o,wid)} <button class="b s x" onclick="toggleFold('${o.id}')">${fold[o.id]?"◂ فتح":"▾ طي"}</button></div></div>${can("cdue",wid)?dueBadgeWh(o,wid):""}${fold[o.id]?foldLine(o,wid):""}${readyBox(o,wid)}${waitBox(o,wid)}${regBanner(o,wid)}<div ${fold[o.id]?'style="display:none"':""}>${isFd(wid)?(o.noShip?'<div class="hold" style="margin-top:6px">⛔ الشحن متوقف حالياً. كلّم مروان.</div>':""):holdBanner(o)}${wid==="wm"?payOkBanner(o)+relBanner(o)+compBanner(o):""}<div style="margin-top:4px">${can("cship",wid)?shipLine(o):""}${wid==="wm"&&can("cwaybill",wid)?`<button class="b s x" onclick="printWaybill('${o.id}')">🖨 بوليصة شحن</button>`:""}</div>
+    return `<div class="card oc" style="${can("cdue",wid)?lateStyleWh(o,wid):""}"><div class="row"><div>${woChk(o,wid)}<b>${cT(o,wid)}</b>${isTr(o)?` <span class="tag" style="background:#3d6f8e">أمر نقل داخلي</span>`:""}<div class="mut">${metaLine(o,wid)}</div>${onyxBox(o,wid)}${nameBox(o,wid)+linkBox(o,wid)}</div><div class="x">${prioTag(o,wid)}${tag(o.stage)}${woPrBtn(o,wid)} <button class="b s x" onclick="toggleFold('${o.id}')">${fold[o.id]?"◂ فتح":"▾ طي"}</button></div></div>${can("cdue",wid)?dueBadgeWh(o,wid):""}${fold[o.id]?foldLine(o,wid):""}${readyBox(o,wid)}${waitBox(o,wid)}${regBanner(o,wid)}<div ${fold[o.id]?'style="display:none"':""}>${isFd(wid)?(o.noShip?'<div class="hold" style="margin-top:6px">⛔ الشحن متوقف حالياً. كلّم مروان.</div>':""):holdBanner(o)}${wid==="wm"?payOkBanner(o)+relBanner(o)+compBanner(o):""}<div style="margin-top:4px">${can("cship",wid)?shipLine(o):""}${wid==="wm"&&can("cwaybill",wid)?`<button class="b s x" onclick="printWaybill('${o.id}')">🖨 بوليصة شحن</button>`:""}</div>
     ${lm&&!(isFd(wid)&&/تحصيل|سداد|الحسابات|دفع/.test(lm.text))&&(can("cship",wid)||/الأصناف|الكميات|تحضير/.test(lm.text))&&!(isFd(wid)&&/بيانات الشحن/.test(lm.text))?`<div class="hold" style="color:#7b5aa6">آخر تعديل: ${esc(lm.text)}</div>`:""}
     <div class="mut" style="margin-top:6px">جاهز ${rd} من ${mi.length} صنف عندك${done?" · <b>تم الشحن</b>"+(sh.ref?" (شحنة "+esc(sh.ref)+")":"")+(sh.driver?" · السائق "+esc(sh.driver)+" · "+esc(sh.car):""):""}</div>
     ${wid==="wm"?prepBox(o)+cartonBox(o):""}
@@ -2291,7 +2300,7 @@ function girlAmount(id){
 function girlCollect(id){const c0=orders.find(x=>x.id===id);if(c0&&teleLocked(c0))return toast("الطلب اتشحن من مشعل، مفيش تعديل");const v=+($("#pc-"+id)?.value)||0;if(!v)return toast("اكتب المبلغ المحصّل");upd(id,o=>{o.collected=v;if(!o.collectedAt)o.collectedAt=Date.now()},"التحصيل: بلّغت "+actor()+" إن العميل دفع "+v)}
 function accView(){
   const all=orders.filter(o=>o.stage!=="cancelled"&&noT(o)&&match(o)),act=all.filter(o=>!(o.acct==="full"||o.release)),arch=all.filter(o=>o.acct==="full"||o.release);
-  const accCard=o=>`<div class="card" style="${can("cdue","acc")?lateStyle(o):""}"><div class="row"><div><b>${cT(o,"acc")}</b><div class="mut">${[can("camt","acc")?"قيمة الطلب "+(o.amount||0)+" · بلّغت البنت تحصيل: "+(o.collected||0)+(o.collected?" ("+diffTxt(o.amount,o.collected).t+")":""):"",can("cgirl","acc")?"البنت: "+esc(o.createdBy):"",can("cphone","acc")?esc(o.phone):""].filter(Boolean).join(" · ")}</div></div><div class="x">${can("camt","acc")?payTag(o):""}</div></div>${onyxAlertBox(o,"acc")}${nameBox(o,"acc")+linkBox(o,"acc")}
+  const accCard=o=>`<div class="card oc" style="${can("cdue","acc")?lateStyle(o):""}"><div class="row"><div><b>${cT(o,"acc")}</b><div class="mut">${[can("camt","acc")?"قيمة الطلب "+(o.amount||0)+" · بلّغت البنت تحصيل: "+(o.collected||0)+(o.collected?" ("+diffTxt(o.amount,o.collected).t+")":""):"",can("cgirl","acc")?"البنت: "+esc(o.createdBy):"",can("cphone","acc")?esc(o.phone):""].filter(Boolean).join(" · ")}</div></div><div class="x">${can("camt","acc")?payTag(o):""}</div></div>${onyxAlertBox(o,"acc")}${nameBox(o,"acc")+linkBox(o,"acc")}
   ${can("cdue","acc")?dueBadge(o):""}${can("camt","acc")?accBadge(o):""}${can("cship","acc")?shipLine(o):""}
   ${holdBanner(o)}
   <div class="row" style="margin-top:8px">${o.acct?"":`<button class="b ok" onclick="accFull('${o.id}')">تأكيد تحصيل كامل</button>`}<input class="wi" id="ap-${o.id}" type="number" placeholder="${o.acct?"تصحيح إجمالي المبلغ المحصّل":"إجمالي المبلغ المحصّل"}" value="${o.acct?esc(o.accAmt):""}" oninput="accDiff('${o.id}')"><button class="b" onclick="accPart('${o.id}')">${o.acct?"حفظ التصحيح":"تأكيد المبلغ المحصّل"}</button>${o.acct?`<button class="b s x" onclick="accReset('${o.id}')">إلغاء تأكيد التحصيل</button>`:""}</div>
@@ -2773,7 +2782,7 @@ uiInstBtn();window.addEventListener("appinstalled",uiInstBtn);
 async function uiInstall(){if(!window._ip)return;window._ip.prompt();try{await window._ip.userChoice}catch(e){}window._ip=null;uiRefresh()}
 function uiRefresh(){
   const el=document.getElementById("uipanel");if(!el)return;if(!uiOpen){el.innerHTML="";return}
-  const u=uiGet(),mode=u.mode||"auto",col=u.col||"oud",fs=u.fs||"m";
+  const u=uiGet(),mode=u.mode||"auto",col=u.col||"oud",fs=u.fs||"m",cd=u.cd||"c";
   const ch=(on,fn,t,dot)=>`<label class="drcb ${on?"on":""}"><input type="checkbox" ${on?"checked":""} onchange="${fn}">${dot?`<i style="width:14px;height:14px;border-radius:50%;background:${dot};display:inline-block;border:1px solid rgba(0,0,0,.25)"></i>`:""}${t}</label>`;
   const grp=(t,h)=>`<div class="drg"><span class="drl">${t}</span>${h}</div>`;
   const standalone=(window.matchMedia&&matchMedia("(display-mode: standalone)").matches)||navigator.standalone,ios=/iphone|ipad|ipod/i.test(navigator.userAgent);
@@ -2782,6 +2791,7 @@ function uiRefresh(){
   ${grp("الوضع",[["auto","تلقائي (زي الجهاز)"],["light","فاتح"],["dark","داكن"]].map(([k,t])=>ch(mode===k,`uiSet('mode','${k}')`,t)).join(""))}
   ${grp("اللون",Object.entries(UIP).map(([k,p])=>ch(col===k,`uiSet('col','${k}')`,p.n,p.l.pri)).join(""))}
   ${grp("حجم الخط",[["s","صغير"],["m","عادي"],["l","كبير"]].map(([k,t])=>ch(fs===k,`uiSet('fs','${k}')`,t)).join(""))}
+  ${grp("حجم الكروت",[["c","مضغوط"],["n","عادي (الشكل القديم)"]].map(([k,t])=>ch(cd===k,`uiSet('cd','${k}')`,t)).join(""))}
   ${grp("التثبيت",inst)}
   <div class="mut" style="margin-top:6px">الاختيارات بتتحفظ على الجهاز ده بس.</div></div>`;
 }
