@@ -598,7 +598,7 @@ async function ack(oid,mid){
 const mods=o=>(o.log||[]).filter(l=>l.kind==="mod");
 
 /* ---- الصلاحيات (المدير يتحكم فيها) ---- */
-const APP_VER="2026-10-31a";
+const APP_VER="2026-10-31b";
 let secOpen={};
 let accounts=[],announce=null,newsAll=false,selAcct="";
 const seenGet=k=>{try{return localStorage.getItem(k)||""}catch(e){return ""}};
@@ -1583,9 +1583,47 @@ function itemsTbl(o,mode){
   const it=o.items||[];
   if(!it.length)return `<div class="mut" style="margin-top:6px">مفيش أصناف مسجّلة للطلب ده</div>`;
   const rd=it.filter(i=>itemSt(i).c==="ok").length;
-  return `<div class="tw" style="margin-top:6px"><div class="mut">جاهز ${rd} من ${it.length} صنف${mode==="log"&&can("sstock")?" · أرصدة: "+stockVis().map(w=>WHN[w].replace("مخزن ","")+" "+(stockDocs[w]?esc(stkAge(stockDocs[w])):"لم يُرفع")).join(" · "):""}</div><table><tr><th>الكود</th><th>اسم الصنف</th><th>الوحدة</th><th>المطلوب</th>${mode==="log"&&can("sstock")?"<th>الأرصدة (سلاش / بدون)</th>":""}<th>المخزن</th><th>المتحضّر</th><th>الحالة</th></tr>${it.map((i,x)=>{const s=itemSt(i),k=o.id+"-"+x;return `<tr style="background:${ROWBG[s.c]}"><td>${esc(i.code||"")}${(()=>{const pk=isPk(i.wh)?packOf(i.code):null;return pk?`<div class="mut">${pk.pack?esc(pk.pack.n):"⚠ عبوة غير معروفة /"+esc(pk.suf)}</div>`:""})()}</td><td>${esc(i.name)}</td><td>${mode==="log"&&(pendWh[k]!==undefined?pendWh[k]:i.wh)&&!isDec({...i,wh:(pendWh[k]!==undefined?pendWh[k]:i.wh)})?`<select style="min-width:90px" onchange="pendUnit['${k}']=this.value">${unitsFor(i).map(u=>`<option ${(pendUnit[k]!==undefined?pendUnit[k]:(i.unit||defU(i)))===u?"selected":""}>${u}</option>`).join("")}</select>`:esc(unitOf(i)||"—")}</td><td><b>${esc(i.qty)}</b></td>
-  ${mode==="log"&&can("sstock")?`<td style="min-width:190px">${stockCell(i)}</td>`:""}<td>${mode==="log"?`<select style="min-width:120px" onchange="pendWh['${k}']=this.value"><option value="">— حدّد —</option>${Object.entries(WHN).map(([v,n])=>`<option value="${v}" ${(pendWh[k]!==undefined?pendWh[k]:i.wh)===v?"selected":""}>${n}</option>`).join("")}</select>`:esc(WHN[i.wh]||"—")}</td>
-  <td><b>${esc(+i.picked||0)}</b></td><td>${esc(s.t)}</td></tr>`}).join("")}</table></div>`;
+  return `<div class="tw" style="margin-top:6px"><div class="mut">جاهز ${rd} من ${it.length} صنف${mode==="log"&&can("sstock")?" · أرصدة: "+stockVis().map(w=>WHN[w].replace("مخزن ","")+" "+(stockDocs[w]?esc(stkAge(stockDocs[w])):"لم يُرفع")).join(" · "):""}</div><table><tr><th>الكود</th><th>اسم الصنف</th><th>الوحدة</th><th>المطلوب</th>${mode==="log"&&can("sstock")?"<th>الأرصدة (سلاش / بدون)</th>":""}<th>المخزن</th><th>المتحضّر</th><th>الحالة</th></tr>${it.map((i,x)=>{const s=itemSt(i),k=o.id+"-"+x;return `<tr style="background:${ROWBG[s.c]}"><td>${esc(i.code||"")}${(()=>{const pk=isPk(i.wh)?packOf(i.code):null;return pk?`<div class="mut">${pk.pack?esc(pk.pack.n):"⚠ عبوة غير معروفة /"+esc(pk.suf)}</div>`:""})()}</td><td>${esc(i.name)}${i.split?`<div class="mut">✂ جزء من إجمالي ${esc(i.split.total)}</div>`:""}</td><td>${mode==="log"&&(pendWh[k]!==undefined?pendWh[k]:i.wh)&&!isDec({...i,wh:(pendWh[k]!==undefined?pendWh[k]:i.wh)})?`<select style="min-width:90px" onchange="pendUnit['${k}']=this.value">${unitsFor(i).map(u=>`<option ${(pendUnit[k]!==undefined?pendUnit[k]:(i.unit||defU(i)))===u?"selected":""}>${u}</option>`).join("")}</select>`:esc(unitOf(i)||"—")}</td><td><b>${esc(i.qty)}</b></td>
+  ${mode==="log"&&can("sstock")?`<td style="min-width:190px">${stockCell(i)}</td>`:""}<td>${mode==="log"?`<select style="min-width:120px" onchange="pendWh['${k}']=this.value"><option value="">— حدّد —</option>${Object.entries(WHN).map(([v,n])=>`<option value="${v}" ${(pendWh[k]!==undefined?pendWh[k]:i.wh)===v?"selected":""}>${n}</option>`).join("")}</select>${i.split?`<button class="b s x" style="margin-top:4px" onclick="mergeSplit('${o.id}',${x})">↩ دمج الأجزاء</button>`:(+i.qty>1?`<button class="b s x" style="margin-top:4px" onclick="splitOpen['${k}']=!splitOpen['${k}'];render()">✂ تقسيم على مخزنين</button>`:"")}`:esc(WHN[i.wh]||"—")}</td>
+  <td><b>${esc(+i.picked||0)}</b></td><td>${esc(s.t)}</td></tr>${mode==="log"&&splitOpen[k]&&!i.split?splitPanel(o,x,i,k):""}`}).join("")}</table></div>`;
+}
+let splitOpen={};
+function splitPanel(o,x,i,k){
+  const opt=(sel)=>`<option value="">— اختار —</option>`+Object.entries(WHN).map(([v,n])=>`<option value="${v}" ${sel===v?"selected":""}>${n}</option>`).join("");
+  return `<tr><td colspan="9" style="background:rgba(61,111,142,.10)"><b>✂ تقسيم ${esc(i.name)} – الكمية ${esc(i.qty)}</b>
+  <div class="row" style="margin-top:6px;align-items:end"><div><label>المخزن الأول</label><select id="sp1-${k}">${opt(i.wh||"wo")}</select></div><div><label>كميته</label><input id="sq-${k}" inputmode="decimal" style="width:90px" oninput="spRest('${k}',${+i.qty})"></div><div><label>المخزن التاني (الباقي)</label><select id="sp2-${k}">${opt(i.wh==="wa"?"wo":"wa")}</select></div><div><label>الباقي</label><b id="sr-${k}">${esc(i.qty)}</b></div></div>
+  <div class="row" style="margin-top:6px"><button class="b ok x" onclick="doSplit('${o.id}',${x})">✂ تقسيم</button><button class="b s x" onclick="delete splitOpen['${k}'];render()">إلغاء</button></div></td></tr>`;
+}
+function spRest(k,q){const v=+ar2en($("#sq-"+k)?.value||"").replace(",","."),e=$("#sr-"+k);if(e)e.textContent=(v>0&&v<q)?String(Math.round((q-v)*1e6)/1e6):"—"}
+function doSplit(oid,x){
+  const cur=orders.find(z=>z.id===oid);if(!cur||!needName())return;
+  if(!PRIO[cur.prio])return toast("⚠ حدد «أولوية تجهيز الطلب» الأول (إلزامي قبل التوزيع على المخازن)");
+  const it=cur.items[x];if(!it)return;const k=oid+"-"+x,q=+it.qty;
+  if((+it.picked||0)>0)return toast("الصنف ده اتحضّر منه جزء، مينفعش يتقسم");
+  if(it.wh&&((cur.ship||{})[it.wh]||{}).done)return toast("المخزن شحن الصنف ده بالفعل");
+  const a=$("#sp1-"+k)?.value||"",b=$("#sp2-"+k)?.value||"",q1=+ar2en($("#sq-"+k)?.value||"").replace(",",".");
+  if(!a||!b)return toast("اختار المخزنين");if(a===b)return toast("اختار مخزنين مختلفين");
+  if(!(q1>0&&q1<q))return toast("الكمية الأولى لازم تكون أكبر من صفر وأقل من "+q);
+  const q2=Math.round((q-q1)*1e6)/1e6,u=it.unit||defU(it);
+  Object.keys(pendWh).concat(Object.keys(pendUnit),Object.keys(pendPick),Object.keys(pendReason)).forEach(z=>{if(z.indexOf(oid+"-")===0){delete pendWh[z];delete pendUnit[z];delete pendPick[z];delete pendReason[z]}});
+  delete splitOpen[k];
+  upd(oid,o=>{o.ship=o.ship||{};const t=o.items[x],mk=(w,qy)=>{const r={...t,qty:qy,wh:w,picked:0,reason:"",split:{total:q}};if(!isDec({...r}))r.unit=u;else delete r.unit;return r};
+    o.items.splice(x,1,mk(a,q1),mk(b,q2));
+    [a,b].forEach(w=>{if(isFd(w)){o.sentAt=o.sentAt||{};if(!o.sentAt[w])o.sentAt[w]=Date.now()}if(o.ship[w])o.ship[w].done=false});
+    if(o.sentAt)PACKWH.forEach(w=>{if(!o.items.some(i=>i.wh===w)){delete o.sentAt[w];if(w==="wo")delete o.woAck}});recalc(o)},
+    "تقسيم صنف: "+it.name+" ("+q+") ← "+WHN[a]+" "+q1+" + "+WHN[b]+" "+q2);
+}
+function mergeSplit(oid,x){
+  const cur=orders.find(z=>z.id===oid);if(!cur||!needName())return;
+  const it=cur.items[x],sib=(cur.items||[]).map((i,n)=>({i,n})).filter(z=>z.i.split&&z.i.code===it.code&&z.i.name===it.name);
+  if(sib.some(z=>(+z.i.picked||0)>0))return toast("فيه تحضير على أحد الأجزاء، مينفعش يتدمج");
+  if(sib.some(z=>z.i.wh&&((cur.ship||{})[z.i.wh]||{}).done))return toast("أحد المخازن شحن جزءه بالفعل");
+  if(!confirm("دمج أجزاء الصنف "+it.name+" في صنف واحد وإرجاعه من غير مخزن؟"))return;
+  Object.keys(pendWh).concat(Object.keys(pendUnit),Object.keys(pendPick),Object.keys(pendReason)).forEach(z=>{if(z.indexOf(oid+"-")===0){delete pendWh[z];delete pendUnit[z];delete pendPick[z];delete pendReason[z]}});
+  const idx=sib.map(z=>z.n),tot=sib.reduce((t,z)=>t+(+z.i.qty||0),0);
+  upd(oid,o=>{const f=o.items[idx[0]],m={...f,qty:Math.round(tot*1e6)/1e6,wh:"",picked:0,reason:""};delete m.split;o.items=o.items.filter((_,n)=>!idx.includes(n));o.items.splice(idx[0],0,m);
+    if(o.sentAt)PACKWH.forEach(w=>{if(!o.items.some(i=>i.wh===w)){delete o.sentAt[w];if(w==="wo")delete o.woAck}});recalc(o)},
+    "دمج أجزاء صنف: "+it.name+" ("+tot+")");
 }
 function itemsBox(o){
   if(editItems!==o.id){
@@ -1612,12 +1650,16 @@ function saveWh(oid){
 function buildNext(prev,rows){
   const keyOf=i=>i.code?"c:"+i.code:"n:"+i.name;
   const merged=[];rows.forEach(r=>{const m=merged.find(x=>keyOf(x)===keyOf(r)&&x.name===r.name);if(m)m.qty+=r.qty;else merged.push({name:r.name,code:r.code||"",qty:r.qty,unit:r.unit||""})});
-  const pm={};prev.forEach(p=>pm[keyOf(p)]=p);
-  const next=merged.map(i=>{const p=pm[keyOf(i)];let un=i.unit||(p&&p.unit)||"";if(isP(i.code)&&!["عبوة","جرام"].includes(un))un="عبوة";return {name:i.name,code:i.code,qty:i.qty,wh:p?p.wh||"":"",...(un?{unit:un}:{}),picked:p?(+p.picked||0):0,reason:p?p.reason||"":""}});
+  const pm={},xr=new Set();prev.forEach(p=>pm[keyOf(p)]=p);
+  const next=merged.flatMap(i=>{let p=pm[keyOf(i)];
+    const ps=prev.filter(q=>keyOf(q)===keyOf(i)&&q.name===i.name);
+    if(ps.length>1){if(Math.round(ps.reduce((t,q)=>t+(+q.qty||0),0)*1e6)===Math.round(+i.qty*1e6))return ps.map(q=>({...q}));ps.forEach(q=>q.wh&&xr.add(q.wh));p=null}
+    return [(()=>{let un=i.unit||(p&&p.unit)||"";if(isP(i.code)&&!["عبوة","جرام"].includes(un))un="عبوة";return {name:i.name,code:i.code,qty:i.qty,wh:p?p.wh||"":"",...(un?{unit:un}:{}),picked:p?(+p.picked||0):0,reason:p?p.reason||"":""}})()]});
   const sig=l=>JSON.stringify(l.map(i=>[i.name,i.code||"",+i.qty,unitFill(i)]));
   const same=prev.length>0&&sig(prev)===sig(next),reset=new Set();
-  next.forEach(i=>{const p=pm[keyOf(i)];if((!p||+p.qty!==+i.qty)&&i.wh)reset.add(i.wh)});
+  next.forEach(i=>{const p=pm[keyOf(i)];if(!i.split&&(!p||+p.qty!==+i.qty)&&i.wh)reset.add(i.wh)});
   prev.forEach(p=>{if(p.wh&&!next.some(n=>keyOf(n)===keyOf(p)))reset.add(p.wh)});
+  xr.forEach(w=>reset.add(w));
   return {next,same,reset};
 }
 async function commitItems(id,rows,quiet){
@@ -1826,7 +1868,7 @@ const mineItems=(o,wid)=>(wid==="wo"&&role==="wo"&&!owner&&woPend(o))?[]:(o.item
 function whRow(o,z,done,p){
   const i=z.i,k=o.id+"-"+z.x,pv=pendPick[k]!==undefined?pendPick[k]:(+i.picked||0),pr=pendReason[k]!==undefined?pendReason[k]:(i.reason||""),s=itemSt({...i,picked:+pv||0,reason:pr});
   const pk=packOf(i.code),raw=isPk(i.wh)&&!pk;
-  const cd=raw?`<b class="craw">${esc(i.code||"")}</b>`:esc(i.code||""),nm=raw?`<b class="craw">${esc(i.name)}</b>`:esc(i.name);
+  const cd=raw?`<b class="craw">${esc(i.code||"")}</b>`:esc(i.code||""),nm=(raw?`<b class="craw">${esc(i.name)}</b>`:esc(i.name))+(i.split?`<div class="mut">✂ جزء من إجمالي ${esc(i.split.total)}</div>`:"");
   const warn=p===null&&pk&&!pk.pack?`<div class="hold">⚠ عبوة غير معروفة /${esc(pk.suf)}</div>`:"";
   const first=p?`<td>${cd}</td><td>${nm}</td><td>${esc(p.pack.n)}</td><td><b>${esc(i.qty)}</b></td><td>${fmtW((+i.qty||0)*p.pack.g)}</td>`:`<td>${cd}${warn}</td><td>${nm}</td><td>${esc(i.unit||"—")}</td><td><b>${esc(i.qty)}</b></td>`;
   const full=(+i.qty>0)&&(+pv>=+i.qty);
