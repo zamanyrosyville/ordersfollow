@@ -296,6 +296,19 @@ input.wa-cb{width:30px;height:30px;min-height:0;flex:0 0 auto;padding:0;min-widt
 .cmp .oc th,.cmp .oc td{padding:5px 7px}
 .cmp .oc input,.cmp .oc select{padding:6px 9px}
 .cmp .oc .g2{grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px}
+.cmp .oc{line-height:1.4}
+.cmp .oc .mut{line-height:1.35}
+.cmp .oc td select,.cmp .oc td input{padding:3px 6px}
+.cmp .oc button.b.x{min-height:30px;padding:4px 10px}
+.cmp .oc .stk{display:flex;flex-wrap:wrap;gap:0 10px}
+.cmp .oc .whc{display:flex;flex-wrap:wrap;gap:4px;align-items:center}
+.cmp .oc .whc button{margin-top:0!important}
+.cmp .oc .whc select{width:auto;flex:1 1 110px;min-width:110px}
+.cmp .oc .whc button{flex:0 0 auto;white-space:nowrap}
+.cmp .oc .ib{display:inline-block;vertical-align:top;margin:2px 0 2px 14px!important}
+.cmp .oc .prbox{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:4px 8px;margin:4px 0}
+.cmp .oc .prbox label{margin:0;flex:1 1 220px}
+.cmp .oc .prbox select{flex:2 1 260px;width:auto}
 .cmp .oc .tw{max-height:min(60vh,420px);overflow:auto}
 .cmp .oc .tw th{position:sticky;top:0;z-index:2;background:var(--card)}
 </style>
@@ -607,7 +620,7 @@ async function ack(oid,mid){
 const mods=o=>(o.log||[]).filter(l=>l.kind==="mod");
 
 /* ---- الصلاحيات (المدير يتحكم فيها) ---- */
-const APP_VER="2026-11-01a";
+const APP_VER="2026-11-01b";
 let secOpen={};
 let accounts=[],announce=null,newsAll=false,selAcct="";
 const seenGet=k=>{try{return localStorage.getItem(k)||""}catch(e){return ""}};
@@ -754,7 +767,7 @@ const cT=(o,scr)=>"#<bdi dir=\"ltr\">"+esc(dnum(o,scr))+"</bdi>"+(can("cname",sc
 const nameBox=(o,scr)=>{
   if(isTr(o)||!can("ename",owner?"log":scr)||!can("cname",owner?"log":scr))return "";
   if(scr==="tele"&&!owner&&o.createdBy!==who)return "";
-  return `<details style="margin-top:6px"><summary class="mut">✏ تعديل اسم العميل</summary><div class="row" style="margin-top:6px;gap:6px"><input class="wi" id="en-${o.id}" maxlength="80" style="max-width:240px" value="${esc(o.customer||"")}"><button class="b s" onclick="saveName('${o.id}','${scr}')">حفظ الاسم</button></div></details>`;
+  return `<details class="ib" style="margin-top:6px"><summary class="mut">✏ تعديل اسم العميل</summary><div class="row" style="margin-top:6px;gap:6px"><input class="wi" id="en-${o.id}" maxlength="80" style="max-width:240px" value="${esc(o.customer||"")}"><button class="b s" onclick="saveName('${o.id}','${scr}')">حفظ الاسم</button></div></details>`;
 };
 async function saveName(id,scr){
   if(!needName())return;
@@ -974,7 +987,7 @@ function linkBox(o,scr){
         return `<div class="row" style="margin-top:4px;gap:6px"><a href="#" onclick="openLinked('${x.id}');return false" style="font-weight:700">#<bdi dir="ltr">${esc(dnum(x,sc))}</bdi></a><span class="tag" style="background:${STAGES[x.stage][1]}">${STAGES[x.stage][0]}</span><span class="mut">${esc([pt,pay].filter(Boolean).join(" · "))}</span>`+
           (canL?`<button class="b s" style="margin-inline-start:auto" onclick="unlinkOrd('${o.id}','${x.id}','${scr}')">فك الربط</button>`:"")+`</div>`}).join("")+`</div>`;
   }
-  if(canL)h+=`<details style="margin-top:6px"><summary class="mut">🔗 ربط بطلب تاني لنفس العميل</summary><div class="row" style="margin-top:6px;gap:6px"><input class="wi" id="lk-${o.id}" style="max-width:200px" placeholder="رقم الطلب التاني (أو رقم/كود)"><button class="b s" onclick="linkOrd('${o.id}','${scr}')">ربط</button></div></details>`;
+  if(canL)h+=`<details class="ib" style="margin-top:6px"><summary class="mut">🔗 ربط بطلب تاني لنفس العميل</summary><div class="row" style="margin-top:6px;gap:6px"><input class="wi" id="lk-${o.id}" style="max-width:200px" placeholder="رقم الطلب التاني (أو رقم/كود)"><button class="b s" onclick="linkOrd('${o.id}','${scr}')">ربط</button></div></details>`;
   return h;
 }
 function openLinked(id){const x=orders.find(z=>z.id===id);if(!x)return;qNum=String(x.num);qGirl="";render();window.scrollTo(0,0)}
@@ -1593,7 +1606,7 @@ function itemsTbl(o,mode){
   if(!it.length)return `<div class="mut" style="margin-top:6px">مفيش أصناف مسجّلة للطلب ده</div>`;
   const rd=it.filter(i=>itemSt(i).c==="ok").length;
   return `<div class="tw" style="margin-top:6px"><div class="mut">جاهز ${rd} من ${it.length} صنف${mode==="log"&&can("sstock")?" · أرصدة: "+stockVis().map(w=>WHN[w].replace("مخزن ","")+" "+(stockDocs[w]?esc(stkAge(stockDocs[w])):"لم يُرفع")).join(" · "):""}</div><table><tr><th>الكود</th><th>اسم الصنف</th><th>الوحدة</th><th>المطلوب</th>${mode==="log"&&can("sstock")?"<th>الأرصدة (سلاش / بدون)</th>":""}<th>المخزن</th><th>المتحضّر</th><th>الحالة</th></tr>${it.map((i,x)=>{const s=itemSt(i),k=o.id+"-"+x;return `<tr style="background:${ROWBG[s.c]}"><td>${esc(i.code||"")}${(()=>{const pk=isPk(i.wh)?packOf(i.code):null;return pk?`<div class="mut">${pk.pack?esc(pk.pack.n):"⚠ عبوة غير معروفة /"+esc(pk.suf)}</div>`:""})()}</td><td>${esc(i.name)}${i.split?`<div class="mut">✂ جزء من إجمالي ${esc(i.split.total)}</div>`:""}</td><td>${mode==="log"&&(pendWh[k]!==undefined?pendWh[k]:i.wh)&&!isDec({...i,wh:(pendWh[k]!==undefined?pendWh[k]:i.wh)})?`<select style="min-width:90px" onchange="pendUnit['${k}']=this.value">${unitsFor(i).map(u=>`<option ${(pendUnit[k]!==undefined?pendUnit[k]:(i.unit||defU(i)))===u?"selected":""}>${u}</option>`).join("")}</select>`:esc(unitOf(i)||"—")}</td><td><b>${esc(i.qty)}</b></td>
-  ${mode==="log"&&can("sstock")?`<td style="min-width:190px">${stockCell(i)}</td>`:""}<td>${mode==="log"?`<select style="min-width:120px" onchange="pendWh['${k}']=this.value"><option value="">— حدّد —</option>${Object.entries(WHN).map(([v,n])=>`<option value="${v}" ${(pendWh[k]!==undefined?pendWh[k]:i.wh)===v?"selected":""}>${n}</option>`).join("")}</select>${i.split?`<button class="b s x" style="margin-top:4px" onclick="mergeSplit('${o.id}',${x})">↩ دمج الأجزاء</button>`:(+i.qty>1?`<button class="b s x" style="margin-top:4px" onclick="splitOpen['${k}']=!splitOpen['${k}'];render()">✂ تقسيم على مخزنين</button>`:"")}`:esc(WHN[i.wh]||"—")}</td>
+  ${mode==="log"&&can("sstock")?`<td style="min-width:190px"><div class="stk">${stockCell(i)}</div></td>`:""}<td>${mode==="log"?`<div class="whc"><select style="min-width:120px" onchange="pendWh['${k}']=this.value"><option value="">— حدّد —</option>${Object.entries(WHN).map(([v,n])=>`<option value="${v}" ${(pendWh[k]!==undefined?pendWh[k]:i.wh)===v?"selected":""}>${n}</option>`).join("")}</select>${i.split?`<button class="b s x" style="margin-top:4px" onclick="mergeSplit('${o.id}',${x})">↩ دمج الأجزاء</button>`:(+i.qty>1?`<button class="b s x" style="margin-top:4px" onclick="splitOpen['${k}']=!splitOpen['${k}'];render()" title="تقسيم الكمية على مخزنين">✂ تقسيم</button>`:"")}</div>`:esc(WHN[i.wh]||"—")}</td>
   <td><b>${esc(+i.picked||0)}</b></td><td>${esc(s.t)}</td></tr>${mode==="log"&&splitOpen[k]&&!i.split?splitPanel(o,x,i,k):""}`}).join("")}</table></div>`;
 }
 let splitOpen={};
